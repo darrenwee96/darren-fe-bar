@@ -50,9 +50,12 @@ export function OrderQueue({
   revision,
   onOpen,
   onChanged,
+  noScope = false,
 }: {
   filters: ScopeFilters;
   revision: number;
+  /** The caller has no planning scope: explain that instead of "nothing to decide". */
+  noScope?: boolean;
   onOpen: (id: string) => void;
   onChanged: () => void;
 }) {
@@ -324,11 +327,19 @@ export function OrderQueue({
       {data && rows.length === 0 && !error && (
         <Empty className="py-12">
           <EmptyHeader>
-            <EmptyTitle>{view === 'PENDING' ? 'Nothing left to decide here' : 'No lines match'}</EmptyTitle>
+            <EmptyTitle>
+              {noScope
+                ? 'No stores in your scope'
+                : view === 'PENDING'
+                  ? 'Nothing left to decide here'
+                  : 'No lines match'}
+            </EmptyTitle>
             <EmptyDescription>
-              {view === 'PENDING'
-                ? 'Every order line in this scope has a decision. Switch to Decided to review them, or widen the filters.'
-                : 'Clear a filter or the search to see more store-SKUs.'}
+              {noScope
+                ? 'Order lines appear once a region or store is assigned to you.'
+                : view === 'PENDING'
+                  ? 'Every order line in this scope has a decision. Switch to Decided to review them, or widen the filters.'
+                  : 'Clear a filter or the search to see more store-SKUs.'}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

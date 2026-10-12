@@ -23,7 +23,9 @@ export function StoreNeedPanel({
   filters,
   revision,
   onSelect,
+  noScope = false,
 }: {
+  noScope?: boolean;
   filters: ScopeFilters;
   revision: number;
   onSelect: (locationId: string | undefined) => void;
@@ -73,8 +75,12 @@ export function StoreNeedPanel({
       {data && rows.length === 0 && !error && (
         <Empty className="py-8">
           <EmptyHeader>
-            <EmptyTitle>No stores need an order</EmptyTitle>
-            <EmptyDescription>Stock + inbound covers demand for every store in this selection.</EmptyDescription>
+            <EmptyTitle>{noScope ? 'No stores in your scope' : 'No stores need an order'}</EmptyTitle>
+            <EmptyDescription>
+              {noScope
+                ? 'Stores appear once a region or store is assigned to you.'
+                : 'Stock + inbound covers demand for every store in this selection.'}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}

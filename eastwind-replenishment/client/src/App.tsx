@@ -130,10 +130,21 @@ function ControlPanel() {
             */}
             <div className="@container">
               <div className="grid grid-cols-1 items-start gap-4 @min-[1560px]:grid-cols-[minmax(0,1fr)_400px]">
-                <OrderQueue filters={filters} revision={revision} onOpen={setSelected} onChanged={refresh} />
+                <OrderQueue
+                  noScope={noScope}
+                  filters={filters}
+                  revision={revision}
+                  onOpen={setSelected}
+                  onChanged={refresh}
+                />
                 <div className="order-first grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[1560px]:order-none @min-[1560px]:grid-cols-1">
                   <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
-                  <StoreNeedPanel filters={filters} revision={revision} onSelect={(id) => setFilter('location', id)} />
+                  <StoreNeedPanel
+                    noScope={noScope}
+                    filters={filters}
+                    revision={revision}
+                    onSelect={(id) => setFilter('location', id)}
+                  />
                 </div>
               </div>
             </div>

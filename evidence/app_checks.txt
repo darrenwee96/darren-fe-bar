@@ -114,3 +114,85 @@ Browser check of the DEPLOYED app (headless Chrome, 1920x1080 / 1440x1000, light
   Note: WMAPE tile now reads 25.0% vs 44.6% because a newer backtest run (written by the parallel forecasting change) is the latest.
 Screenshots: _generated/screens/control-panel-overview-light.png, control-panel-full-light.png, control-panel-genie.png,
   control-panel-store-drilldown.png, control-panel-order-sheet.png, control-panel-dark-filtered.png
+
+=== Review fixes 2026-10-12: verified identity, fail-closed scope ===
+Identity (server/routes/identity.ts): x-forwarded-email / x-forwarded-user are no longer trusted on their own (AppKit's
+  getCurrentUserId also just reads x-forwarded-user). Every /api route verifies the forwarded user OAuth token
+  (x-forwarded-access-token) with SCIM /api/2.0/preview/scim/v2/Me; the workspace's userName is the identity used for
+  scope and decided_by (cached 5 min per token hash). No verifiable identity -> 401. Local dev only: DEV_USER_EMAIL.
+  Effective user API scopes on the app: dashboards.genie, iam.access-control:read, iam.current-user:read.
+Scope (fail-closed): unmapped users get an empty scope (no order lines, 403 on decisions); region='*' is the explicit
+  network-wide grant. Startup seed (idempotent, ON CONFLICT DO NOTHING on a unique grant index):
+  '*' for REPLENISHMENT_ANALYSTS (app.yaml: darren.wee@databricks.com), north.manager@eastwind.example -> North,
+  daan3.manager@eastwind.example -> L0022. REPLENISHMENT_SCOPE_MODE removed.
+forecast_vs_actual: loc / sku dimensions are one row per key (max_by latest attribute) instead of SELECT DISTINCT;
+  same totals as before (all stores, forecast weeks unchanged).
+Gates: npm run typecheck OK · npm run lint OK · npm run build OK · npx vitest run:
+   Test Files  1 passed (1)
+        Tests  20 passed (20)
+  (20 test cases in server/routes/replenishment-routes.test.ts; new: 401 no token, 401 rejected token, spoofed header
+   ignored + decision attributed to verified user, token cache, dev identity, SCIM verifier, unmapped user 403 / empty
+   scope, explicit '*' grant, seed rows)
+  databricks apps validate --profile fe-bar:
+    Validating project...
+    ⏭️  Skipped Installing dependencies
+    ✅ Generating types (0.6s)
+    ✅ Running AST-grep lint (0.4s)
+    ✅ Type checking (2.4s)
+    ✅ Building (4.6s)
+    ✅ Running tests (0.7s)
+    ✅ All validation checks passed (8.7s)
+Deploy (bundle target default, profile fe-bar):
+  Files: 7 uploaded, 0 deleted
+  Resources: 0 created, 0 changed, 0 deleted, 1 unchanged
+  ✓ App started successfully
+  You can access the app at https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+  RUNNING ACTIVE 01f1c5ed2922102bb8b5b1992435d9c9
+App startup log:
+  2026-10-12T03:24:23Z [APP] [replenishment] Schema replenishment is ready
+  2026-10-12T03:24:23Z [APP] [replenishment] Planner scope seed applied
+  2026-10-12T03:24:23Z [APP] [appkit:server] Server running on http://0.0.0.0:8000
+Deployed API checks (OAuth bearer, darren.wee@databricks.com; none of these write):
+  GET /api/whoami (signed in as the app owner):
+  {"email":"darren.wee@databricks.com","executesAs":"app service principal; identity verified from your forwarded token, decisions attributed to you","scope":{"restricted":false,"regions":[],"locations":[]}}  -> HTTP 200
+  GET /api/whoami with spoofed x-forwarded-email/x-forwarded-user headers:
+  {"email":"darren.wee@databricks.com","executesAs":"app service principal; identity verified from your forwarded token, decisions attributed to you","scope":{"restricted":false,"regions":[],"locations":[]}}  -> HTTP 200
+  GET /api/recommendations/summary (owner, '*' grant):
+    lines_to_order 1595 peak_needs_order 441 pending 1592
+  POST adjust without reason:
+  {"error":"An adjusted order needs the new quantity and a reason"}  -> HTTP 400
+  POST stale expectedVersion:
+  {"error":"Someone else changed this order. Reload to see the latest decision.","currentVersion":1}  -> HTTP 409
+  Unauthenticated GET /api/whoami (no session):
+    -> HTTP 401
+Scope against the real replenishment.user_scope table (local dev identities, same Lakebase; POSTs use a stale version so
+nothing is written):
+  == DEV_USER_EMAIL=north.manager@eastwind.example
+    whoami north.manager@eastwind.example {'restricted': True, 'regions': ['North'], 'locations': []}
+    summary store_skus 782 lines_to_order 559
+    list ?region=South total 0
+    list regions/stores on page ['North'] 23 total 581
+    POST decision on L0022 rec -> HTTP 403
+  == DEV_USER_EMAIL=daan3.manager@eastwind.example
+    whoami daan3.manager@eastwind.example {'restricted': True, 'regions': [], 'locations': ['L0022']}
+    summary store_skus 31 lines_to_order 26
+    list ?region=South total 0
+    list regions/stores on page ['Central'] 1 total 26
+    POST decision on L0022 rec -> HTTP 409
+  == DEV_USER_EMAIL=stranger@eastwind.example
+    whoami stranger@eastwind.example {'restricted': True, 'regions': [], 'locations': []}
+    summary store_skus 0 lines_to_order 0
+    list ?region=South total 0
+    list regions/stores on page [] 0 total 0
+    POST decision on L0022 rec -> HTTP 403
+Browser sanity check, deployed app, demo user (headless Chrome 1920x1080):
+  user badge: darren.wee@databricks.com
+  no-scope notice shown: 0
+  queue: 1,668 lines needing attention · by order need, then sales lost if not ordered
+  accept buttons on page: 25
+  console errors: []
+  Unmapped user (local, stranger@eastwind.example): "No planning scope assigned" notice, 0 lines, store list empty.
+  Note: recommendation counts changed (1,595 lines to order) because the parallel forecasting change reloaded
+  serving.recommendations.
+Screenshots: _generated/screens/control-panel-overview-light.png (refreshed), control-panel-no-scope.png (new),
+  control-panel-genie.png (refreshed)
