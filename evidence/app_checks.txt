@@ -196,3 +196,26 @@ Browser sanity check, deployed app, demo user (headless Chrome 1920x1080):
   serving.recommendations.
 Screenshots: _generated/screens/control-panel-overview-light.png (refreshed), control-panel-no-scope.png (new),
   control-panel-genie.png (refreshed)
+
+=== Layout fix 2026-10-12: charts keep their aspect ratio ===
+Bug (user report): at wide widths with Genie closed, the forecast chart and the store ranking were squeezed side by side
+  into a 400px column next to the queue (two container-query rules matched; the wrong one won the cascade).
+Fix: charts share a full-width row (3:2) when the workspace is >= 1400px, else stack; the queue spans the full width
+  below. Forecast chart height follows its width (2:1 or wider, 280-440px). KPI tiles share one mini split-bar and a
+  one-line source footer, so all five tiles are the same height.
+Gates: typecheck OK · lint OK · build OK · vitest:      Tests  20 passed (20) · databricks apps validate --profile fe-bar: ✅ All validation checks passed (9.1s)
+Deploy:
+  Files: 8 uploaded, 0 deleted
+  Resources: 0 created, 0 changed, 0 deleted, 1 unchanged
+  ✓ App started successfully
+  You can access the app at https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+  RUNNING ACTIVE 01f1c5ef1f35140288305ea8d53d527d
+Deployed app, headless Chrome (demo user):
+  1920px light genie=false: chart 1072x440 (2.44:1) · tile heights 238 · h-overflow false
+  1920px light genie=true: chart 808x404 (2.00:1) · tile heights 238 · h-overflow false
+  1440px dark genie=false: chart 1350x440 (3.07:1) · tile heights 238 · h-overflow false
+  2560px light genie=false: chart 1456x440 (3.31:1) · tile heights 238 · h-overflow false
+  console errors: []
+Local sweep (same build): forecast chart 2.0-3.3:1 at 1280/1440/1600/1920/2560px with and without the Genie dock,
+  at most 25px of slack under the chart, equal tile heights, no horizontal overflow.
+Screenshots: _generated/screens/control-panel-1920-light.png, control-panel-1920-genie.png, control-panel-1440-dark.png
