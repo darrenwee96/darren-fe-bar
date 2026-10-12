@@ -22,6 +22,7 @@ import {
   useAnalyticsQuery,
 } from '@databricks/appkit-ui/react';
 import { sql } from '@databricks/appkit-ui/js';
+import { Check, Gift, History, PencilLine, Store, X } from 'lucide-react';
 import {
   ApiError,
   fetchRecommendation,
@@ -31,75 +32,102 @@ import {
   type RecommendationDetail,
 } from '../lib/api';
 import { formatDate, formatDateTime, formatInt, formatUsd, titleCase, toNumber } from '../lib/format';
-import { RiskBadge, StatusBadge } from './RiskBadge';
-import { ScenarioChart } from './ScenarioChart';
+import { STOCK_STATUS } from '../lib/risk';
 import { useNumeric } from '../lib/useNumeric';
+import { ScenarioChart } from './ScenarioChart';
+import { DecisionBadge, ExpiryBadge, StockStatusBadge } from './StatusBadges';
 
 interface Props {
   recommendationId: string | null;
   onClose: () => void;
   onSaved: () => void;
+  /** Drill the whole control panel down to this store. */
+  onFocusStore: (locationId: string) => void;
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium tabular-nums text-foreground">{value}</p>
+    <div className="rounded-lg bg-muted/50 px-3 py-2" title={hint}>
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
 
-function ForecastTable({
-  parameters,
-}: {
-  parameters: { location_id: ReturnType<typeof sql.string>; sku_id: ReturnType<typeof sql.string> };
-}) {
-  const { data, loading, error } = useAnalyticsQuery('sku_forecast', parameters);
-  if (loading) return <Skeleton className="h-32 w-full" />;
-  if (error) return <p className="text-sm text-destructive">Could not load the forecast: {error}</p>;
-  if (!data || data.length === 0)
-    return <p className="text-sm text-muted-foreground">No forecast for this store-SKU.</p>;
+/** Weekly units for one store-SKU (actual, latest-run forecast with p90 band, last year) and the forecast table. */
+function SkuForecast({ locationId, skuId }: { locationId: string; skuId: string }) {
+  const params = useMemo(
+    () => ({
+      region: sql.string('ALL'),
+      channel: sql.string('ALL'),
+      category: sql.string('ALL'),
+      location_id: sql.string(locationId),
+      sku_id: sql.string(skuId),
+    }),
+    [locationId, skuId]
+  );
+  const query = useAnalyticsQuery('forecast_vs_actual', params);
+  const rows = useNumeric(query.data);
+  if (query.loading && !rows) return <Skeleton className="h-60 w-full" />;
+  if (query.error) return <p className="text-sm text-destructive">Could not load weekly units: {query.error}</p>;
+  if (!rows || rows.length === 0)
+    return <p className="text-sm text-muted-foreground">No sales history or forecast for this store-SKU.</p>;
+  const forecast = rows.filter((r) => r.actual === null);
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Forecast week</TableHead>
-          <TableHead className="text-right">Expected</TableHead>
-          <TableHead className="text-right">p90 (plan for)</TableHead>
-          <TableHead className="text-right">Same week last year</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.map((r) => (
-          <TableRow key={r.week}>
-            <TableCell>{formatDate(r.week)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatInt(r.expected)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatInt(r.p90)}</TableCell>
-            <TableCell className="text-right tabular-nums text-muted-foreground">{formatInt(r.last_year)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <div className="space-y-3">
+      <ScenarioChart rows={rows} height={230} ariaLabel="Weekly units: actual, forecast with p90 band, last year" />
+      {forecast.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Week of</TableHead>
+              <TableHead className="text-right">Expected</TableHead>
+              <TableHead className="text-right">p90 (plan for)</TableHead>
+              <TableHead className="text-right">Last year</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {forecast.map((r) => (
+              <TableRow key={r.week_start}>
+                <TableCell>{formatDate(r.week_start)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatInt(r.forecast)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatInt(r.p90)}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {formatInt(r.last_year)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   );
 }
 
-function SkuWeeklyChart({
-  parameters,
-}: {
-  parameters: { location_id: ReturnType<typeof sql.string>; sku_id: ReturnType<typeof sql.string> };
-}) {
-  const query = useAnalyticsQuery('sku_weekly', parameters);
-  const { loading, error } = query;
-  const data = useNumeric(query.data);
-  if (loading) return <Skeleton className="h-60 w-full" />;
-  if (error) return <p className="text-sm text-destructive">Could not load weekly units: {error}</p>;
-  if (!data || data.length === 0)
-    return <p className="text-sm text-muted-foreground">No sales history for this store-SKU.</p>;
-  return <ScenarioChart rows={data} height={240} ariaLabel="Weekly units, actual, forecast and last year" />;
+function AuditTrail({ events }: { events: DecisionEvent[] }) {
+  return (
+    <ol className="relative space-y-3 border-l pl-4">
+      {events.map((ev) => (
+        <li key={ev.event_id} className="text-sm">
+          <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
+          <div className="flex flex-wrap items-center gap-x-2 text-foreground">
+            <DecisionBadge status={ev.new_status} />
+            <span className="tabular-nums">
+              {ev.previous_status ? `${formatInt(ev.previous_units)} → ` : ''}
+              {formatInt(ev.new_units)} units
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {ev.changed_by} · {formatDateTime(ev.changed_at)}
+            {ev.reason ? ` · “${ev.reason}”` : ''}
+          </p>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
-export function RecommendationSheet({ recommendationId, onClose, onSaved }: Props) {
+export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocusStore }: Props) {
   const [detail, setDetail] = useState<RecommendationDetail | null>(null);
   const [events, setEvents] = useState<DecisionEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -126,11 +154,6 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
     setMessage(null);
     if (recommendationId) load(recommendationId);
   }, [recommendationId, load]);
-
-  const chartParams = useMemo(
-    () => (detail ? { location_id: sql.string(detail.location_id), sku_id: sql.string(detail.sku_id) } : null),
-    [detail]
-  );
 
   async function decide(status: DecisionStatus) {
     if (!detail) return;
@@ -161,8 +184,7 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
       load(detail.recommendation_id);
       onSaved();
     } catch (e) {
-      const text =
-        e instanceof ApiError && e.status === 409 ? `${e.message}` : e instanceof Error ? e.message : 'Save failed';
+      const text = e instanceof Error ? e.message : 'Save failed';
       setMessage({ tone: 'error', text });
       if (e instanceof ApiError && e.status === 409) load(detail.recommendation_id);
     } finally {
@@ -170,19 +192,39 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
     }
   }
 
+  const leadWeeks = detail ? Math.floor(toNumber(detail.lead_time_days) / 7) + 1 : 0;
+
   return (
     <Sheet open={recommendationId !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle>{detail ? `${detail.sku_name}` : 'Recommendation'}</SheetTitle>
+      <SheetContent side="right" className="w-full gap-0 overflow-y-auto sm:max-w-2xl">
+        <SheetHeader className="border-b">
+          <div className="flex items-center gap-2 pr-6">
+            <SheetTitle className="text-lg">{detail ? detail.sku_name : 'Order line'}</SheetTitle>
+            {detail?.peak_gift_flag && <Gift className="h-4 w-4 text-primary" aria-label="Peak gift SKU" />}
+          </div>
           <SheetDescription>
             {detail
-              ? `${detail.location_name} · ${titleCase(detail.channel_type)} · ${detail.region} region`
+              ? `${detail.location_name} · ${titleCase(detail.channel_type)} · ${detail.region} · ${detail.category}`
               : 'Loading…'}
           </SheetDescription>
+          {detail && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <StockStatusBadge risk={detail.stockout_risk} />
+              <ExpiryBadge risk={detail.overstock_risk} />
+              <DecisionBadge status={detail.decision_status} />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7 text-muted-foreground"
+                onClick={() => onFocusStore(detail.location_id)}
+              >
+                <Store className="mr-1 h-3.5 w-3.5" /> Focus panel on this store
+              </Button>
+            </div>
+          )}
         </SheetHeader>
 
-        <div className="space-y-5 px-4 pb-6">
+        <div className="space-y-6 p-4">
           {loadError && (
             <Alert variant="destructive">
               <AlertDescription>{loadError}</AlertDescription>
@@ -198,66 +240,56 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
 
           {detail && (
             <>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">Stockout</span>
-                <RiskBadge risk={detail.stockout_risk} label="Stockout" />
-                <span className="ml-2 text-sm text-muted-foreground">Overstock</span>
-                <RiskBadge risk={detail.overstock_risk} label="Overstock" />
-                <span className="ml-2 text-sm text-muted-foreground">Decision</span>
-                <StatusBadge status={detail.decision_status} />
-              </div>
-
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Recommended order</p>
-                <p className="text-2xl font-semibold tabular-nums text-foreground">
-                  {formatInt(detail.recommended_units)} units
+              <section className="rounded-xl border bg-gradient-to-br from-primary/5 to-transparent p-4">
+                <p className="text-xs font-medium text-muted-foreground">Recommended order</p>
+                <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                  {formatInt(detail.recommended_units)} <span className="text-base font-normal">units</span>
                 </p>
-                <p className="text-sm text-foreground">
+                <p className="mt-1 text-sm text-foreground">
                   {detail.explanation_text || 'Stock covers expected demand; no change from the usual pattern.'}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Main forecast driver: {detail.top_driver} · model v{detail.model_version} · refreshed{' '}
-                  {formatDateTime(detail.refreshed_at)}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {STOCK_STATUS[detail.stockout_risk].hint}. Main forecast driver: {detail.top_driver} · model v
+                  {detail.model_version} · refreshed {formatDateTime(detail.refreshed_at)}
                 </p>
-              </div>
+              </section>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Stat label="On hand" value={formatInt(detail.on_hand_units)} />
                 <Stat label="Inbound" value={formatInt(detail.inbound_units)} />
-                <Stat
-                  label={`Demand over ${Math.floor(toNumber(detail.lead_time_days) / 7) + 1} wk`}
-                  value={formatInt(detail.demand_cover_units)}
-                />
+                <Stat label={`Demand over ${leadWeeks} wk`} value={formatInt(detail.demand_cover_units)} />
                 <Stat label="Safety stock" value={formatInt(detail.safety_units)} />
                 <Stat label="Recent weekly sales" value={formatInt(detail.recent_weekly_units)} />
                 <Stat label="Lead time" value={`${formatInt(detail.lead_time_days)} days`} />
                 <Stat label="Shelf life" value={`${formatInt(detail.shelf_life_days)} days`} />
                 <Stat label="Case pack" value={`${formatInt(detail.case_pack_units)} units`} />
-                <Stat label="Sales at risk if not ordered" value={formatUsd(detail.est_lost_sales_if_no_order)} />
-                <Stat label="Stock expected to expire" value={formatUsd(detail.est_expiry_value)} />
+                <Stat
+                  label="Lost if not ordered"
+                  value={formatUsd(detail.est_lost_sales_if_no_order)}
+                  hint="Estimated sales lost before the next delivery if no order is placed"
+                />
+                <Stat label="Expected to expire" value={formatUsd(detail.est_expiry_value)} />
                 <Stat label="Cap applied" value={detail.cap_applied === 'SHELF_LIFE' ? 'Shelf life' : 'None'} />
                 <Stat
                   label="Order value at cost"
                   value={formatUsd(toNumber(detail.recommended_units) * toNumber(detail.unit_cost))}
                 />
-              </div>
+              </section>
 
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Weekly units: 26 weeks actual, then the 6-week forecast from {formatDate(detail.as_of_date)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Actual from gold.weekly_demand_features, forecast (dashed) from gold.demand_forecasts; last year =
-                  same calendar week
-                </p>
-                {chartParams && <SkuWeeklyChart parameters={chartParams} />}
-                {chartParams && <ForecastTable parameters={chartParams} />}
-              </div>
+              <section className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Forecast vs actual</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Weekly units · this store-SKU · forecast from {formatDate(detail.as_of_date)}, latest run
+                  </p>
+                </div>
+                <SkuForecast locationId={detail.location_id} skuId={detail.sku_id} />
+              </section>
 
               <Separator />
 
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">Your decision</p>
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Decision</h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
                     <Label htmlFor="order-units">Order quantity (units)</Label>
@@ -283,22 +315,19 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button disabled={saving} onClick={() => void decide('ACCEPTED')}>
-                    Accept {formatInt(detail.recommended_units)}
+                    <Check className="mr-1 h-4 w-4" /> Accept {formatInt(detail.recommended_units)}
                   </Button>
                   <Button variant="secondary" disabled={saving} onClick={() => void decide('ADJUSTED')}>
-                    Save adjusted quantity
+                    <PencilLine className="mr-1 h-4 w-4" /> Save adjusted quantity
                   </Button>
                   <Button variant="outline" disabled={saving} onClick={() => void decide('REJECTED')}>
-                    Reject
+                    <X className="mr-1 h-4 w-4" /> Reject
                   </Button>
                 </div>
                 {message && (
-                  <p
-                    className={`text-sm ${message.tone === 'error' ? 'text-destructive' : 'text-success'}`}
-                    role="status"
-                  >
-                    {message.text}
-                  </p>
+                  <Alert variant={message.tone === 'error' ? 'destructive' : 'default'} className="py-2">
+                    <AlertDescription role="status">{message.text}</AlertDescription>
+                  </Alert>
                 )}
                 {detail.decided_by && (
                   <p className="text-xs text-muted-foreground">
@@ -306,26 +335,18 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved }: Prop
                     {formatInt(detail.version)}
                   </p>
                 )}
-              </div>
+              </section>
 
               {events.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">
-                    Audit trail (Lakebase replenishment.decision_events)
+                <section className="space-y-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    <History className="h-4 w-4" aria-hidden /> Audit trail
+                  </h3>
+                  <AuditTrail events={events} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Lakebase replenishment.decision_events (append-only)
                   </p>
-                  <ul className="space-y-1 text-sm">
-                    {events.map((ev) => (
-                      <li key={ev.event_id} className="text-muted-foreground">
-                        {formatDateTime(ev.changed_at)} · {ev.changed_by}:{' '}
-                        {ev.previous_status
-                          ? `${titleCase(ev.previous_status)} ${formatInt(ev.previous_units)} → `
-                          : ''}
-                        {titleCase(ev.new_status)} {formatInt(ev.new_units)}
-                        {ev.reason ? ` ("${ev.reason}")` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                </section>
               )}
             </>
           )}

@@ -1,27 +1,66 @@
 // Typed client for the replenishment API (server/routes/replenishment-routes.ts).
 // Postgres numeric / bigint values arrive as strings, so numbers are converted with Number() at render.
+// Every endpoint applies the caller's planning scope server-side; the filters sent here only narrow within it.
 
 export type Risk = 'HIGH' | 'MEDIUM' | 'LOW';
 export type DecisionStatus = 'ACCEPTED' | 'ADJUSTED' | 'REJECTED';
 type Numeric = number | string;
 
+export interface Scope {
+  restricted: boolean;
+  regions: string[];
+  locations: string[];
+}
+
 export interface Summary {
-  as_of_date: string;
-  model_version: string;
-  refreshed_at: string;
-  loaded_at: string;
+  as_of_date: string | null;
+  model_version: string | null;
+  refreshed_at: string | null;
+  loaded_at: string | null;
   store_skus: Numeric;
   lines_to_order: Numeric;
   recommended_units: Numeric;
   order_value_at_cost: Numeric;
-  high_stockout_risk: Numeric;
-  high_risk_lost_sales: Numeric;
+  needs_order: Numeric;
+  needs_order_sales: Numeric;
+  peak_lines: Numeric;
+  peak_needs_order: Numeric;
+  peak_needs_order_sales: Numeric;
+  peak_needs_order_pending: Numeric;
   shelf_capped: Numeric;
   high_overstock_risk: Numeric;
+  expiry_value: Numeric;
   decided_lines: Numeric;
+  pending_lines: Numeric;
+  pending_value_at_cost: Numeric;
   accepted: Numeric;
   adjusted: Numeric;
   rejected: Numeric;
+}
+
+export interface StoreNeed {
+  location_id: string;
+  location_name: string;
+  region: string;
+  channel_type: string;
+  needs_order: Numeric;
+  safety_top_up: Numeric;
+  pending_lines: Numeric;
+  needs_order_sales: Numeric;
+}
+
+export interface StoreOption {
+  location_id: string;
+  location_name: string;
+  region: string;
+  channel_type: string;
+}
+
+export interface FilterOptions {
+  regions: string[];
+  categories: string[];
+  stores: StoreOption[];
+  scope: Scope;
 }
 
 export interface RecommendationRow {
@@ -34,6 +73,7 @@ export interface RecommendationRow {
   sku_id: string;
   sku_name: string;
   category: string;
+  peak_gift_flag: boolean;
   on_hand_units: Numeric;
   inbound_units: Numeric;
   recommended_units: Numeric;
@@ -78,12 +118,19 @@ export interface DecisionEvent {
   changed_at: string;
 }
 
-export interface ListFilters {
+/** Global control-panel filters (undefined = all). */
+export interface ScopeFilters {
   region?: string;
   channel?: string;
+  category?: string;
+  location?: string;
+}
+
+export interface ListFilters extends ScopeFilters {
   risk?: Risk;
-  status?: 'PENDING' | DecisionStatus;
+  status?: 'PENDING' | 'DECIDED' | DecisionStatus;
   search?: string;
+  peakOnly: boolean;
   actionableOnly: boolean;
   limit: number;
   offset: number;
@@ -111,21 +158,33 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function fetchSummary() {
-  return request<Summary>('/api/recommendations/summary');
+function query(params: object): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(key, String(value));
+  }
+  return search.toString();
 }
 
 export function fetchWhoami() {
-  return request<{ email: string; executesAs: string }>('/api/whoami');
+  return request<{ email: string; executesAs: string; scope: Scope }>('/api/whoami');
+}
+
+export function fetchFilterOptions() {
+  return request<FilterOptions>('/api/filters');
+}
+
+export function fetchSummary(filters: ScopeFilters) {
+  return request<Summary>(`/api/recommendations/summary?${query(filters)}`);
+}
+
+export function fetchStoreNeeds(filters: ScopeFilters) {
+  return request<{ rows: StoreNeed[] }>(`/api/recommendations/by-store?${query(filters)}`);
 }
 
 export function fetchRecommendations(filters: ListFilters) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== undefined && value !== '') params.set(key, String(value));
-  }
   return request<{ rows: RecommendationRow[]; total: number; limit: number; offset: number }>(
-    `/api/recommendations?${params.toString()}`
+    `/api/recommendations?${query(filters)}`
   );
 }
 
@@ -139,9 +198,12 @@ export function saveDecision(
   id: string,
   body: { status: DecisionStatus; finalUnits?: number; reason?: string; expectedVersion: number | null }
 ) {
-  return request<{ version: Numeric }>(`/api/recommendations/${encodeURIComponent(id)}/decision`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return request<{ version: Numeric; decision_status: DecisionStatus; final_order_units: Numeric }>(
+    `/api/recommendations/${encodeURIComponent(id)}/decision`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
 }
