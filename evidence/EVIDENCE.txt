@@ -516,7 +516,7 @@ Success measure                         Where                 Result
 --------------------------------------- --------------------- -------------------------------
 Forecast accuracy by channel            Section 5 table       Model WMAPE 23.6-26.6% by
                                         (gold.forecast_        channel vs 38.1-47.7% seasonal
-                                        accuracy)              naive: a 40-48% relative
+                                        accuracy)              naive: a 36-50% relative
                                                                improvement, ahead of the 20-30%
                                                                improvement the impact estimate
                                                                assumes.
