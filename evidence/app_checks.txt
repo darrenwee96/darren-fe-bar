@@ -39,3 +39,78 @@ Browser verification (local dev against the same warehouse, Lakebase, Genie spac
   - Genie panel: "Which stores have the largest recommended order value at cost?" answered with expandable SQL + chart/table
 Bugs found and fixed during verification: warehouse JSON returns numerics as strings (useNumeric hook);
   categorical BarCharts default to horizontal (orientation pinned); four chart titles corrected to match the data.
+
+=== Control panel revamp 2026-10-12 (branch polly/app-control-panel) ===
+Six tab pages (Overview, Stores, StoreDetail, Forecast, Inventory, Order approval) replaced by one control-panel view:
+  KPI strip · order queue (one-click accept, adjust/reject side sheet) · Forecast vs actual (+ p90 band) ·
+  Order need by store (click = drill-down) · docked Ask Genie panel. Global region/channel/category/store filters in the URL.
+  Old routes (/orders, /stores/:id, ...) redirect to /.
+Queries: 19 -> 3 (forecast_vs_actual, accuracy_by_channel, waste_kpis); 15 unused removed; forecast_trend / store_weekly /
+  sku_weekly / sku_forecast merged into forecast_vs_actual.
+Run-id fix: forecast_vs_actual reads only the latest forecast_run_id (max generated_at); accuracy_by_channel the latest
+  backtest_run_id. Live proof: gold.demand_forecasts now holds 2 runs for as_of_date 2026-08-31
+    dea753895bff4639ab894f61eac4d8f4  generated 2026-10-10T03:17Z  13,482 rows  1,097,570 units
+    ff8be64acf434b3683706d302189a486  generated 2026-10-12T03:02Z  13,482 rows  1,064,462 units
+  The old "as_of_date = max(as_of_date)" filter would sum both runs (~2.16M units over 6 weeks); the app shows 1.06M (latest run only).
+  forecast_vs_actual (all stores), forecast weeks: week | expected | p90 | last year
+    31 Aug | 162768.0 | 228588.4 | 163907.01666666672
+    7 Sep | 180411.8 | 282535.0 | 160302.5833333333
+    14 Sep | 194144.8 | 297906.8 | 188495.25000000006
+    21 Sep | 204191.3 | 313625.4 | 239701.36666666658
+    28 Sep | 159279.3 | 220917.4 | 229071.44999999995
+    5 Oct | 163666.3 | 223235.5 | 193989.53333333324
+Relabel: stockout_risk HIGH / MEDIUM / LOW shown as "Order needed" (needs an order to avoid a stockout) / "Below safety stock" / "Covered".
+Server-side scope: replenishment.user_scope (app SP-owned, created at startup) is applied to every Lakebase read and write;
+  out-of-scope decision = 403; unmapped users are network-wide (REPLENISHMENT_SCOPE_MODE=strict = no access).
+
+Gates (eastwind-replenishment/):
+  npm run typecheck -> OK (tsc server + client, 0 errors)
+  npm run lint      -> OK (eslint, 0 problems); npm run lint:ast-grep -> No ast-grep lint violations found
+  npm run build     -> OK (tsdown server + vite client)
+  npx vitest run    -> 1 file, 12 tests passed (server/routes/replenishment-routes.test.ts: 9 decision API, 3 scope/filters)
+    400 adjust w/o reason · 400 reject w/o reason / unknown status / negative units · 409 stale version · 409 decided-first ·
+    201 accept (audit event) · 200 adjust (version bump, previous units) · 201 reject (0 units) · 404 unknown · 403 out of scope ·
+    open vs strict scope · list scope params override client region · 400 malformed filters
+  databricks apps validate --profile fe-bar:
+    Validating project...
+    ⏭️  Skipped Installing dependencies
+    ✅ Generating types (0.7s)
+    ✅ Running AST-grep lint (0.4s)
+    ✅ Type checking (2.4s)
+    ✅ Building (4.8s)
+    ✅ Running tests (0.6s)
+    ✅ All validation checks passed (8.9s)
+Deploy (bundle target default, profile fe-bar):
+  databricks bundle deploy --profile fe-bar -> Files: 9 uploaded · Resources: 0 created, 0 changed, 1 unchanged
+  databricks bundle run app --profile fe-bar -> App started successfully; app_status RUNNING, compute ACTIVE
+  App log: "[replenishment] Schema replenishment is ready" · "Server running on http://0.0.0.0:8000"
+  URL: https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+Deployed API checks (OAuth bearer, darren.wee@databricks.com; none of these write):
+  POST adjust without reason:
+  {"error":"An adjusted order needs the new quantity and a reason"}  -> HTTP 400
+  POST accept with stale expectedVersion 99 (current is 1):
+  {"error":"Someone else changed this order. Reload to see the latest decision.","currentVersion":1}  -> HTTP 409
+  POST accept on unknown id:
+  {"error":"Recommendation not found"}  -> HTTP 404
+  GET list with bad channel:
+  {"error":"Invalid filters"}  -> HTTP 400
+  GET list region=North (scope open for this user):
+    total 502 first Tainan Old Town Shop North
+  GET detail audit trail for 1fdae3f412deef49:
+     REJECTED v1 events 1
+Browser check of the DEPLOYED app (headless Chrome, 1920x1080 / 1440x1000, light + dark), console errors: none
+  KPIs: Peak gifts needing an order | 478 | of 908 lines | $2.73M lost if not ordered · 475 pending | Order week Aug 31, 2026 · Lakebase serving.recommendations | Forecast error (WMAPE) | 25.0% | vs 44.6% same week last year | Downtown | 24.9% | Highway | 24.6% | Airport | 25.5% | Backtest MA 2025 + LNY 2026 · gold.forecast_accuracy | Waste + markdown | $474.2K | 1.2% of sales · ▼ 1.2 pts vs LY | Last 13 wks Jun 1, 2026 – Aug 24, 2026 · gold.weekly_demand_features | Orders placed from forecast | 67% | 2 of 3 decided · 1 un
+  Queue: 1,452 lines needing attention · by order need, then sales lost if not ordered
+  Store #1: Taichung Park Shop 2 | Downtown · Central | 18 | $109.9K
+  Drill-down URL: https://eastwind-replenishment-7474660797782218.aws.databricksapps.com/?location=L0018 | forecast meta: Weekly units · 26 wks actual + 6-wk forecast · Taichung Park Shop 2
+  Drill KPIs: Peak gifts needing an order | 8 | of 12 lines | $93.3K lost if not ordered · 8 pending | Order week Aug 31, 2026 · Lakebase serving.recommendations | Forecast error (WMAPE) | 25.0% | vs 44.6% same week last year | Downtown | 24.9% | Highway | 24.6% | Airport | 25.5% | Backtest MA 2025 + LNY 2026 · g
+  Sheet: Classic Lotus Mooncake Box (4pc) | Recommended order | 552 units | Mid-Autumn Festival 2026 in 3 weeks · Forecast 22.9x recent weekly sales · Stock covers 0.2 of 3 weeks needed · Capped by 30-day shelf life | Needs an order to avoid a stockout: stock + inbound is below demand until the next delivery. Main forecast driver: Same holida
+  Reject without reason -> Add a short reason so planners can learn from the override.
+  Filtered North/Mooncake KPIs: Peak gifts needing an order | 74 | of 74 lines | $572.3K lost if not ordered · 74 pending | Order week Aug 31, 2026 · Lakebase serving.recommendations | Forecast error (WMAPE) | 25.0% | vs 44.6% same week last year | Downtown | 24.9% | Highway | 24.6% | Airport | 25.5% | Backtest MA 2025 + LNY 2026 
+  Legacy /orders -> https://eastwind-replenishment-7474660797782218.aws.databricksapps.com/
+  Console errors: []
+  Genie (docked panel, on-behalf-of user): Genie finished in 23s; answer compared model vs baseline WMAPE per channel and fold
+    with an expandable "SQL Query" attachment + Chart/Table.
+  Note: WMAPE tile now reads 25.0% vs 44.6% because a newer backtest run (written by the parallel forecasting change) is the latest.
+Screenshots: _generated/screens/control-panel-overview-light.png, control-panel-full-light.png, control-panel-genie.png,
+  control-panel-store-drilldown.png, control-panel-order-sheet.png, control-panel-dark-filtered.png
