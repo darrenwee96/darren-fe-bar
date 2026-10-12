@@ -25,7 +25,7 @@ For the VP Merchandising and the CIO · October 2026
 
 | KPI | Value | What it means | Proof |
 |---|---|---|---|
-| Forecast error | **40–48% lower** | lower than today's method, in every channel | WMAPE 0.24–0.25 vs 0.44–0.46 for last-year-same-week, across two holiday backtests |
+| Forecast error | **43–49% lower** | lower than today's method, in both holiday seasons | WMAPE 0.24–0.25 vs 0.44–0.46 for last-year-same-week overall; 36–50% lower in each channel |
 | Plan-for coverage | **91–92%** | of store-SKU-weeks land within the p90 plan-for quantity | The calibrated p90 band drives safety stock, so you know how much buffer you're buying |
 | Lost sales recovered (target) | **$2–3M/yr** | 10–15% of today's $17.8M/yr lost sales | Conservative: the peak-season backtest cut modelled lost sales in every channel and every holiday window |
 
@@ -34,7 +34,7 @@ For the VP Merchandising and the CIO · October 2026
 
 **Speaker notes**
 - Tell: "Here's the result in your KPIs first."
-- Show: forecast error is 40–48% lower than last-year-same-week in every channel. The p90 plan-for covers 91–92% of weeks, so safety stock is calibrated, not guessed. The value target is $2–3M a year of recovered lost sales, which is 10–15% of the $17.8M lost today.
+- Show: overall forecast error is 43–49% lower than last-year-same-week in both holiday backtests, and 36–50% lower channel by channel. The p90 plan-for covers 91–92% of weeks, so safety stock is calibrated, not guessed. The value target is $2–3M a year of recovered lost sales, which is 10–15% of the $17.8M lost today.
 - Tell: "That $2–3M is deliberately conservative. The peak-season backtest, which I'll show on slide 8, points much higher. For the VP: fewer empty shelves on gifts. For the CIO: one governed pipeline."
 
 ---
@@ -153,11 +153,11 @@ The policy backtest is a simulation on synthetic data. A full-year replay comes 
 
 - **Day 30, governance pack:** row filters by region, column masks on cost, persona groups, lineage in UC.
 - **Day 60, waste-aware ordering:** add shelf-life and waste limits to the order rule; replay a full year.
-- **Day 90, 10-store pilot:** managers order from the app; you measure all four success measures live.
+- **Day 90, one-region pilot:** managers order from the app; you measure all four success measures live.
 
 **The ask: approve a one-region pilot.** You get live proof on stockouts, waste, and adoption before a network-wide rollout.
 
 **Speaker notes**
 - Tell: "Here's how we get from backtest to proof in your stores."
-- Show: in 30 days, close the governance gaps. In 60 days, make ordering waste-aware and replay a full year. In 90 days, run a 10-store pilot in one region and measure all four success measures live.
+- Show: in 30 days, close the governance gaps. In 60 days, make ordering waste-aware and replay a full year. In 90 days, run a one-region pilot and measure all four success measures live.
 - Tell: "The ask is simple: approve a one-region pilot. You risk little and get real numbers before you scale."
