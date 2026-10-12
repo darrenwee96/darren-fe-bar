@@ -37,6 +37,66 @@
   "data_sources": {
     "tables": [
       {
+        "identifier": "darren_fe_bar_catalog.gold.business_impact_summary",
+        "description": [
+          "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel."
+        ],
+        "column_configs": [
+          {
+            "column_name": "annualized_lost_sales_delta",
+            "description": [
+              "Annualized lost-sales reduction from forecast policy, USD."
+            ]
+          },
+          {
+            "column_name": "annualized_waste_delta",
+            "description": [
+              "Annualized waste reduction from forecast policy, USD."
+            ]
+          },
+          {
+            "column_name": "channel_type",
+            "description": [
+              "Store channel."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "fold",
+            "description": [
+              "Backtest fold."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "forecast_lost_sales",
+            "description": [
+              "Lost sales under forecast-driven ordering, USD."
+            ]
+          },
+          {
+            "column_name": "forecast_waste_value",
+            "description": [
+              "Waste value under forecast-driven ordering, USD."
+            ]
+          },
+          {
+            "column_name": "manual_lost_sales",
+            "description": [
+              "Lost sales under manual ordering, USD."
+            ]
+          },
+          {
+            "column_name": "manual_waste_value",
+            "description": [
+              "Waste value under manual ordering, USD."
+            ]
+          }
+        ]
+      },
+      {
         "identifier": "darren_fe_bar_catalog.gold.channel_weekly_kpis",
         "description": [
           "One row per week (Monday week_start) x channel_type x region. Sum the money and unit columns across rows; rates must be weighted by ranged_series, never averaged."
@@ -99,6 +159,22 @@
             ]
           },
           {
+            "column_name": "peak_gift_ranged_series",
+            "description": [
+              "Number of peak gift store-SKU combinations ranged that week; weight for peak_gift_stockout_day_rate."
+            ]
+          },
+          {
+            "column_name": "peak_gift_stockout_day_rate",
+            "description": [
+              "Share of peak gift SKU-days with no stock on hand. Weighted roll-up: SUM(peak_gift_stockout_day_rate * peak_gift_ranged_series) / SUM(peak_gift_ranged_series)."
+            ],
+            "synonyms": [
+              "peak gift stockout rate",
+              "Mid-Autumn stockout rate"
+            ]
+          },
+          {
             "column_name": "ranged_series",
             "description": [
               "Number of store-SKU combinations ranged that week; the weight for the rate columns."
@@ -154,7 +230,7 @@
         ]
       },
       {
-        "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+        "identifier": "darren_fe_bar_catalog.gold.demand_forecasts_current",
         "description": [
           "Current 6-week forecast per store-SKU-week from the @champion model, as of 2026-08-31. Join silver.dim_location / silver.dim_product for names, region, and category."
         ],
@@ -280,6 +356,14 @@
             "description": [
               "(sum forecast - sum actual) / sum actual; negative = under-forecast. Null for p90 coverage."
             ]
+          },
+          {
+            "column_name": "calibration",
+            "description": [
+              "raw_quantile before conformal p90 calibration or post_conformal after segmented conformal uplift."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
           },
           {
             "column_name": "fold",
@@ -771,7 +855,7 @@
           "How does forecast error change with how many weeks ahead we forecast, model vs last year?"
         ],
         "sql": [
-          "SELECT a.fold, CAST(a.segment AS INT) AS weeks_ahead,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.fold, CAST(a.segment AS INT)\nORDER BY a.fold, weeks_ahead"
+          "SELECT a.fold, CAST(a.segment AS INT) AS weeks_ahead,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'\nGROUP BY a.fold, CAST(a.segment AS INT)\nORDER BY a.fold, weeks_ahead"
         ],
         "usage_guidance": [
           "Pivot model vs baseline accuracy; default to observed_uncensored."
@@ -783,7 +867,7 @@
           "What is the weekly forecast for Pineapple Cake Box (10pc) in the North region compared with last year?"
         ],
         "sql": [
-          "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units,\n       SUM(f.forecast_p90) AS p90_units, SUM(f.baseline_seasonal_naive) AS last_year_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts f\nJOIN darren_fe_bar_catalog.silver.dim_location l ON f.location_id = l.location_id\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.sku_name = 'Pineapple Cake Box (10pc)' AND l.region = 'North'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
+          "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units,\n       SUM(f.forecast_p90) AS p90_units, SUM(f.baseline_seasonal_naive) AS last_year_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts_current f\nJOIN darren_fe_bar_catalog.silver.dim_location l ON f.location_id = l.location_id\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.sku_name = 'Pineapple Cake Box (10pc)' AND l.region = 'North'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
         ],
         "usage_guidance": [
           "Forecast joined to store and product dimensions."
@@ -821,7 +905,7 @@
       {
         "id": "922a208c1aece157c5f21163abf8cee9",
         "left": {
-          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts_current",
           "alias": "demand_forecasts"
         },
         "right": {
@@ -836,7 +920,7 @@
       {
         "id": "a2d9b1cee9364b58ae0612f4ae2b7e7c",
         "left": {
-          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts_current",
           "alias": "demand_forecasts"
         },
         "right": {
@@ -851,7 +935,7 @@
       {
         "id": "b931f1888dc61cebde8a6674d1e14a68",
         "left": {
-          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts_current",
           "alias": "demand_forecasts"
         },
         "right": {
@@ -919,7 +1003,7 @@
           "id": "2721920d5de231538559f3c10d42088a",
           "display_name": "Observed accuracy (default)",
           "sql": [
-            "forecast_accuracy.scored_against = 'observed_uncensored'"
+            "forecast_accuracy.scored_against = 'observed_uncensored' AND forecast_accuracy.calibration = 'post_conformal'"
           ],
           "synonyms": [
             "accuracy",
@@ -963,7 +1047,7 @@
           "id": "f439382023c553fd7a8f71a4772c9545",
           "display_name": "Mid-Autumn range",
           "sql": [
-            "replenishment_recommendations_current.category = 'Mooncake'"
+            "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('TE03', 'GB01')"
           ],
           "synonyms": [
             "mooncakes",
@@ -1034,6 +1118,23 @@
         ]
       },
       {
+        "id": "6e20909e0d9d973abfd82bc37fe4b3d2",
+        "question": [
+          "What was the peak gift stockout day rate by channel during the Mid-Autumn 2025 window?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT k.channel_type,\n       SUM(k.peak_gift_stockout_day_rate * k.peak_gift_ranged_series) / SUM(k.peak_gift_ranged_series) AS peak_gift_stockout_day_rate\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-07'\nGROUP BY k.channel_type\nORDER BY peak_gift_stockout_day_rate DESC"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must use peak_gift_stockout_day_rate, not overall stockout_day_rate, and filter the Mid-Autumn 2025 event window."
+        ]
+      },
+      {
         "id": "871f97ceab680fcdd71e46004401c4c3",
         "question": [
           "What are the top 10 highway stores by mooncake sales at risk from high stockout risk?"
@@ -1068,6 +1169,23 @@
         ]
       },
       {
+        "id": "9c3c93cafb2d2fbf4ea4511367b210cb",
+        "question": [
+          "Show total expected demand by forecast week for current forecasts only."
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts_current f\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must query demand_forecasts_current so old appended forecast runs are not double-counted."
+        ]
+      },
+      {
         "id": "9e2a1315823aad190cfb26b72dcabbac",
         "question": [
           "Which 5 downtown stores have the largest recommended order value at cost?"
@@ -1090,12 +1208,29 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT a.segment AS channel_type,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.segment\nORDER BY a.segment"
+              "SELECT a.segment AS channel_type,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'\nGROUP BY a.segment\nORDER BY a.segment"
             ]
           }
         ],
         "evaluation_note": [
           "Must use fold MA2025, segment_type CHANNEL, scored_against observed_uncensored."
+        ]
+      },
+      {
+        "id": "bd85d95dc5d693a5185ca19a9893112c",
+        "question": [
+          "How much annualized lost sales and waste reduction does the forecast policy show by channel?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT b.channel_type,\n       SUM(b.annualized_lost_sales_delta) AS annualized_lost_sales_reduction_usd,\n       SUM(b.annualized_waste_delta) AS annualized_waste_reduction_usd\nFROM darren_fe_bar_catalog.gold.business_impact_summary b\nGROUP BY b.channel_type\nORDER BY annualized_lost_sales_reduction_usd DESC"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must use business_impact_summary and report honest policy-backtest deltas by channel."
         ]
       },
       {
@@ -1107,7 +1242,7 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts f\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.category = 'Mooncake'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
+              "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts_current f\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.category = 'Mooncake'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
             ]
           }
         ],
@@ -1124,7 +1259,7 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT a.fold, a.wmape AS p90_coverage\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'\nORDER BY a.fold"
+              "SELECT a.fold, a.wmape AS p90_coverage\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'\n  AND a.calibration = 'post_conformal'\nORDER BY a.fold"
             ]
           }
         ],

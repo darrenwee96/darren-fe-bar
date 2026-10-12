@@ -64,11 +64,18 @@ TABLES = {
             col("peak_gift_net_sales", "Net sales of peak gift SKUs (mooncakes, LNY hampers, etc.), USD."),
             col("units_sold", "Units sold.", ["volume"]),
             col("ranged_series", "Number of store-SKU combinations ranged that week; the weight for the rate columns."),
+            col("peak_gift_ranged_series", "Number of peak gift store-SKU combinations ranged that week; weight for peak_gift_stockout_day_rate."),
             col(
                 "stockout_day_rate",
                 "Share of store-SKU-days with no stock on hand. Weighted roll-up: "
                 "SUM(stockout_day_rate * ranged_series) / SUM(ranged_series).",
                 ["stockout rate", "out of stock rate", "OOS rate"],
+            ),
+            col(
+                "peak_gift_stockout_day_rate",
+                "Share of peak gift SKU-days with no stock on hand. Weighted roll-up: "
+                "SUM(peak_gift_stockout_day_rate * peak_gift_ranged_series) / SUM(peak_gift_ranged_series).",
+                ["peak gift stockout rate", "Mid-Autumn stockout rate"],
             ),
             col(
                 "censored_series_share",
@@ -86,6 +93,7 @@ TABLES = {
         "fold x scored_against x segment_type x segment x method.",
         "columns": [
             col("fold", "Backtest fold: MA2025 (Mid-Autumn 2025) or LNY2026 (Lunar New Year 2026).", match=True),
+            col("calibration", "raw_quantile before conformal p90 calibration or post_conformal after segmented conformal uplift.", match=True),
             col(
                 "scored_against",
                 "observed_uncensored = scored against recorded sales in weeks with < 2 stockout days (the "
@@ -122,7 +130,7 @@ TABLES = {
             col("generated_at", exclude=True),
         ],
     },
-    f"{C}.gold.demand_forecasts": {
+    f"{C}.gold.demand_forecasts_current": {
         "description": "Current 6-week forecast per store-SKU-week from the @champion model, as of 2026-08-31. "
         "Join silver.dim_location / silver.dim_product for names, region, and category.",
         "columns": [
@@ -213,6 +221,19 @@ TABLES = {
             col("version", exclude=True),
         ],
     },
+    f"{C}.gold.business_impact_summary": {
+        "description": "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel.",
+        "columns": [
+            col("fold", "Backtest fold.", match=True),
+            col("channel_type", "Store channel.", match=True),
+            col("manual_lost_sales", "Lost sales under manual ordering, USD."),
+            col("forecast_lost_sales", "Lost sales under forecast-driven ordering, USD."),
+            col("manual_waste_value", "Waste value under manual ordering, USD."),
+            col("forecast_waste_value", "Waste value under forecast-driven ordering, USD."),
+            col("annualized_lost_sales_delta", "Annualized lost-sales reduction from forecast policy, USD."),
+            col("annualized_waste_delta", "Annualized waste reduction from forecast policy, USD."),
+        ],
+    },
     f"{C}.silver.dim_location": {
         "description": "One row per store (80).",
         "columns": [
@@ -237,7 +258,7 @@ TABLES = {
     },
 }
 
-F = f"{C}.gold.demand_forecasts"
+F = f"{C}.gold.demand_forecasts_current"
 R = f"{C}.gold.replenishment_recommendations_current"
 D = f"{C}.gold.order_decisions_history"
 L = f"{C}.silver.dim_location"
@@ -281,8 +302,8 @@ SNIPPETS = {
         ),
     ],
     "filters": [
-        ("Observed accuracy (default)", "forecast_accuracy.scored_against = 'observed_uncensored'", ["accuracy", "real-world accuracy"]),
-        ("Mid-Autumn range", "replenishment_recommendations_current.category = 'Mooncake'", ["mooncakes", "Mid-Autumn products"]),
+        ("Observed accuracy (default)", "forecast_accuracy.scored_against = 'observed_uncensored' AND forecast_accuracy.calibration = 'post_conformal'", ["accuracy", "real-world accuracy"]),
+        ("Mid-Autumn range", "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('TE03', 'GB01')", ["mooncakes", "Mid-Autumn products"]),
         ("Lines to order", "replenishment_recommendations_current.recommended_units > 0", ["orders to place"]),
         ("Manager overrides", "order_decisions_history.decision_status IN ('ADJUSTED', 'REJECTED')", ["overrides", "overridden"]),
         (
@@ -325,7 +346,7 @@ LIMIT 10""",
        MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,
        MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape
 FROM {A} a
-WHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored'
+WHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'
 GROUP BY a.fold, CAST(a.segment AS INT)
 ORDER BY a.fold, weeks_ahead""",
         "Pivot model vs baseline accuracy; default to observed_uncensored.",
@@ -439,7 +460,7 @@ ORDER BY waste_usd DESC""",
        MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,
        MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape
 FROM {A} a
-WHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored'
+WHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'
 GROUP BY a.segment
 ORDER BY a.segment""",
         "Must use fold MA2025, segment_type CHANNEL, scored_against observed_uncensored.",
@@ -495,8 +516,37 @@ ORDER BY shelf_capped_stores DESC""",
         f"""SELECT a.fold, a.wmape AS p90_coverage
 FROM {A} a
 WHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'
+  AND a.calibration = 'post_conformal'
 ORDER BY a.fold""",
         "p90 coverage is stored in the wmape column for method model_p90_coverage; target is 0.90.",
+    ),
+    (
+        "What was the peak gift stockout day rate by channel during the Mid-Autumn 2025 window?",
+        f"""SELECT k.channel_type,
+       SUM(k.peak_gift_stockout_day_rate * k.peak_gift_ranged_series) / SUM(k.peak_gift_ranged_series) AS peak_gift_stockout_day_rate
+FROM {K} k
+WHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-07'
+GROUP BY k.channel_type
+ORDER BY peak_gift_stockout_day_rate DESC""",
+        "Must use peak_gift_stockout_day_rate, not overall stockout_day_rate, and filter the Mid-Autumn 2025 event window.",
+    ),
+    (
+        "How much annualized lost sales and waste reduction does the forecast policy show by channel?",
+        f"""SELECT b.channel_type,
+       SUM(b.annualized_lost_sales_delta) AS annualized_lost_sales_reduction_usd,
+       SUM(b.annualized_waste_delta) AS annualized_waste_reduction_usd
+FROM {C}.gold.business_impact_summary b
+GROUP BY b.channel_type
+ORDER BY annualized_lost_sales_reduction_usd DESC""",
+        "Must use business_impact_summary and report honest policy-backtest deltas by channel.",
+    ),
+    (
+        "Show total expected demand by forecast week for current forecasts only.",
+        f"""SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units
+FROM {F} f
+GROUP BY f.forecast_week
+ORDER BY f.forecast_week""",
+        "Must query demand_forecasts_current so old appended forecast runs are not double-counted.",
     ),
     (
         "Which 5 downtown stores have the largest recommended order value at cost?",

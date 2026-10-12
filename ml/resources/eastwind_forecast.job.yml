@@ -1,20 +1,31 @@
 resources:
   jobs:
-    eastwind_forecast:
-      name: eastwind-forecast
-      description: Backtest, train, register (@champion), score six-week store-SKU forecasts, build order recommendations, and sync them with Lakebase.
+    eastwind_forecast_weekly_scoring:
+      name: eastwind-forecast-weekly-scoring
+      description: Refresh ETL, score six-week store-SKU forecasts with the current @champion model, build recommendations, and sync Lakebase.
+      schedule:
+        quartz_cron_expression: "0 0 6 ? * MON"
+        timezone_id: "Asia/Singapore"
+        pause_status: PAUSED
       tasks:
-        - task_key: train_and_score
+        - task_key: refresh_etl
+          pipeline_task:
+            pipeline_id: ${var.etl_pipeline_id}
+            full_refresh: false
+        - task_key: score_champion
+          depends_on:
+            - task_key: refresh_etl
           notebook_task:
             notebook_path: ../src/train_forecast.py
             base_parameters:
               catalog: ${var.catalog}
               experiment: ${resources.experiments.demand_forecasting.name}
               as_of: ${var.as_of}
+              mode: score_only
           environment_key: ml_env
         - task_key: build_recommendations
           depends_on:
-            - task_key: train_and_score
+            - task_key: score_champion
           notebook_task:
             notebook_path: ../src/build_recommendations.py
             base_parameters:
@@ -50,3 +61,41 @@ resources:
               - mlflow>=3.1,<4
               - databricks-sdk>=0.81
               - psycopg[binary]>=3.2
+    eastwind_forecast_training:
+      name: eastwind-forecast-training
+      description: Retrain, backtest, and register a candidate; move @champion only when WMAPE is no worse than the existing champion gate.
+      schedule:
+        quartz_cron_expression: "0 0 8 ? * MON#1"
+        timezone_id: "Asia/Singapore"
+        pause_status: PAUSED
+      tasks:
+        - task_key: refresh_etl
+          pipeline_task:
+            pipeline_id: ${var.etl_pipeline_id}
+            full_refresh: false
+        - task_key: train_score_and_gate
+          depends_on:
+            - task_key: refresh_etl
+          notebook_task:
+            notebook_path: ../src/train_forecast.py
+            base_parameters:
+              catalog: ${var.catalog}
+              experiment: ${resources.experiments.demand_forecasting.name}
+              as_of: ${var.as_of}
+              mode: train_score
+          environment_key: ml_env
+        - task_key: build_recommendations
+          depends_on:
+            - task_key: train_score_and_gate
+          notebook_task:
+            notebook_path: ../src/build_recommendations.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: ml_env
+      environments:
+        - environment_key: ml_env
+          spec:
+            environment_version: "4"
+            dependencies:
+              - lightgbm==4.6.0
+              - mlflow>=3.1,<4

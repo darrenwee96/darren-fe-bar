@@ -1,47 +1,62 @@
-Eastwind Gourmet — six-week forecasts from @champion (gold.demand_forecasts)
-forecast_run_id dea753895bff4639ab894f61eac4d8f4, model darren_fe_bar_catalog.ml.eastwind_demand v1, as_of 2026-08-31
-13,482 rows = 2,247 store-SKUs x 6 weeks. Mid-Autumn 2026 is Friday 2026-09-25.
+Eastwind Gourmet - current six-week forecasts
+
+Source: darren_fe_bar_catalog.gold.demand_forecasts_current
+Weekly scoring run: 938785124085419, task score_champion 124749291865187
+forecast_run_id 17a961419d614fec86a654e9fba155f6, model_version 5 (@champion), as_of 2026-08-31
+Rows: 13,482 = 2,247 store-SKUs x 6 weeks. Mid-Autumn 2026 is Friday 2026-09-25.
 
 1) L0001 Zhongshan Shop x SKU-MC01 Classic Lotus Mooncake Box
-   event_naive | forecast | forecast_week | horizon | p90 | seasonal_naive | top_driver
-   85.0 | 38.1 | 2026-08-31 | 1 | 153.8 | 11.0 | t_same_event_ly
-   353.0 | 296.6 | 2026-09-07 | 2 | 398.6 | 14.0 | t_same_event_ly
-   72.0 | 271.6 | 2026-09-14 | 3 | 271.6 | 85.0 | t_same_event_ly
-   0.0 | 165.9 | 2026-09-21 | 4 | 233.7 | 353.0 | t_lag_52
-   72.0 | 12.0 | 2026-09-28 | 5 | 13.6 | 72.0 | sku_id
-   0.0 | 10.0 | 2026-10-05 | 6 | 13.1 | 0.0 | sku_id
-   Seasonal-naive peaks the week of 09-21 and is still at 72 the week after the festival (Mid-Autumn 2025
-   was 10-06); the model peaks 09-07..09-14 and drops to ~12 after the festival.
+forecast_week | horizon | forecast | p90   | seasonal_naive | event_naive | top_driver
+2026-09-07    | 2       | 242.8    | 401.8 | 14.0           | 353.0       | Holiday
+2026-09-21    | 4       | 91.3     | 141.4 | 353.0          | 0.0         | Last year
 
-2) All mooncake SKUs (MC01-MC04) by channel and week
-   channel_type | forecast_units | forecast_week | p90_units | seasonal_naive
-   AIRPORT | 1584.0 | 2026-08-31 | 8359.0 | 506.0
-   DOWNTOWN | 2448.0 | 2026-08-31 | 15413.0 | 793.0
-   HIGHWAY | 1106.0 | 2026-08-31 | 5122.0 | 368.0
-   AIRPORT | 8020.0 | 2026-09-07 | 18342.0 | 615.0
-   DOWNTOWN | 14906.0 | 2026-09-07 | 28223.0 | 1182.0
-   HIGHWAY | 5909.0 | 2026-09-07 | 13679.0 | 617.0
-   AIRPORT | 8596.0 | 2026-09-14 | 12356.0 | 5969.0
-   DOWNTOWN | 15318.0 | 2026-09-14 | 20755.0 | 11070.0
-   HIGHWAY | 5824.0 | 2026-09-14 | 8813.0 | 3930.0
-   AIRPORT | 9159.0 | 2026-09-21 | 12599.0 | 12631.0
-   DOWNTOWN | 12133.0 | 2026-09-21 | 17343.0 | 19690.0
-   HIGHWAY | 7347.0 | 2026-09-21 | 11092.0 | 10156.0
-   AIRPORT | 496.0 | 2026-09-28 | 760.0 | 4821.0
-   DOWNTOWN | 747.0 | 2026-09-28 | 1102.0 | 5541.0
-   HIGHWAY | 377.0 | 2026-09-28 | 619.0 | 3704.0
-   AIRPORT | 473.0 | 2026-10-05 | 682.0 | 507.0
-   DOWNTOWN | 708.0 | 2026-10-05 | 1030.0 | 843.0
-   HIGHWAY | 353.0 | 2026-10-05 | 537.0 | 164.0
-   Seasonal-naive leaves ~14,000 mooncake units of demand in the week of 09-28, after the festival;
-   the model forecasts ~1,600 — the difference is stock that manual ordering would have left to expire.
+The 2026-09-21 festival-week forecast no longer maps to the 2025 post-festival week. The event-aligned signal now peaks in the 2026-09-07 lead-up window and the 2026-09-21 forecast is lower.
 
-3) Top driver per forecast (largest absolute contribution to the expected forecast)
-   n | top_driver
-   8817 | sku_id
-   2737 | roll_mean_8
-   1372 | t_same_event_ly
-   295 | t_lag_52
-   257 | location_id
-   4 | roll_mean_4
-   sku_id / location_id mean 'this product/store's usual level'; recommendations will map drivers to plain language.
+2) Peak-gift forecast totals by SKU and week
+forecast_week | sku_id   | forecast_units | p90_units | event_naive | rows
+2026-08-31    | SKU-GB01 | 1,550          | 2,286     | 1,993       | 54
+2026-08-31    | SKU-MC01 | 2,880          | 8,386     | 7,389       | 80
+2026-08-31    | SKU-MC02 | 2,238          | 6,416     | 5,861       | 80
+2026-08-31    | SKU-MC03 | 1,333          | 4,177     | 3,834       | 54
+2026-08-31    | SKU-MC04 | 1,693          | 4,086     | 3,940       | 44
+2026-08-31    | SKU-TE03 | 4,147          | 5,864     | 5,262       | 80
+2026-09-07    | SKU-GB01 | 3,046          | 5,380     | 3,706       | 54
+2026-09-07    | SKU-MC01 | 11,265         | 24,138    | 19,572      | 80
+2026-09-07    | SKU-MC02 | 8,831          | 20,721    | 16,543      | 80
+2026-09-07    | SKU-MC03 | 2,355          | 7,489     | 5,124       | 54
+2026-09-07    | SKU-MC04 | 6,229          | 11,669    | 10,942      | 44
+2026-09-07    | SKU-TE03 | 6,625          | 10,621    | 8,910       | 80
+2026-09-14    | SKU-GB01 | 4,059          | 6,664     | 4,627       | 54
+2026-09-14    | SKU-MC01 | 18,286         | 24,475    | 12,374      | 80
+2026-09-14    | SKU-MC02 | 15,868         | 22,603    | 12,629      | 80
+2026-09-14    | SKU-MC03 | 8,773          | 10,836    | 2,452       | 54
+2026-09-14    | SKU-MC04 | 8,511          | 11,567    | 6,625       | 44
+2026-09-14    | SKU-TE03 | 8,181          | 13,013    | 10,810      | 80
+2026-09-21    | SKU-GB01 | 2,119          | 4,051     | 1,387       | 54
+2026-09-21    | SKU-MC01 | 6,366          | 8,910     | 185         | 80
+2026-09-21    | SKU-MC02 | 6,414          | 8,603     | 303         | 80
+2026-09-21    | SKU-MC03 | 2,138          | 4,712     | 1,866       | 54
+2026-09-21    | SKU-MC04 | 2,880          | 3,856     | 86          | 44
+2026-09-21    | SKU-TE03 | 5,360          | 7,700     | 3,681       | 80
+2026-09-28    | SKU-GB01 | 1,095          | 1,625     | 4,627       | 54
+2026-09-28    | SKU-MC01 | 511            | 995       | 12,374      | 80
+2026-09-28    | SKU-MC02 | 420            | 872       | 12,629      | 80
+2026-09-28    | SKU-MC03 | 229            | 492       | 2,452       | 54
+2026-09-28    | SKU-MC04 | 293            | 503       | 6,625       | 44
+2026-09-28    | SKU-TE03 | 3,567          | 5,172     | 10,810      | 80
+2026-10-05    | SKU-GB01 | 1,080          | 1,630     | 1,387       | 54
+2026-10-05    | SKU-MC01 | 462            | 989       | 185         | 80
+2026-10-05    | SKU-MC02 | 390            | 887       | 303         | 80
+2026-10-05    | SKU-MC03 | 247            | 502       | 1,866       | 54
+2026-10-05    | SKU-MC04 | 276            | 525       | 86          | 44
+2026-10-05    | SKU-TE03 | 3,527          | 5,334     | 3,681       | 80
+
+3) Recommendations generated from current forecasts
+Rows 2,247; recommended units 251,992; lines to order 1,536; shelf-life capped 224; high stockout risk 1,075; high overstock risk 114; order value at cost $2,705,318.
+
+4) Genie validation
+python3 genie/build_space.py --check passed all 6 examples and 14 benchmarks, including:
+- current forecast totals from gold.demand_forecasts_current
+- peak gift stockout day rate
+- Mid-Autumn 2025 benchmark window ending 2025-10-07
+- policy backtest business impact summary
