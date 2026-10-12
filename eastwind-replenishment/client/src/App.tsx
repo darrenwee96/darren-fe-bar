@@ -125,29 +125,28 @@ function ControlPanel() {
             )}
             <KpiStrip filters={filters} summary={s} loading={summary.loading} error={summary.error} />
             {/*
-              Container queries, so the layout follows the space actually left beside the Genie dock:
-              queue | charts side by side when the workspace is >= 1560px, otherwise charts on top, queue full width.
+              Charts share a row (forecast 3/5, store ranking 2/5) once the workspace is >= 1400px, else they stack, so they keep a proper aspect ratio at any
+              width, with or without the Genie dock; the queue spans the full width below. Container queries follow
+              the space actually left beside the dock.
             */}
             <div className="@container">
-              <div className="grid grid-cols-1 items-start gap-4 @min-[1560px]:grid-cols-[minmax(0,1fr)_400px]">
-                <OrderQueue
+              <div className="grid grid-cols-1 gap-4 @min-[1400px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
+                <StoreNeedPanel
                   noScope={noScope}
                   filters={filters}
                   revision={revision}
-                  onOpen={setSelected}
-                  onChanged={refresh}
+                  onSelect={(id) => setFilter('location', id)}
                 />
-                <div className="order-first grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[1560px]:order-none @min-[1560px]:grid-cols-1">
-                  <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
-                  <StoreNeedPanel
-                    noScope={noScope}
-                    filters={filters}
-                    revision={revision}
-                    onSelect={(id) => setFilter('location', id)}
-                  />
-                </div>
               </div>
             </div>
+            <OrderQueue
+              noScope={noScope}
+              filters={filters}
+              revision={revision}
+              onOpen={setSelected}
+              onChanged={refresh}
+            />
           </main>
         </div>
         <GenieDock email={whoami.data?.email ?? null} filters={filters} storeName={store?.location_name} />

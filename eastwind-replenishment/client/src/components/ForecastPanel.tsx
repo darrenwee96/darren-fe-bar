@@ -5,6 +5,7 @@ import { Sparkles } from 'lucide-react';
 import type { ScopeFilters } from '../lib/api';
 import { warehouseParams } from '../lib/filters';
 import { formatInt, formatPct } from '../lib/format';
+import { useElementWidth } from '../lib/useElementWidth';
 import { useNumeric } from '../lib/useNumeric';
 import { useGenie } from '../genie/context';
 import { Panel } from './Panel';
@@ -20,6 +21,9 @@ export function ForecastPanel({ filters, scopeLabel }: { filters: ScopeFilters; 
   const params = useMemo(() => ({ ...warehouseParams(filters), sku_id: sql.string('ALL') }), [filters]);
   const q = useAnalyticsQuery('forecast_vs_actual', params);
   const rows = useNumeric(q.data);
+  // Keep the plot at 2:1 or wider (280-440px tall) at any width, with or without the Genie dock.
+  const { ref, width } = useElementWidth<HTMLDivElement>();
+  const height = Math.round(Math.min(440, Math.max(280, width / 2)));
 
   const outlook = useMemo(() => {
     const fc = (rows ?? []).filter((r) => r.actual === null);
@@ -77,13 +81,16 @@ export function ForecastPanel({ filters, scopeLabel }: { filters: ScopeFilters; 
         rows={6}
         emptyText="No sales or forecast for this selection."
       />
-      {rows && rows.length > 0 && (
-        <ScenarioChart
-          rows={rows}
-          height={320}
-          ariaLabel={`Weekly units for ${scopeLabel}: actual, forecast with p90 band, last year`}
-        />
-      )}
+      <div ref={ref}>
+        {rows && rows.length > 0 && width > 0 && (
+          <ScenarioChart
+            key={height}
+            rows={rows}
+            height={height}
+            ariaLabel={`Weekly units for ${scopeLabel}: actual, forecast with p90 band, last year`}
+          />
+        )}
+      </div>
     </Panel>
   );
 }
