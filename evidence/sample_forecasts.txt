@@ -1,47 +1,55 @@
-Eastwind Gourmet — six-week forecasts from @champion (gold.demand_forecasts)
-forecast_run_id dea753895bff4639ab894f61eac4d8f4, model darren_fe_bar_catalog.ml.eastwind_demand v1, as_of 2026-08-31
-13,482 rows = 2,247 store-SKUs x 6 weeks. Mid-Autumn 2026 is Friday 2026-09-25.
+Eastwind Gourmet — current six-week forecasts
+
+Source: darren_fe_bar_catalog.gold.demand_forecasts_current
+Weekly scoring run: job 26281524780601, run 248246615129193, task score_champion 176451596254457
+forecast_run_id c0e42eefc0d14d7fb6a53870d72443fb, model_version 1 (@champion), as_of 2026-08-31
+Rows: 13,482 = 2,247 store-SKUs x 6 weeks. Mid-Autumn 2026 is Friday 2026-09-25.
+
+Why model_version is still 1:
+The improved candidate v3 raised p90 coverage and reduced peak-gift under-forecast bias, but slightly worsened overall observed WMAPE.
+The champion gate did not promote it, so current scoring uses the existing champion model while the append-only forecast table is protected by gold.demand_forecasts_current.
 
 1) L0001 Zhongshan Shop x SKU-MC01 Classic Lotus Mooncake Box
-   event_naive | forecast | forecast_week | horizon | p90 | seasonal_naive | top_driver
-   85.0 | 38.1 | 2026-08-31 | 1 | 153.8 | 11.0 | t_same_event_ly
-   353.0 | 296.6 | 2026-09-07 | 2 | 398.6 | 14.0 | t_same_event_ly
-   72.0 | 271.6 | 2026-09-14 | 3 | 271.6 | 85.0 | t_same_event_ly
-   0.0 | 165.9 | 2026-09-21 | 4 | 233.7 | 353.0 | t_lag_52
-   72.0 | 12.0 | 2026-09-28 | 5 | 13.6 | 72.0 | sku_id
-   0.0 | 10.0 | 2026-10-05 | 6 | 13.1 | 0.0 | sku_id
-   Seasonal-naive peaks the week of 09-21 and is still at 72 the week after the festival (Mid-Autumn 2025
-   was 10-06); the model peaks 09-07..09-14 and drops to ~12 after the festival.
+forecast_week | horizon | forecast | p90   | seasonal_naive | event_naive | top_driver
+2026-08-31    | 1       | 13.9     | 18.6  | 11.0           | 11.0        | Holiday
+2026-09-07    | 2       | 46.4     | 100.2 | 14.0           | 14.0        | Holiday
+2026-09-14    | 3       | 104.4    | 160.6 | 85.0           | 85.0        | Holiday
+2026-09-21    | 4       | 99.6     | 251.0 | 353.0          | 353.0       | Holiday
+2026-09-28    | 5       | 11.9     | 19.0  | 504.0          | 504.0       | Last year
+2026-10-05    | 6       | 10.0     | 13.1  | 0.0            | 0.0         | Last year
 
 2) All mooncake SKUs (MC01-MC04) by channel and week
-   channel_type | forecast_units | forecast_week | p90_units | seasonal_naive
-   AIRPORT | 1584.0 | 2026-08-31 | 8359.0 | 506.0
-   DOWNTOWN | 2448.0 | 2026-08-31 | 15413.0 | 793.0
-   HIGHWAY | 1106.0 | 2026-08-31 | 5122.0 | 368.0
-   AIRPORT | 8020.0 | 2026-09-07 | 18342.0 | 615.0
-   DOWNTOWN | 14906.0 | 2026-09-07 | 28223.0 | 1182.0
-   HIGHWAY | 5909.0 | 2026-09-07 | 13679.0 | 617.0
-   AIRPORT | 8596.0 | 2026-09-14 | 12356.0 | 5969.0
-   DOWNTOWN | 15318.0 | 2026-09-14 | 20755.0 | 11070.0
-   HIGHWAY | 5824.0 | 2026-09-14 | 8813.0 | 3930.0
-   AIRPORT | 9159.0 | 2026-09-21 | 12599.0 | 12631.0
-   DOWNTOWN | 12133.0 | 2026-09-21 | 17343.0 | 19690.0
-   HIGHWAY | 7347.0 | 2026-09-21 | 11092.0 | 10156.0
-   AIRPORT | 496.0 | 2026-09-28 | 760.0 | 4821.0
-   DOWNTOWN | 747.0 | 2026-09-28 | 1102.0 | 5541.0
-   HIGHWAY | 377.0 | 2026-09-28 | 619.0 | 3704.0
-   AIRPORT | 473.0 | 2026-10-05 | 682.0 | 507.0
-   DOWNTOWN | 708.0 | 2026-10-05 | 1030.0 | 843.0
-   HIGHWAY | 353.0 | 2026-10-05 | 537.0 | 164.0
-   Seasonal-naive leaves ~14,000 mooncake units of demand in the week of 09-28, after the festival;
-   the model forecasts ~1,600 — the difference is stock that manual ordering would have left to expire.
+channel_type | forecast_week | forecast_units | p90_units | seasonal_naive
+AIRPORT      | 2026-08-31    | 633            | 1,620     | 509
+DOWNTOWN     | 2026-08-31    | 921            | 1,954     | 796
+HIGHWAY      | 2026-08-31    | 432            | 1,546     | 368
+AIRPORT      | 2026-09-07    | 1,650          | 8,221     | 615
+DOWNTOWN     | 2026-09-07    | 2,959          | 10,028    | 1,182
+HIGHWAY      | 2026-09-07    | 1,100          | 7,299     | 617
+AIRPORT      | 2026-09-14    | 4,258          | 9,348     | 6,009
+DOWNTOWN     | 2026-09-14    | 8,031          | 17,019    | 11,085
+HIGHWAY      | 2026-09-14    | 2,558          | 7,694     | 3,930
+AIRPORT      | 2026-09-21    | 5,669          | 13,537    | 15,553
+DOWNTOWN     | 2026-09-21    | 7,524          | 18,808    | 25,367
+HIGHWAY      | 2026-09-21    | 4,596          | 11,769    | 11,260
+AIRPORT      | 2026-09-28    | 501            | 847       | 12,577
+DOWNTOWN     | 2026-09-28    | 759            | 1,150     | 13,699
+HIGHWAY      | 2026-09-28    | 381            | 677       | 7,803
+AIRPORT      | 2026-10-05    | 481            | 698       | 1,043
+DOWNTOWN     | 2026-10-05    | 723            | 1,045     | 1,197
+HIGHWAY      | 2026-10-05    | 356            | 541       | 200
 
-3) Top driver per forecast (largest absolute contribution to the expected forecast)
-   n | top_driver
-   8817 | sku_id
-   2737 | roll_mean_8
-   1372 | t_same_event_ly
-   295 | t_lag_52
-   257 | location_id
-   4 | roll_mean_4
-   sku_id / location_id mean 'this product/store's usual level'; recommendations will map drivers to plain language.
+3) Top driver groups in current forecasts
+top_driver            | n
+Last year             | 7,174
+Holiday               | 3,632
+Recent trend          | 2,676
+
+4) Recommendations generated from current forecasts
+Rows 2,247; recommended units 190,674; lines to order 1,595; shelf-life capped 307; high stockout risk 1,029; high overstock risk 119; order value at cost $1,844,500.
+
+Genie validation
+python3 genie/build_space.py --check passed all 6 examples and 14 benchmarks, including:
+- current forecast totals from gold.demand_forecasts_current
+- peak gift stockout day rate
+- policy backtest business impact summary

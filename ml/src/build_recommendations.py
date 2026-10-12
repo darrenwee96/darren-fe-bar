@@ -25,12 +25,12 @@ spark.sql("""
 CREATE OR REPLACE TEMPORARY VIEW recommendations_staged AS
 WITH run AS (
   SELECT forecast_run_id, as_of_date, model_version
-  FROM gold.demand_forecasts
+  FROM gold.demand_forecasts_current
   ORDER BY generated_at DESC
   LIMIT 1
 ),
 forecast AS (
-  SELECT f.* FROM gold.demand_forecasts f JOIN run USING (forecast_run_id)
+  SELECT f.* FROM gold.demand_forecasts_current f JOIN run USING (forecast_run_id)
 ),
 product AS (
   SELECT *, CAST(lead_time_days / 7 AS INT) AS lead_weeks, CAST(floor(shelf_life_days / 7) AS INT) AS shelf_weeks
@@ -62,7 +62,11 @@ agg AS (
     sum(CASE WHEN f.horizon > p.lead_weeks AND f.horizon <= p.lead_weeks + p.shelf_weeks THEN f.forecast_units ELSE 0 END) AS demand_in_shelf_window,
     sum(CASE WHEN f.horizon <= greatest(p.shelf_weeks, 1) THEN f.forecast_units ELSE 0 END) AS demand_before_current_expiry,
     sum(f.forecast_units) AS demand_6w_units,
-    max_by(f.top_driver, f.forecast_units) AS model_top_driver
+    max_by(f.top_driver, abs(f.top_driver_contribution)) AS model_top_driver,
+    sum(CASE WHEN f.top_driver = 'Holiday' THEN f.top_driver_contribution ELSE 0 END) AS holiday_driver_units,
+    sum(CASE WHEN f.top_driver = 'Recent trend' THEN f.top_driver_contribution ELSE 0 END) AS recent_driver_units,
+    sum(CASE WHEN f.top_driver = 'Last year' THEN f.top_driver_contribution ELSE 0 END) AS last_year_driver_units,
+    sum(CASE WHEN f.top_driver = 'Store-product baseline' THEN f.top_driver_contribution ELSE 0 END) AS baseline_driver_units
   FROM forecast f
   JOIN product p USING (sku_id)
   GROUP BY ALL
@@ -122,16 +126,14 @@ SELECT
        ELSE 'LOW' END AS overstock_risk,
   round(greatest(0, s.demand_cover_units - s.stock_position) * s.list_price, 2) AS est_lost_sales_if_no_order,
   round(CASE WHEN s.shelf_weeks < 6 THEN greatest(0, s.stock_position - s.demand_before_current_expiry) * s.unit_cost ELSE 0 END, 2) AS est_expiry_value,
-  CASE s.model_top_driver
-    WHEN 't_same_event_ly' THEN 'Same holiday last year'
-    WHEN 't_lag_52' THEN 'Same week last year'
-    WHEN 'roll_mean_8' THEN 'Recent 8-week sales'
-    WHEN 'roll_mean_4' THEN 'Recent 4-week sales'
-    WHEN 't_weeks_to_next_event' THEN 'Upcoming holiday'
-    WHEN 't_in_event_window' THEN 'Holiday window'
-    ELSE 'Usual level for this product and store'
-  END AS top_driver,
+  s.model_top_driver AS top_driver,
   concat_ws(' · ',
+    CASE WHEN abs(s.holiday_driver_units) >= greatest(abs(s.recent_driver_units), abs(s.last_year_driver_units), abs(s.baseline_driver_units))
+         THEN concat(CASE WHEN s.holiday_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.holiday_driver_units, 0), ' units from holiday timing') END,
+    CASE WHEN abs(s.recent_driver_units) >= greatest(abs(s.last_year_driver_units), abs(s.baseline_driver_units))
+         THEN concat(CASE WHEN s.recent_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.recent_driver_units, 0), ' units from recent trend') END,
+    CASE WHEN abs(s.last_year_driver_units) >= greatest(abs(s.holiday_driver_units), abs(s.baseline_driver_units))
+         THEN concat(CASE WHEN s.last_year_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.last_year_driver_units, 0), ' units from last year') END,
     CASE WHEN ne.weeks_to_next_event <= 6 AND s.recent_weekly_units > 0
               AND s.demand_cover_units / (s.lead_weeks + 1) > 1.2 * s.recent_weekly_units
          THEN concat(ne.next_event_name, ' in ', ne.weeks_to_next_event, CASE WHEN ne.weeks_to_next_event = 1 THEN ' week' ELSE ' weeks' END) END,

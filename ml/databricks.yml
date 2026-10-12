@@ -18,6 +18,10 @@ variables:
   as_of:
     description: First forecast week (Monday after the last observed week).
     default: "2026-08-31"
+  etl_pipeline_id:
+    description: Existing eastwind-etl Lakeflow pipeline ID for the scoring and training jobs to refresh first.
+    lookup:
+      pipeline: eastwind-etl
 
 targets:
   dev:

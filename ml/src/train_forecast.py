@@ -16,6 +16,7 @@
 dbutils.widgets.text("catalog", "darren_fe_bar_catalog")
 dbutils.widgets.text("experiment", "/Users/darren.wee@databricks.com/eastwind-gourmet/demand_forecasting")
 dbutils.widgets.text("as_of", "2026-08-31")
+dbutils.widgets.text("mode", "train_score")
 
 import json
 import warnings
@@ -33,9 +34,11 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)  # nanmean over all-N
 CATALOG = dbutils.widgets.get("catalog")
 EXPERIMENT = dbutils.widgets.get("experiment")
 AS_OF = pd.Timestamp(dbutils.widgets.get("as_of"))
+MODE = dbutils.widgets.get("mode")
 MODEL_NAME = f"{CATALOG}.ml.eastwind_demand"
 HORIZON = 6
 CENSORED_OOS_DAYS = 2
+PROMOTE_TOLERANCE = 0.002
 # Backtest folds: (name, first origin, last origin). Each fold trains on target weeks before its first origin.
 FOLDS = [
     ("MA2025", "2025-08-04", "2025-10-20"),  # Mid-Autumn 2025-10-06
@@ -55,17 +58,19 @@ experiment_id = mlflow.set_experiment(EXPERIMENT).experiment_id
 
 hist = (
     spark.table(f"{CATALOG}.gold.weekly_demand_features")
-    .select("location_id", "sku_id", "week_start", "units_sold", "oos_days",
+    .select("location_id", "sku_id", "week_start", "units_sold", "demand_units_uncensored", "oos_days", "in_stock_days",
             "channel_type", "region", "capacity_tier", "category", "gift_flag", "peak_gift_flag",
             "shelf_life_days", "list_price")
     .toPandas()
 )
 hist["week_start"] = pd.to_datetime(hist["week_start"])
+hist["list_price"] = hist["list_price"].astype(float)
 cal = (
     spark.table(f"{CATALOG}.silver.dim_calendar")
     .where("day_of_week = 2")  # Mondays
     .select(F.col("date").alias("week_start"), "next_event_type", "next_event_seq",
-            "weeks_to_next_event", "in_event_window")
+            "weeks_to_next_event", "days_to_next_event", "days_from_week_start_to_next_event",
+            "event_window_days_in_week", "event_peak_days_in_week", "in_event_window")
     .toPandas()
 )
 cal["week_start"] = pd.to_datetime(cal["week_start"])
@@ -84,13 +89,15 @@ S = len(series)
 # Dense matrices: units and out-of-stock days by series x week; NaN where the SKU is not stocked.
 U = np.full((S, K_HIST), np.nan)
 OOS = np.zeros((S, K_HIST))
-U[hist["s"], hist["k"]] = hist["units_sold"]
+U[hist["s"], hist["k"]] = hist["demand_units_uncensored"].fillna(hist["units_sold"])
 OOS[hist["s"], hist["k"]] = hist["oos_days"]
+INSTOCK = np.zeros((S, K_HIST))
+INSTOCK[hist["s"], hist["k"]] = hist["in_stock_days"].fillna(7)
 
 cal["k"] = ((cal["week_start"] - BASE).dt.days // 7).astype(int)
 cal_by_k = cal.set_index("k")
 # (event_type, event_seq, weeks_to_event) -> week index, for event-aligned "same week last year".
-event_week = {(r.next_event_type, int(r.next_event_seq), int(r.weeks_to_next_event)): int(r.k)
+event_week = {(r.next_event_type, int(r.next_event_seq), int(r.days_to_next_event)): int(r.k)
               for r in cal.dropna(subset=["next_event_type"]).itertuples()}
 print(f"series={S} history_weeks={K_HIST} base={BASE.date()} as_of={AS_OF.date()}")
 
@@ -105,7 +112,9 @@ CAT_FEATURES = ["location_id", "sku_id", "channel_type", "region", "capacity_tie
 NUM_FEATURES = [
     "horizon", "gift_flag", "peak_gift_flag", "shelf_life_days", "list_price",
     "lag_1", "lag_2", "lag_4", "roll_mean_4", "roll_mean_8", "oos_days_prev_4", "ly_origin_mean_4",
-    "t_lag_52", "t_same_event_ly", "t_weeks_to_next_event", "t_in_event_window", "t_week_of_year",
+    "in_stock_days_prev_4", "t_lag_52", "t_same_event_ly", "t_weeks_to_next_event", "t_days_to_next_event",
+    "t_days_from_week_start_to_next_event", "t_event_window_days_in_week", "t_event_peak_days_in_week",
+    "t_in_event_window", "t_week_of_year",
 ]
 FEATURES = CAT_FEATURES + NUM_FEATURES
 CATEGORIES = {c: sorted(series[c].unique().tolist()) for c in CAT_FEATURES if c != "t_next_event_type"}
@@ -131,12 +140,13 @@ def design(origins):
             "lag_1": week_col(U, o - 1), "lag_2": week_col(U, o - 2), "lag_4": week_col(U, o - 4),
             "roll_mean_4": window_mean(o - 4, o), "roll_mean_8": window_mean(o - 8, o),
             "oos_days_prev_4": OOS[:, max(0, o - 4):min(o, K_HIST)].sum(axis=1),
+            "in_stock_days_prev_4": INSTOCK[:, max(0, o - 4):min(o, K_HIST)].sum(axis=1),
             "ly_origin_mean_4": window_mean(o - 56, o - 52),
         }
         for h in range(1, HORIZON + 1):
             t = o + h - 1
             c = cal_by_k.loc[t]
-            ly_k = event_week.get((c.next_event_type, int(c.next_event_seq) - 1, int(c.weeks_to_next_event)), -1)
+            ly_k = event_week.get((c.next_event_type, int(c.next_event_seq) - 1, int(c.days_to_next_event)), -1)
             df = static.copy()
             df["origin_week"] = BASE + pd.Timedelta(weeks=o)
             df["target_week"] = BASE + pd.Timedelta(weeks=t)
@@ -147,6 +157,10 @@ def design(origins):
             df["t_same_event_ly"] = week_col(U, ly_k)
             df["t_next_event_type"] = c.next_event_type
             df["t_weeks_to_next_event"] = int(c.weeks_to_next_event)
+            df["t_days_to_next_event"] = int(c.days_to_next_event)
+            df["t_days_from_week_start_to_next_event"] = int(c.days_from_week_start_to_next_event)
+            df["t_event_window_days_in_week"] = int(c.event_window_days_in_week)
+            df["t_event_peak_days_in_week"] = int(c.event_peak_days_in_week)
             df["t_in_event_window"] = int(bool(c.in_event_window))
             df["t_week_of_year"] = int((BASE + pd.Timedelta(weeks=t)).isocalendar().week)
             df["actual"] = week_col(U, t)
@@ -165,12 +179,80 @@ def design(origins):
 
 
 def trainable(df):
+    return df[df["actual"].notna()]
+
+
+def observed_scored(df):
     return df[df["actual"].notna() & ~df["censored"]]
 
 
 all_origins = list(range(8, K_HIST))  # need 8 weeks of lags
 history = design(all_origins)
 print(f"design rows={len(history):,}  trainable={len(trainable(history)):,}")
+
+if MODE == "score_only":
+    with mlflow.start_run(run_name="score_champion_only") as score_run:
+        future = design([K_HIST])
+        client = MlflowClient(registry_uri="databricks-uc")
+        champion_version = client.get_model_version_by_alias(MODEL_NAME, "champion").version
+        champion = mlflow.pyfunc.load_model(f"models:/{MODEL_NAME}@champion")
+        score_input = future[FEATURES].copy()
+        for c in CATEGORIES:
+            score_input[c] = score_input[c].astype(str)
+        preds = champion.predict(score_input)
+        future["forecast_units"] = preds["forecast_units"].to_numpy()
+        future["forecast_p90"] = preds["forecast_p90"].to_numpy()
+        holiday = (future["peak_gift_flag"].astype(int) == 1) & (
+            (future["t_event_window_days_in_week"].astype(int) > 0) | (future["t_weeks_to_next_event"].astype(int) <= 6)
+        )
+        recent = (~holiday) & (future["horizon"].astype(int) <= 2) & (future["roll_mean_4"].fillna(0) > 0)
+        last_year = (~holiday) & (~recent) & future["t_lag_52"].notna()
+        future["top_driver"] = np.select(
+            [holiday, recent, last_year],
+            ["Holiday", "Recent trend", "Last year"],
+            default="Store-product baseline",
+        )
+        reference = np.select(
+            [holiday, recent, last_year],
+            [future["seasonal_naive"], future["roll_mean_4"].fillna(0), future["t_lag_52"].fillna(0)],
+            default=future["forecast_units"],
+        )
+        future["top_driver_contribution"] = future["forecast_units"] - reference
+        mlflow.log_metrics({"forecast_rows": len(future), "forecast_total_units": float(future["forecast_units"].sum())})
+
+        run_id = score_run.info.run_id
+        generated_at = pd.Timestamp.utcnow().tz_localize(None)
+        forecasts = future[["location_id", "sku_id", "channel_type", "origin_week", "target_week", "horizon",
+                            "forecast_units", "forecast_p90", "seasonal_naive", "event_naive",
+                            "top_driver", "top_driver_contribution"]].copy()
+        for c in ["location_id", "sku_id", "channel_type"]:
+            forecasts[c] = forecasts[c].astype(str)
+        forecasts = forecasts.rename(columns={"origin_week": "as_of_date", "target_week": "forecast_week",
+                                              "seasonal_naive": "baseline_seasonal_naive", "event_naive": "baseline_event_naive"})
+        forecasts.insert(0, "forecast_run_id", run_id)
+        forecasts["model_name"] = MODEL_NAME
+        forecasts["model_version"] = str(champion_version)
+        forecasts["generated_at"] = generated_at
+        (spark.createDataFrame(forecasts)
+         .withColumn("as_of_date", F.to_date("as_of_date")).withColumn("forecast_week", F.to_date("forecast_week"))
+         .write.mode("append").option("mergeSchema", "true").saveAsTable(f"{CATALOG}.gold.demand_forecasts"))
+        spark.sql(f"""
+        CREATE OR REPLACE VIEW {CATALOG}.gold.demand_forecasts_current
+        COMMENT 'Latest forecast_run_id from append-only gold.demand_forecasts. Use this for current Genie and planner reads.'
+        AS
+        SELECT *
+        FROM {CATALOG}.gold.demand_forecasts
+        WHERE forecast_run_id = (
+          SELECT forecast_run_id
+          FROM {CATALOG}.gold.demand_forecasts
+          QUALIFY row_number() OVER (ORDER BY generated_at DESC, forecast_run_id DESC) = 1
+        )
+        """)
+        dbutils.notebook.exit(json.dumps({
+            "mode": MODE, "final_run_id": run_id, "model": MODEL_NAME, "model_version": str(champion_version),
+            "alias": "champion", "forecast_rows": len(forecasts),
+            "forecast_weeks": sorted(forecasts["forecast_week"].astype(str).unique().tolist()),
+        }))
 
 # COMMAND ----------
 
@@ -231,9 +313,10 @@ def accuracy_table(df, actual_col="actual"):
 class DemandForecaster(mlflow.pyfunc.PythonModel):
     """Expected weekly units (Tweedie) and p90 (quantile) for store-SKU-horizon rows."""
 
-    def __init__(self, mean_model, p90_model, features, categories):
+    def __init__(self, mean_model, p90_model, features, categories, p90_calibration=None):
         self.mean_model, self.p90_model = mean_model, p90_model
         self.features, self.categories = features, categories
+        self.p90_calibration = p90_calibration or {"peak_event": 0.0, "rest": 0.0}
 
     def predict(self, context, model_input, params=None):
         x = model_input[self.features].copy()
@@ -241,6 +324,10 @@ class DemandForecaster(mlflow.pyfunc.PythonModel):
             x[c] = pd.Categorical(x[c].astype(str), categories=cats)
         f = np.clip(self.mean_model.predict(x), 0, None)
         p90 = np.maximum(np.clip(self.p90_model.predict(x), 0, None), f)
+        if {"peak_gift_flag", "t_in_event_window"}.issubset(model_input.columns):
+            peak = (model_input["peak_gift_flag"].astype(int) == 1) & (model_input["t_in_event_window"].astype(int) == 1)
+            uplift = np.where(peak, self.p90_calibration.get("peak_event", 0.0), self.p90_calibration.get("rest", 0.0))
+            p90 = p90 + uplift
         return pd.DataFrame({"forecast_units": f, "forecast_p90": p90})
 
 
@@ -282,7 +369,7 @@ with mlflow.start_run(run_name="backtest") as backtest_run:
             test = history[(history["origin_week"] >= first_ts) & (history["origin_week"] <= last_ts)].copy()
             models = fit(train)
             test["forecast"], test["forecast_p90"] = predict(models, test)
-            scored = trainable(test)
+            scored = observed_scored(test)
             acc = accuracy_table(scored).assign(fold=name, scored_against="observed_uncensored")
             # Censoring check: all test weeks (including censored) against true demand.
             vs_truth = test.merge(truth, on=["location_id", "sku_id", "target_week"], how="inner")
@@ -300,6 +387,14 @@ with mlflow.start_run(run_name="backtest") as backtest_run:
             fold_tables.append(table)
             fold_preds.append(test.assign(fold=name))
     backtest_acc = pd.concat(fold_tables, ignore_index=True)
+    backtest_pred = pd.concat(fold_preds, ignore_index=True)
+    residual_source = backtest_pred.merge(truth, on=["location_id", "sku_id", "target_week"], how="inner")
+    residual_source["p90_gap"] = (residual_source["true_units"] - residual_source["forecast_p90"]).clip(lower=0)
+    peak_mask = (residual_source["peak_gift_flag"] == 1) & (residual_source["t_in_event_window"] == 1)
+    p90_uplift_peak = float(np.nanquantile(residual_source.loc[peak_mask, "p90_gap"], 0.90)) if peak_mask.any() else 0.0
+    p90_uplift_rest = float(np.nanquantile(residual_source.loc[~peak_mask, "p90_gap"], 0.90)) if (~peak_mask).any() else 0.0
+    p90_calibration = {"peak_event": round(p90_uplift_peak, 4), "rest": round(p90_uplift_rest, 4)}
+    mlflow.log_params({f"p90_conformal_uplift_{k}": v for k, v in p90_calibration.items()})
     mlflow.log_table(backtest_acc, artifact_file="accuracy_all_folds.json")
     for name, s in fold_summary.items():
         mlflow.log_metric(f"wmape_model_ALL_{name}", s["model"])
@@ -317,17 +412,18 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
     train = trainable(history)
     models = fit(train)
     mean_model, p90_model = models
-    mlflow.log_params({"train_rows": len(train), "train_target_weeks": f"{train.target_week.min().date()}..{train.target_week.max().date()}",
+    mlflow.log_params({"mode": MODE, "train_rows": len(train), "train_target_weeks": f"{train.target_week.min().date()}..{train.target_week.max().date()}",
                        "as_of": str(AS_OF.date()), "backtest_run_id": backtest_run.info.run_id,
                        "mean_objective": "tweedie(1.3)", "p90_objective": "quantile(0.9)",
-                       "mean_rounds": MEAN_ROUNDS, "p90_rounds": P90_ROUNDS})
+                       "mean_rounds": MEAN_ROUNDS, "p90_rounds": P90_ROUNDS,
+                       **{f"p90_conformal_uplift_{k}": v for k, v in p90_calibration.items()}})
     for name, s in fold_summary.items():
         for method, v in s.items():
             mlflow.log_metric(f"backtest_{name}_{'p90_coverage' if method == 'model_p90_coverage' else 'wmape_' + method}", v)
     importance = pd.DataFrame({"feature": FEATURES, "gain": mean_model.feature_importance("gain")}).sort_values("gain", ascending=False)
     mlflow.log_table(importance, artifact_file="feature_importance.json")
 
-    forecaster = DemandForecaster(mean_model, p90_model, FEATURES, CATEGORIES)
+    forecaster = DemandForecaster(mean_model, p90_model, FEATURES, CATEGORIES, p90_calibration)
     example = model_input(train.head(50))
     info = mlflow.pyfunc.log_model(
         name="model",
@@ -339,22 +435,61 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
     )
     client = MlflowClient(registry_uri="databricks-uc")
     version = info.registered_model_version
-    client.set_registered_model_alias(MODEL_NAME, "champion", version)
+    current_champion = None
+    try:
+        current = client.get_model_version_by_alias(MODEL_NAME, "champion")
+        current_champion = current.version
+    except Exception:
+        pass
+    candidate_wmape = float(np.mean([s["model"] for s in fold_summary.values()]))
+    champion_wmape = None
+    if current_champion:
+        try:
+            runs = mlflow.search_runs(
+                experiment_ids=[experiment_id],
+                filter_string=f"params.model_version = '{current_champion}'",
+                order_by=["start_time DESC"],
+                max_results=1,
+            )
+            if len(runs):
+                vals = [runs.iloc[0].get(f"metrics.backtest_{name}_wmape_model") for name, *_ in FOLDS]
+                vals = [float(v) for v in vals if pd.notna(v)]
+                champion_wmape = float(np.mean(vals)) if vals else None
+        except Exception as e:
+            mlflow.set_tag("champion_gate_warning", str(e)[:250])
+    promote = MODE != "score_only" and (champion_wmape is None or candidate_wmape <= champion_wmape + PROMOTE_TOLERANCE)
+    if promote:
+        client.set_registered_model_alias(MODEL_NAME, "champion", version)
+    mlflow.log_params({"model_version": version, "previous_champion_version": current_champion,
+                       "candidate_mean_wmape": candidate_wmape, "champion_mean_wmape": champion_wmape,
+                       "promoted_to_champion": promote})
     client.update_model_version(MODEL_NAME, version, description=(
         f"Global LightGBM demand forecaster (Tweedie mean + p90 quantile), horizons 1-{HORIZON} weeks. "
         f"Backtest WMAPE: " + ", ".join(f"{k} model {v['model']:.3f} vs seasonal-naive {v['seasonal_naive']:.3f}" for k, v in fold_summary.items())))
-    mlflow.log_param("model_version", version)
 
     # Score from the as-of date with the registered @champion model.
     future = design([K_HIST])
-    champion = mlflow.pyfunc.load_model(f"models:/{MODEL_NAME}@champion")
+    score_version = str(version if promote or not current_champion else current_champion)
+    scoring_uri = info.model_uri if promote or not current_champion else f"models:/{MODEL_NAME}@champion"
+    champion = mlflow.pyfunc.load_model(scoring_uri)
     preds = champion.predict(model_input(future))
     future["forecast_units"] = preds["forecast_units"].to_numpy()
     future["forecast_p90"] = preds["forecast_p90"].to_numpy()
     # Top driver: the feature with the largest contribution to the expected forecast.
     contrib = mean_model.predict(future[FEATURES], pred_contrib=True)[:, :-1]
     top = np.abs(contrib).argmax(axis=1)
-    future["top_driver"] = np.array(FEATURES)[top]
+    def driver_group(feature):
+        if feature in {"t_same_event_ly", "t_weeks_to_next_event", "t_days_to_next_event",
+                       "t_days_from_week_start_to_next_event", "t_event_window_days_in_week",
+                       "t_event_peak_days_in_week", "t_in_event_window", "t_next_event_type"}:
+            return "Holiday"
+        if feature in {"lag_1", "lag_2", "lag_4", "roll_mean_4", "roll_mean_8", "oos_days_prev_4", "in_stock_days_prev_4"}:
+            return "Recent trend"
+        if feature in {"t_lag_52", "ly_origin_mean_4"}:
+            return "Last year"
+        return "Store-product baseline"
+
+    future["top_driver"] = [driver_group(f) for f in np.array(FEATURES)[top]]
     future["top_driver_contribution"] = contrib[np.arange(len(future)), top]
     mlflow.log_metrics({"forecast_rows": len(future), "forecast_total_units": float(future["forecast_units"].sum())})
 
@@ -376,11 +511,24 @@ forecasts = forecasts.rename(columns={"origin_week": "as_of_date", "target_week"
                                       "seasonal_naive": "baseline_seasonal_naive", "event_naive": "baseline_event_naive"})
 forecasts.insert(0, "forecast_run_id", run_id)
 forecasts["model_name"] = MODEL_NAME
-forecasts["model_version"] = str(version)
+forecasts["model_version"] = score_version
 forecasts["generated_at"] = generated_at
 (spark.createDataFrame(forecasts)
  .withColumn("as_of_date", F.to_date("as_of_date")).withColumn("forecast_week", F.to_date("forecast_week"))
  .write.mode("append").option("mergeSchema", "true").saveAsTable(f"{CATALOG}.gold.demand_forecasts"))
+
+spark.sql(f"""
+CREATE OR REPLACE VIEW {CATALOG}.gold.demand_forecasts_current
+COMMENT 'Latest forecast_run_id from append-only gold.demand_forecasts. Use this for current Genie and planner reads.'
+AS
+SELECT *
+FROM {CATALOG}.gold.demand_forecasts
+WHERE forecast_run_id = (
+  SELECT forecast_run_id
+  FROM {CATALOG}.gold.demand_forecasts
+  QUALIFY row_number() OVER (ORDER BY generated_at DESC, forecast_run_id DESC) = 1
+)
+""")
 
 acc_out = backtest_acc.assign(backtest_run_id=backtest_run.info.run_id, model_name=MODEL_NAME,
                               model_version=str(version), generated_at=generated_at)
@@ -395,9 +543,33 @@ bt = bt.merge(truth, on=["location_id", "sku_id", "target_week"], how="left")
 (spark.createDataFrame(bt).withColumn("origin_week", F.to_date("origin_week")).withColumn("target_week", F.to_date("target_week"))
  .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{CATALOG}.ml.backtest_forecasts"))
 
+policy = bt.copy()
+policy["manual_order_units"] = np.maximum(0, policy["seasonal_naive"] * 1.25 - policy["actual"].fillna(0))
+policy["forecast_order_units"] = np.maximum(0, policy["forecast"] + (policy["forecast_p90"] - policy["forecast"]) - policy["actual"].fillna(0))
+policy["manual_lost_units"] = np.maximum(0, policy["true_units"].fillna(policy["actual"]) - policy["seasonal_naive"] * 1.25)
+policy["forecast_lost_units"] = np.maximum(0, policy["true_units"].fillna(policy["actual"]) - policy["forecast_p90"])
+policy["manual_waste_units"] = np.maximum(0, policy["seasonal_naive"] * 1.25 - policy["true_units"].fillna(policy["actual"]))
+policy["forecast_waste_units"] = np.maximum(0, policy["forecast_p90"] - policy["true_units"].fillna(policy["actual"]))
+price = series[["location_id", "sku_id", "channel_type", "list_price"]].copy()
+price["list_price"] = price["list_price"].astype(float)
+policy = policy.merge(price, on=["location_id", "sku_id", "channel_type"], how="left")
+policy_summary = (
+    policy.groupby(["fold", "channel_type"], as_index=False)
+    .agg(manual_lost_sales=("manual_lost_units", lambda x: float((x * policy.loc[x.index, "list_price"]).sum())),
+         forecast_lost_sales=("forecast_lost_units", lambda x: float((x * policy.loc[x.index, "list_price"]).sum())),
+         manual_waste_value=("manual_waste_units", lambda x: float((x * policy.loc[x.index, "list_price"] * 0.55).sum())),
+         forecast_waste_value=("forecast_waste_units", lambda x: float((x * policy.loc[x.index, "list_price"] * 0.55).sum())))
+)
+policy_summary["annualized_lost_sales_delta"] = (policy_summary["manual_lost_sales"] - policy_summary["forecast_lost_sales"]) * 52 / 18
+policy_summary["annualized_waste_delta"] = (policy_summary["manual_waste_value"] - policy_summary["forecast_waste_value"]) * 52 / 18
+spark.createDataFrame(policy_summary).write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
+    f"{CATALOG}.gold.business_impact_summary"
+)
+
 for t, c in [("gold.demand_forecasts", "Six-week store-SKU forecasts (expected units and p90) from the @champion model; append-only by forecast_run_id."),
              ("gold.forecast_accuracy", "Backtest WMAPE / bias / p90 coverage by fold, channel, horizon, and segment: model vs seasonal-naive and event-aligned naive."),
-             ("ml.backtest_forecasts", "Rolling-origin backtest predictions with actuals, censoring flag, and synthetic true demand.")]:
+             ("ml.backtest_forecasts", "Rolling-origin backtest predictions with actuals, censoring flag, and synthetic true demand."),
+             ("gold.business_impact_summary", "Policy backtest comparing forecast-driven orders with manual seasonal-naive ordering by fold and channel.")]:
     spark.sql(f"COMMENT ON TABLE {CATALOG}.{t} IS '{c}'")
 
 dbutils.notebook.exit(json.dumps({
