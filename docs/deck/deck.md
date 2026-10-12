@@ -41,7 +41,7 @@ For the VP Merchandising and the CIO · October 2026
 |---|---|---|---|
 | Lost sales recovered (target) | **$2–3M/yr** | 10–15% of today's $17.8M/yr lost sales | Conservative: the peak-season backtest cut modelled lost sales in every channel and every holiday window |
 | Plan-for coverage | **91–92%** | of store-SKU-weeks land within the p90 plan-for quantity | The calibrated p90 band drives safety stock, so you know how much buffer you're buying |
-| One platform | **1** | platform from ingestion to ML, apps, and Gen AI | 6 capabilities on Databricks under one governance layer. No tool sprawl, no copies between vendors, one bill |
+| One platform | **1** | platform from ingestion to ML, apps, and Gen AI | 6 capabilities on Databricks, one security and lineage model, fewer vendor handoffs |
 
 - **VP Merchandising:** fuller shelves on peak gifts, and orders your managers trust.
 - **CIO:** one governed platform from POS to order, traceable end to end.
@@ -84,7 +84,7 @@ Managers order from experience. Holiday peaks make the swings larger.
 
 **Speaker notes**
 - **TELL:** "Four reasons this hasn't been solved with a spreadsheet or another point tool."
-- **SHOW:** The five feeds don't share keys. Sales history undercounts demand exactly when shelves are empty. Festivals move, so last year's week is the wrong week. And the usual answer, six tools wired together, means six copies of the data and six permission models.
+- **SHOW:** The five feeds don't share keys. Sales history undercounts demand exactly when shelves are empty. Festivals move, so last year's week is the wrong week. And the usual answer, six tools wired together, means copies and handoffs between vendors, each with its own permission model.
 - **TELL:** "The first three are data and modelling problems. The fourth is a platform problem, and it's what makes the first three expensive to fix. The next slide addresses all four."
 
 ---
@@ -100,14 +100,14 @@ Raw files (POS sales, ERP inventory, product catalog, store master, holiday cale
 - **Databricks App:** managers review and approve orders
 - **Unity Catalog, one governance layer under everything:** permissions, lineage, and audit across every step
 - **Loop:** decisions flow back to gold.
-- Band label: one copy of data · one bill.
+- Band label: one governed data flow.
 
 One weekly job refreshes data, scores the @champion model, builds orders, loads Lakebase, and ingests decisions.
 
 **Speaker notes**
 - **TELL:** "One platform, not a chain of vendors."
 - **SHOW:** Raw files land in Lakeflow and are refined bronze to silver to gold, and bad rows are quarantined. The forecast trains on gold, is tracked in MLflow, and serves only once it passes the @champion gate. Orders and manager decisions live in Lakebase, the operational database, with an audit trail. Genie and the app sit on the same data. Unity Catalog runs underneath all of it: one set of permissions, one lineage graph.
-- **TELL:** "For you, [CIO], that means no copies between vendors, one security model, and one bill. Every recommended order traces back to the POS and ERP rows behind it."
+- **TELL:** "For you, [CIO], that means one platform to govern and operate: no vendor-to-vendor copies, fewer handoffs, and one security and lineage model. Every recommended order traces back to the POS and ERP rows behind it."
 
 ---
 
@@ -122,7 +122,7 @@ One weekly job refreshes data, scores the @champion model, builds orders, loads 
 | Slow decisions | One-click approve in the App, on Lakebase | Accept, adjust, or reject with a reason, all audited |
 | Ad-hoc questions | Genie Agent on governed gold tables | 11 of 11 benchmark questions correct, SQL shown |
 
-**Every row runs on one platform: same data, same permissions, no copies.**
+**Every row runs on one platform: same data, same permissions, no vendor-to-vendor copies.**
 
 **Speaker notes**
 - **TELL:** "Each pain point maps to one capability and one result, all on the same platform."
@@ -208,7 +208,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 ### VP Merchandising
 
 **1. What does it cost?**
-- *Exec:* It runs on one platform with one bill, so there's no separate ETL, ML, database, and app licence. We'll size the pilot with you; this build doesn't include a cost figure.
+- *Exec:* It runs on one platform to govern and operate, with fewer vendor handoffs to build and maintain. We'll size the pilot with you; this build doesn't include a cost figure.
 - *Technical:* The pipeline, SQL warehouse, and Lakebase run serverless or autoscaling (E§3, E§7). The weekly scoring job ran in about six minutes (E§5).
 
 **2. What's the risk?**
@@ -259,7 +259,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 
 ### Objection handling
 
-- **"We already have a BI tool and a data warehouse."** Keep them. This isn't a BI replacement; it's the forecast-to-order loop your BI can't close. Gold tables are open to your BI through a SQL warehouse, and you avoid adding yet another copy for ML, an OLTP database, and an app host.
+- **"We already have a BI tool and a data warehouse."** Keep them. This isn't a BI replacement; it's the forecast-to-order loop your BI can't close. Gold tables are open to your BI through a SQL warehouse, and you avoid adding vendor-to-vendor copies for ML, an OLTP database, and an app host.
 - **"Why not buy a point forecasting SaaS?"** A SaaS forecast is another copy of your data, another permission model, and a black box your managers won't trust. Here the festival logic is yours, every order traces to its source rows, and manager decisions flow back to improve the next forecast, all under Unity Catalog.
 - **"These numbers are synthetic."** Yes, and we say so on the slides. The synthetic business is calibrated to realistic magnitudes ($160.8M net sales, $17.8M lost sales, $3.87M waste a year, E§2). That's exactly why the ask is a one-region pilot: to measure on your real data before any finance claim.
 - **"$26.8M sounds too good."** Agreed, which is why it isn't our headline. It annualises the two most stressed holiday windows. We commit to $2–3M and let the pilot and a full-year replay decide the rest.
