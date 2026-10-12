@@ -6,3 +6,7 @@ env:
     valueFrom: postgres
   - name: DATABRICKS_GENIE_SPACE_ID
     valueFrom: genie-space
+  # Network-wide planner scope ('*') seeded into replenishment.user_scope at startup (comma-separated emails).
+  # Everyone else is fail-closed until a row is added for them.
+  - name: REPLENISHMENT_ANALYSTS
+    value: 'darren.wee@databricks.com'

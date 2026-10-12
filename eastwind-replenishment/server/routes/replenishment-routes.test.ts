@@ -2,7 +2,28 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { registerReplenishmentRoutes, resolveScope, type Lakebase } from './replenishment-routes';
+import { scimVerifier, type IdentityOptions } from './identity';
+import { registerReplenishmentRoutes, resolveScope, scopeSeedRows, type Lakebase } from './replenishment-routes';
+
+const PLANNER = 'planner@eastwind.example';
+/** Default user_scope: the planner holds the explicit network-wide grant. */
+const NETWORK_WIDE: Record<string, { region: string | null; location_id: string | null }[]> = {
+  [PLANNER]: [{ region: '*', location_id: null }],
+};
+
+/** Fake workspace: token "tok:<email>" belongs to <email>; "tok:revoked" is rejected. Counts verifications. */
+function fakeIdentity(devUser: string | null = null) {
+  const verified: string[] = [];
+  const options: IdentityOptions = {
+    devUser,
+    verifyToken: (token) => {
+      verified.push(token);
+      const email = token.startsWith('tok:') ? token.slice(4) : null;
+      return Promise.resolve(email === 'revoked' ? null : email);
+    },
+  };
+  return { options, verified };
+}
 
 interface Call {
   text: string;
@@ -25,7 +46,7 @@ function fakeLakebase(state: FakeState) {
     calls.push({ text, params });
     if (text.includes('FROM replenishment.user_scope')) {
       const email = String(params[0]).toLowerCase();
-      return { rows: state.scope?.[email] ?? [] };
+      return { rows: (state.scope ?? NETWORK_WIDE)[email] ?? [] };
     }
     if (text.includes('AS in_scope')) {
       if (!state.rec) return { rows: [] };
@@ -68,10 +89,10 @@ function fakeLakebase(state: FakeState) {
 
 let server: Server | null = null;
 
-async function start(db: Lakebase) {
+async function start(db: Lakebase, identity: IdentityOptions = fakeIdentity().options) {
   const app = express();
   app.use(express.json());
-  registerReplenishmentRoutes(app, db);
+  registerReplenishmentRoutes(app, db, identity);
   server = await new Promise<Server>((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });
@@ -83,10 +104,16 @@ afterEach(async () => {
   server = null;
 });
 
-async function decide(base: string, body: unknown, email = 'planner@eastwind.example') {
+const asUser = (email: string, extra: Record<string, string> = {}) => ({
+  'x-forwarded-access-token': `tok:${email}`,
+  'x-forwarded-email': email,
+  ...extra,
+});
+
+async function decide(base: string, body: unknown, email = PLANNER, extra: Record<string, string> = {}) {
   const res = await fetch(`${base}/api/recommendations/rec-1/decision`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-forwarded-email': email },
+    headers: { 'Content-Type': 'application/json', ...asUser(email, extra) },
     body: JSON.stringify(body),
   });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
@@ -141,7 +168,7 @@ describe('POST /api/recommendations/:id/decision', () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ decision_status: 'ACCEPTED', final_order_units: 624, version: 1 });
     const insert = calls.find((c) => c.text.includes('INSERT INTO replenishment.order_decisions'));
-    expect(insert?.params[8]).toBe('planner@eastwind.example');
+    expect(insert?.params[8]).toBe(PLANNER);
     const event = calls.find((c) => c.text.includes('INSERT INTO replenishment.decision_events'));
     expect(event?.params.slice(2, 6)).toEqual([null, 'ACCEPTED', null, 624]);
     expect(calls.map((c) => c.text)).toContain('COMMIT');
@@ -187,19 +214,88 @@ describe('POST /api/recommendations/:id/decision', () => {
   });
 });
 
-describe('scope', () => {
-  it('is network-wide for unmapped users in open mode and empty in strict mode', async () => {
-    const { db } = fakeLakebase({});
-    expect(await resolveScope(db, 'analyst@eastwind.example', 'open')).toEqual({
-      restricted: false,
-      regions: [],
-      locations: [],
+describe('identity', () => {
+  it('returns 401 when there is no forwarded user token (and no dev identity)', async () => {
+    const { db, calls } = fakeLakebase({ rec: REC });
+    const base = await start(db);
+    const res = await fetch(`${base}/api/recommendations/rec-1/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-email': PLANNER },
+      body: JSON.stringify({ status: 'ACCEPTED', expectedVersion: null }),
     });
-    expect(await resolveScope(db, 'analyst@eastwind.example', 'strict')).toEqual({
+    expect(res.status).toBe(401);
+    expect((await fetch(`${base}/api/recommendations`, { headers: { 'x-forwarded-user': PLANNER } })).status).toBe(401);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('returns 401 when the workspace rejects the token', async () => {
+    const { db } = fakeLakebase({ rec: REC });
+    const base = await start(db);
+    const res = await fetch(`${base}/api/whoami`, { headers: { 'x-forwarded-access-token': 'tok:revoked' } });
+    expect(res.status).toBe(401);
+  });
+
+  it('ignores a spoofed x-forwarded-email and attributes the decision to the verified token owner', async () => {
+    const { db, calls } = fakeLakebase({ rec: REC, decision: null });
+    const base = await start(db);
+    const res = await decide(base, { status: 'ACCEPTED', expectedVersion: null }, PLANNER, {
+      'x-forwarded-email': 'ceo@eastwind.example',
+      'x-forwarded-user': 'ceo@eastwind.example',
+    });
+    expect(res.status).toBe(201);
+    const insert = calls.find((c) => c.text.includes('INSERT INTO replenishment.order_decisions'));
+    expect(insert?.params[8]).toBe(PLANNER);
+    expect(calls.find((c) => c.text.includes('FROM replenishment.user_scope'))?.params).toEqual([PLANNER]);
+  });
+
+  it('verifies each token once and serves repeat requests from the cache', async () => {
+    const { db } = fakeLakebase({});
+    const identity = fakeIdentity();
+    const base = await start(db, identity.options);
+    for (let i = 0; i < 3; i++)
+      expect((await fetch(`${base}/api/whoami`, { headers: asUser(PLANNER) })).status).toBe(200);
+    expect(identity.verified).toEqual([`tok:${PLANNER}`]);
+  });
+
+  it('uses the dev identity only when no token is sent and one is configured', async () => {
+    const { db } = fakeLakebase({ scope: { 'dev@eastwind.example': [{ region: '*', location_id: null }] } });
+    const base = await start(db, fakeIdentity('dev@eastwind.example').options);
+    const me = (await (await fetch(`${base}/api/whoami`)).json()) as { email: string; scope: { restricted: boolean } };
+    expect(me).toMatchObject({ email: 'dev@eastwind.example', scope: { restricted: false } });
+  });
+
+  it('scimVerifier reads userName from SCIM /Me and treats 401 as unverified', async () => {
+    const urls: string[] = [];
+    const ok = scimVerifier('https://ws.example', (url) => {
+      urls.push(url instanceof Request ? url.url : url.toString());
+      return Promise.resolve(new Response(JSON.stringify({ userName: 'a@b.example' }), { status: 200 }));
+    });
+    expect(await ok('t')).toBe('a@b.example');
+    expect(urls).toEqual(['https://ws.example/api/2.0/preview/scim/v2/Me']);
+    const denied = scimVerifier('https://ws.example', () => Promise.resolve(new Response('{}', { status: 401 })));
+    expect(await denied('t')).toBeNull();
+  });
+});
+
+describe('scope (fail-closed)', () => {
+  it('gives an unmapped user an empty scope and the explicit * grant network-wide access', async () => {
+    const { db } = fakeLakebase({ scope: { [PLANNER]: [{ region: '*', location_id: null }] } });
+    expect(await resolveScope(db, 'stranger@eastwind.example')).toEqual({
       restricted: true,
       regions: [],
       locations: [],
     });
+    expect(await resolveScope(db, PLANNER)).toEqual({ restricted: false, regions: [], locations: [] });
+  });
+
+  it('returns 403 on a decision and filters every list row out for an unmapped user', async () => {
+    const { db, calls } = fakeLakebase({ rec: REC, decision: null, scope: {} });
+    const base = await start(db);
+    const res = await decide(base, { status: 'ACCEPTED', expectedVersion: null }, 'stranger@eastwind.example');
+    expect(res.status).toBe(403);
+    await fetch(`${base}/api/recommendations`, { headers: asUser('stranger@eastwind.example') });
+    const list = calls.find((c) => c.text.includes('count(*) OVER ()'));
+    expect(list?.params.slice(4, 7)).toEqual([true, [], []]);
   });
 
   it('applies the server-side scope to the list even when the client asks for another region', async () => {
@@ -212,17 +308,27 @@ describe('scope', () => {
     const { db, calls } = fakeLakebase({ scope });
     const base = await start(db);
     const res = await fetch(`${base}/api/recommendations?region=South`, {
-      headers: { 'x-forwarded-email': 'north.planner@eastwind.example' },
+      headers: asUser('north.planner@eastwind.example'),
     });
     expect(res.status).toBe(200);
     const list = calls.find((c) => c.text.includes('count(*) OVER ()'));
     expect(list?.params.slice(0, 7)).toEqual(['South', null, null, null, true, ['North'], ['L0022']]);
   });
 
+  it('seeds network-wide rows for REPLENISHMENT_ANALYSTS plus two sample store managers', () => {
+    const rows = scopeSeedRows(' owner@eastwind.example, analyst@eastwind.example ,');
+    expect(rows.filter((r) => r[1] === '*').map((r) => r[0])).toEqual([
+      'owner@eastwind.example',
+      'analyst@eastwind.example',
+    ]);
+    expect(rows.filter((r) => r[1] !== '*')).toHaveLength(2);
+    expect(scopeSeedRows('').every((r) => r[1] !== '*')).toBe(true);
+  });
+
   it('rejects malformed filters with 400', async () => {
     const { db } = fakeLakebase({});
     const base = await start(db);
-    expect((await fetch(`${base}/api/recommendations?channel=MALL`)).status).toBe(400);
-    expect((await fetch(`${base}/api/recommendations?limit=1000`)).status).toBe(400);
+    expect((await fetch(`${base}/api/recommendations?channel=MALL`, { headers: asUser(PLANNER) })).status).toBe(400);
+    expect((await fetch(`${base}/api/recommendations?limit=1000`, { headers: asUser(PLANNER) })).status).toBe(400);
   });
 });

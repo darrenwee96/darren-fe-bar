@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import { useCallback, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle, Badge, Button } from '@databricks/appkit-ui/react';
-import { Clock, Moon, Sparkles, Sun, TriangleAlert } from 'lucide-react';
+import { Clock, Lock, Moon, Sparkles, Sun, TriangleAlert } from 'lucide-react';
 import { ForecastPanel } from './components/ForecastPanel';
 import { FilterBar } from './components/FilterBar';
 import { KpiStrip } from './components/KpiStrip';
@@ -77,6 +77,8 @@ function ControlPanel() {
   const filterKey = JSON.stringify(filters);
   const summary = useAsync(`${filterKey}|${revision}`, () => fetchSummary(filters));
 
+  const scope = whoami.data?.scope;
+  const noScope = !!scope && scope.restricted && scope.regions.length === 0 && scope.locations.length === 0;
   const store = options.data?.stores.find((s) => s.location_id === filters.location);
   const scopeLabel =
     store?.location_name ??
@@ -96,7 +98,25 @@ function ControlPanel() {
             <FilterBar options={options.data} />
           </div>
           <main className="space-y-4 p-4 md:px-6">
-            {summary.error && !s && (
+            {whoami.error && (
+              <Alert variant="destructive">
+                <TriangleAlert className="h-4 w-4" />
+                <AlertTitle>Could not verify who you are</AlertTitle>
+                <AlertDescription>{whoami.error}</AlertDescription>
+              </Alert>
+            )}
+            {noScope && (
+              <Alert>
+                <Lock className="h-4 w-4" />
+                <AlertTitle>No planning scope assigned</AlertTitle>
+                <AlertDescription>
+                  Order lines and decisions are limited to the regions or stores you plan for, and none are assigned to{' '}
+                  {whoami.data?.email}. Ask an app admin to add you to replenishment.user_scope. Forecast and accuracy
+                  charts stay available.
+                </AlertDescription>
+              </Alert>
+            )}
+            {summary.error && !s && !whoami.error && (
               <Alert variant="destructive">
                 <TriangleAlert className="h-4 w-4" />
                 <AlertTitle>Order recommendations unavailable</AlertTitle>

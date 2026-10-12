@@ -8,11 +8,13 @@
 // The app's service principal creates and owns `replenishment` at startup; the load job grants it
 // SELECT on `serving`.
 //
-// Scoping is enforced here, not in the UI: every read and write joins the caller's scope from
-// replenishment.user_scope. Client filters (region, store, ...) only narrow within that scope.
+// Identity comes from ./identity (the user's forwarded token, verified with the workspace), never from a bare header.
+// Scoping is enforced here, not in the UI, and fails closed: every read and write joins the caller's scope from
+// replenishment.user_scope; a user with no rows sees nothing. Client filters (region, store, ...) only narrow within it.
 
 import { z } from 'zod';
-import type { Application, Request } from 'express';
+import type { Application, Response } from 'express';
+import { createIdentityResolver, defaultIdentityOptions, requireUser, type IdentityOptions } from './identity';
 
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -74,7 +76,34 @@ const SETUP_SQL = [
      CHECK (region IS NOT NULL OR location_id IS NOT NULL)
    )`,
   `CREATE INDEX IF NOT EXISTS user_scope_email_idx ON replenishment.user_scope (lower(user_email))`,
+  `ALTER TABLE replenishment.user_scope ADD COLUMN IF NOT EXISTS note TEXT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS user_scope_grant_uq
+     ON replenishment.user_scope (lower(user_email), coalesce(region, ''), coalesce(location_id, ''))`,
 ];
+
+/** region = '*' grants every region and store (analysts / planners). It must be granted explicitly. */
+export const ALL_REGIONS = '*';
+
+/**
+ * Idempotent demo seed: network-wide rows for REPLENISHMENT_ANALYSTS (comma-separated emails, set in app.yaml) plus
+ * two sample store-manager mappings. Existing rows are left alone; remove a row to revoke.
+ */
+export function scopeSeedRows(analysts = process.env.REPLENISHMENT_ANALYSTS ?? '') {
+  const rows: [string, string | null, string | null, string][] = analysts
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((email) => [email, ALL_REGIONS, null, 'Network-wide analyst (seeded from REPLENISHMENT_ANALYSTS)']);
+  rows.push(
+    ['north.manager@eastwind.example', 'North', null, 'Sample: North region manager'],
+    ['daan3.manager@eastwind.example', null, 'L0022', 'Sample: Daan Shop 3 store manager']
+  );
+  return rows;
+}
+
+const SEED_SQL = `
+  INSERT INTO replenishment.user_scope (user_email, region, location_id, note) VALUES ($1, $2, $3, $4)
+  ON CONFLICT (lower(user_email), coalesce(region, ''), coalesce(location_id, '')) DO NOTHING`;
 
 const RISKS = ['HIGH', 'MEDIUM', 'LOW'] as const;
 const STATUSES = ['PENDING', 'DECIDED', 'ACCEPTED', 'ADJUSTED', 'REJECTED'] as const;
@@ -109,37 +138,23 @@ const DecisionBody = z
   })
   .refine((b) => b.status !== 'REJECTED' || !!b.reason, { message: 'A rejected order needs a reason' });
 
-/** Signed-in user from the Databricks Apps proxy; a fixed identity in local development. */
-export function currentUser(req: Request): string {
-  return req.header('x-forwarded-email') ?? req.header('x-forwarded-user') ?? 'local-developer';
-}
-
 export interface Scope {
-  /** false = network-wide (no mapping and open mode); true = only the listed regions / stores. */
+  /** false = network-wide (an explicit '*' grant); true = only the listed regions / stores (possibly none). */
   restricted: boolean;
   regions: string[];
   locations: string[];
 }
 
 /**
- * Resolve the caller's planning scope from replenishment.user_scope. A user with mapping rows sees only those regions
- * and stores. A user without rows is network-wide in `open` mode (analysts / planners, the default) and sees
- * nothing in `strict` mode (REPLENISHMENT_SCOPE_MODE=strict).
+ * Resolve the caller's planning scope from replenishment.user_scope. Fail-closed: a user without rows gets an empty
+ * scope (sees nothing, 403 on decisions). region = '*' is the explicit network-wide grant.
  */
-export async function resolveScope(
-  db: Lakebase,
-  user: string,
-  mode = process.env.REPLENISHMENT_SCOPE_MODE
-): Promise<Scope> {
+export async function resolveScope(db: Lakebase, user: string): Promise<Scope> {
   const { rows } = await db.query(
     'SELECT region, location_id FROM replenishment.user_scope WHERE lower(user_email) = lower($1)',
     [user]
   );
-  if (rows.length === 0) {
-    return mode === 'strict'
-      ? { restricted: true, regions: [], locations: [] }
-      : { restricted: false, regions: [], locations: [] };
-  }
+  if (rows.some((r) => r.region === ALL_REGIONS)) return { restricted: false, regions: [], locations: [] };
   const pick = (key: string) => [
     ...new Set(rows.map((r) => r[key]).filter((v): v is string => typeof v === 'string' && v.length > 0)),
   ];
@@ -262,15 +277,27 @@ const DECISION_REC_SQL = `
 const unavailable = (err: unknown, fallback: string) =>
   servingUnavailable(err) ? 'Recommendations have not been loaded into Lakebase yet' : fallback;
 
-/** Register the API on an Express app. Exported separately from setup so tests can mount it on a bare app. */
-export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
-  app.get('/api/whoami', async (req, res) => {
-    const email = currentUser(req);
+/** The verified caller set by `requireUser`. */
+const userOf = (res: Response): string => String(res.locals.user);
+
+/**
+ * Register the API on an Express app. Exported separately from setup so tests can mount it on a bare app with a fake
+ * Lakebase and a fake token verifier. Every route requires a verified identity (401 otherwise).
+ */
+export function registerReplenishmentRoutes(
+  app: Application,
+  db: Lakebase,
+  identity: IdentityOptions = defaultIdentityOptions()
+) {
+  const auth = requireUser(createIdentityResolver(identity));
+
+  app.get('/api/whoami', auth, async (_req, res) => {
+    const email = userOf(res);
     try {
       const scope = await resolveScope(db, email);
       res.json({
         email,
-        executesAs: 'app service principal (decisions are attributed to the signed-in user)',
+        executesAs: 'app service principal; identity verified from your forwarded token, decisions attributed to you',
         scope,
       });
     } catch (err) {
@@ -279,9 +306,9 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.get('/api/filters', async (req, res) => {
+  app.get('/api/filters', auth, async (_req, res) => {
     try {
-      const scope = await resolveScope(db, currentUser(req));
+      const scope = await resolveScope(db, userOf(res));
       const { rows } = await db.query(OPTIONS_SQL, scopeParams(scope));
       const stores = new Map<
         string,
@@ -313,14 +340,14 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.get('/api/recommendations/summary', async (req, res) => {
+  app.get('/api/recommendations/summary', auth, async (req, res) => {
     const parsed = ScopeFilters.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
       return;
     }
     try {
-      const scope = await resolveScope(db, currentUser(req));
+      const scope = await resolveScope(db, userOf(res));
       const { rows } = await db.query(SUMMARY_SQL, filterParams(parsed.data, scope));
       res.json(rows[0]);
     } catch (err) {
@@ -329,14 +356,14 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.get('/api/recommendations/by-store', async (req, res) => {
+  app.get('/api/recommendations/by-store', auth, async (req, res) => {
     const parsed = ScopeFilters.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
       return;
     }
     try {
-      const scope = await resolveScope(db, currentUser(req));
+      const scope = await resolveScope(db, userOf(res));
       const { rows } = await db.query(BY_STORE_SQL, filterParams(parsed.data, scope));
       res.json({ rows });
     } catch (err) {
@@ -345,7 +372,7 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.get('/api/recommendations', async (req, res) => {
+  app.get('/api/recommendations', auth, async (req, res) => {
     const parsed = ListQuery.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
@@ -353,7 +380,7 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
     const q = parsed.data;
     try {
-      const scope = await resolveScope(db, currentUser(req));
+      const scope = await resolveScope(db, userOf(res));
       const { rows } = await db.query(LIST_SQL, [
         ...filterParams(q, scope),
         q.risk ?? null,
@@ -373,9 +400,9 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.get('/api/recommendations/:id', async (req, res) => {
+  app.get('/api/recommendations/:id', auth, async (req, res) => {
     try {
-      const scope = await resolveScope(db, currentUser(req));
+      const scope = await resolveScope(db, userOf(res));
       const { rows } = await db.query(DETAIL_SQL, [req.params.id, ...scopeParams(scope)]);
       if (rows.length === 0) {
         res.status(404).json({ error: 'Recommendation not found' });
@@ -389,14 +416,14 @@ export function registerReplenishmentRoutes(app: Application, db: Lakebase) {
     }
   });
 
-  app.post('/api/recommendations/:id/decision', async (req, res) => {
+  app.post('/api/recommendations/:id/decision', auth, async (req, res) => {
     const parsed = DecisionBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid decision' });
       return;
     }
     const body = parsed.data;
-    const user = currentUser(req);
+    const user = userOf(res);
     let scope: Scope;
     try {
       scope = await resolveScope(db, user);
@@ -500,6 +527,8 @@ export async function setupReplenishmentRoutes(appkit: AppKitWithLakebase) {
       await appkit.lakebase.query(statement);
     }
     console.log('[replenishment] Schema replenishment is ready');
+    for (const row of scopeSeedRows()) await appkit.lakebase.query(SEED_SQL, row);
+    console.log('[replenishment] Planner scope seed applied');
   } catch (err) {
     console.warn('[replenishment] Schema setup failed:', (err as Error).message);
   }

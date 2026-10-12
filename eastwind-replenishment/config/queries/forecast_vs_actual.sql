@@ -14,8 +14,16 @@ WITH run AS (
   ORDER BY max(generated_at) DESC
   LIMIT 1
 ),
-loc AS (SELECT DISTINCT location_id, region FROM darren_fe_bar_catalog.gold.weekly_demand_features),
-sku AS (SELECT DISTINCT sku_id, category FROM darren_fe_bar_catalog.gold.weekly_demand_features),
+-- One row per key (the latest attribute), so a store that changed region or a SKU that changed category can never
+-- duplicate forecast rows in the joins below.
+loc AS (
+  SELECT location_id, max_by(region, week_start) AS region
+  FROM darren_fe_bar_catalog.gold.weekly_demand_features GROUP BY location_id
+),
+sku AS (
+  SELECT sku_id, max_by(category, week_start) AS category
+  FROM darren_fe_bar_catalog.gold.weekly_demand_features GROUP BY sku_id
+),
 b AS (SELECT max(week_start) AS last_week FROM darren_fe_bar_catalog.gold.weekly_demand_features),
 hist AS (
   SELECT w.week_start, sum(w.units_sold) AS units, sum(coalesce(w.units_lag_52, 0)) AS last_year

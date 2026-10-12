@@ -57,7 +57,7 @@ owns it.
 
 | Route                                    | What it does                                                                                                                         |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/whoami`                        | Signed-in user and resolved planning scope                                                                                           |
+| `GET /api/whoami`                        | Verified user and resolved planning scope                                                                                            |
 | `GET /api/filters`                       | Regions, categories and stores inside the caller's scope                                                                             |
 | `GET /api/recommendations/summary`       | KPI counts and values for the filters                                                                                                |
 | `GET /api/recommendations/by-store`      | Top 10 stores by order need                                                                                                          |
@@ -65,20 +65,45 @@ owns it.
 | `GET /api/recommendations/:id`           | Line detail and audit trail                                                                                                          |
 | `POST /api/recommendations/:id/decision` | `{status, finalUnits?, reason?, expectedVersion}` returns 201/200, 400 (validation), 403 (out of scope), 404, or 409 (stale version) |
 
-### Planner scope (server-side)
+### Identity
+
+All API routes go through `server/routes/identity.ts`. The app does not trust `x-forwarded-email` or
+`x-forwarded-user` on their own. The Databricks Apps proxy forwards the signed-in user's OAuth token as
+`x-forwarded-access-token` (`user_api_scopes` is set, and the platform adds `iam.current-user:read`). The server
+verifies that token with the workspace (`GET /api/2.0/preview/scim/v2/Me`) and uses the identity the workspace returns,
+cached for 5 minutes per token hash. Requests without a verifiable token get `401`. Scope checks and `decided_by` both
+use this identity.
+
+### Planner scope (server-side, fail-closed)
 
 Every Lakebase read and write applies the caller's scope from `replenishment.user_scope`. The UI is never the only
 filter: a client asking for another region gets nothing back, and a decision on an out-of-scope store returns `403`.
+**A user with no rows sees no order lines and cannot decide.** The panel tells them no scope is assigned; forecast and
+accuracy charts stay visible.
+
+| Row                     | Grants                                       |
+| ----------------------- | -------------------------------------------- |
+| `region = '*'`          | Every region and store (analysts / planners) |
+| `region = 'North'`      | One region                                   |
+| `location_id = 'L0022'` | One store                                    |
+
+At startup the app seeds, idempotently (`ON CONFLICT DO NOTHING`):
+
+- a `'*'` row for each email in `REPLENISHMENT_ANALYSTS` (`app.yaml`; currently the app owner)
+- two sample store managers: `north.manager@eastwind.example` (North region) and `daan3.manager@eastwind.example`
+  (store L0022)
 
 ```sql
--- Limit a store manager to the North region plus one extra store
+-- Grant another analyst network-wide access, or limit a store manager to a region plus one store
+INSERT INTO replenishment.user_scope (user_email, region, note) VALUES ('analyst@example.com', '*', 'Planner');
 INSERT INTO replenishment.user_scope (user_email, region) VALUES ('manager@example.com', 'North');
 INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('manager@example.com', 'L0022');
+-- Revoke
+DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('manager@example.com');
 ```
 
-Users with no rows are network-wide (analysts and planners). Set `REPLENISHMENT_SCOPE_MODE=strict` to give unmapped
-users no access instead. The warehouse charts show aggregated history and forecasts. To restrict those per user too,
-add a Unity Catalog row filter on the Gold tables.
+The warehouse charts show aggregated history and forecasts and run as the app service principal. To restrict those
+per user too, add a Unity Catalog row filter on the Gold tables.
 
 ## Local development
 
@@ -90,7 +115,8 @@ cp .env.example .env      # set DATABRICKS_CONFIG_PROFILE, warehouse, Lakebase a
 npm run dev               # http://localhost:8000 (hot reload; runs typegen first)
 ```
 
-Locally, decisions are attributed to `local-developer` unless an `x-forwarded-email` header is sent.
+Locally there is no proxy token. With `NODE_ENV=development` (`npm run dev`), the identity is `DEV_USER_EMAIL` from `.env`
+(default `local-developer`), and that identity needs a `user_scope` row like any other user.
 
 Checks:
 
