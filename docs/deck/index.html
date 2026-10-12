@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Eastwind Gourmet · Forecast-driven replenishment</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  html, body { margin: 0; background: #0e1a1f; }
+  body { font-family: var(--font-sans); color: var(--db-ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .deck { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; }
+  .page { width: 1280px; height: 720px; position: relative; overflow: hidden; background: var(--db-oat-light); }
+  @media print {
+    html, body { background: none; }
+    .deck { display: block; padding: 0; }
+    .page { break-after: page; page-break-after: always; }
+    .page:last-child { break-after: auto; page-break-after: auto; }
+  }
+  body.single .deck { padding: 0; gap: 0; }
+  body.single .page { display: none; }
+  body.single .page.on { display: block; }
+
+  .slide { position: absolute; inset: 0; padding: 56px 80px 72px; display: flex; flex-direction: column; }
+  .slide.dark { background: var(--db-navy); color: #F4F1ED; }
+  .slide.white { background: #fff; }
+
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--db-lava); }
+  .dark .eyebrow { color: #FFC9BF; }
+  .title { font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; color: var(--db-navy); margin-top: 8px; }
+  .dark .title { color: #fff; }
+  .rule { height: 3px; width: 100%; background: var(--db-oat-medium); margin: 16px 0 32px; position: relative; }
+  .rule::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 88px; background: var(--db-lava); }
+  .white .rule { background: var(--db-oat-medium); }
+
+  .footer { position: absolute; left: 80px; right: 80px; bottom: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--db-ink-muted); }
+  .dark .footer { color: #7E9098; }
+  .source { position: absolute; left: 80px; bottom: 44px; font-size: 12px; font-style: italic; color: var(--db-ink-muted); }
+
+  .card { background: #fff; border-radius: 12px; box-shadow: var(--shadow-md); padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+  .white .card { background: var(--db-oat-light); box-shadow: none; border: 1px solid var(--db-line); }
+  .lab { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-ink-muted); }
+  .h { font-size: 20px; font-weight: 700; color: var(--db-navy); line-height: 1.25; }
+  .d { font-size: 16px; line-height: 1.45; color: var(--db-ink-soft); }
+  .small { font-size: 12px; line-height: 1.45; color: var(--db-ink-muted); }
+  .chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 4px; background: var(--db-oat-medium); color: var(--db-navy); font-size: 12px; font-weight: 700; }
+  .mono { font-family: var(--font-mono); }
+
+  /* KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .kpi { min-height: 344px; box-sizing: border-box; background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 32px 32px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .kpi .num { font-size: 64px; font-weight: 700; letter-spacing: -.03em; color: var(--db-navy); line-height: 1; margin-top: 8px; }
+  .kpi .what { font-size: 20px; font-weight: 500; color: var(--db-navy); line-height: 1.3; }
+  .kpi .proof { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--db-line); font-size: 12px; line-height: 1.5; color: var(--db-ink-muted); }
+  .kpi.hl { background: var(--db-navy); border-color: var(--db-navy); }
+  .kpi.hl .lab { color: #FFC9BF; }
+  .kpi.hl .num { color: #fff; }
+  .kpi.hl .what { color: #fff; }
+  .kpi.hl .proof { color: #B9C6CB; border-top-color: #33505A; }
+
+  /* tables */
+  .tbl { border-collapse: collapse; width: 100%; }
+  .tbl th { background: var(--db-coral); color: #fff; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  .tbl th:first-child { border-top-left-radius: 8px; }
+  .tbl th:last-child { border-top-right-radius: 8px; }
+  .tbl td { padding: 16px; font-size: 16px; line-height: 1.35; color: var(--db-ink); vertical-align: top; }
+  .tbl tbody tr:nth-child(odd) { background: #fff; }
+  .tbl tbody tr:nth-child(even) { background: #F3F3F3; }
+  .tbl td:first-child { font-weight: 700; color: var(--db-navy); }
+  .tbl td .sub { display: block; font-size: 12px; color: var(--db-ink-muted); margin-top: 4px; }
+  .pill { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pill.ok { background: #DDF3EA; color: var(--db-green-700); }
+  .pill.part { background: #FFF1D1; color: #8A5B00; }
+  .pill.no { background: #FBE3E0; color: var(--db-maroon); }
+
+  /* architecture */
+  .arch { display: grid; grid-template-columns: repeat(6, 1fr); gap: 32px; position: relative; }
+  .node { background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 16px; display: flex; flex-direction: column; gap: 8px; position: relative; min-height: 264px; }
+  .node .ic { width: 48px; height: 48px; }
+  .node .step { font-family: var(--font-mono); font-size: 12px; color: var(--db-lava); }
+  .node .nt { font-size: 16px; font-weight: 700; color: var(--db-navy); line-height: 1.25; }
+  .node ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .node li { font-size: 12px; line-height: 1.4; color: var(--db-ink-soft); padding-left: 12px; position: relative; }
+  .node li::before { content: ""; position: absolute; left: 0; top: 6px; width: 4px; height: 4px; border-radius: 1px; background: var(--db-coral); }
+  .node:not(:last-child)::after { content: ""; position: absolute; right: -27px; top: 40px; width: 22px; height: 2px; background: var(--db-coral); }
+  .node:not(:last-child)::before { content: ""; position: absolute; right: -28px; top: 36px; border-left: 8px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  .node.dk { background: var(--db-navy); border-color: var(--db-navy); }
+  .node.dk .nt { color: #fff; }
+  .node.dk li { color: #C9D3D7; }
+  .src { display: flex; flex-direction: column; gap: 8px; }
+  .src span { font-size: 12px; font-weight: 700; color: var(--db-navy); background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 4px; padding: 4px 8px; }
+
+  /* timeline */
+  .tl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; margin-top: 8px; }
+  .tl::before { content: ""; position: absolute; left: 0; right: 0; top: 13px; height: 2px; background: var(--db-line); }
+  .tl .nd { position: relative; display: flex; flex-direction: column; gap: 12px; }
+  .tl .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--db-coral); border: 6px solid #fff; box-shadow: 0 0 0 1px var(--db-line); box-sizing: border-box; z-index: 1; }
+  .tl .nd:nth-child(2) .dot { background: var(--db-lava); }
+  .tl .nd:nth-child(3) .dot { background: var(--db-navy-700); }
+  .tl .when { font-family: var(--font-mono); font-size: 16px; color: var(--db-lava); font-weight: 500; }
+
+  /* screenshot */
+  .shot { position: relative; border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid var(--db-line); }
+  .shot img { display: block; width: 100%; }
+  .box { position: absolute; border: 2px solid var(--db-lava); border-radius: 6px; }
+  .mk { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: var(--db-lava); color: #fff; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(255,54,33,.24); }
+  .co { display: grid; grid-template-columns: 32px 1fr; gap: 16px; align-items: start; }
+  .co .mk { position: static; box-shadow: none; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- 1 · Title -->
+<section class="page" id="s1"><div class="slide dark">
+  <img src="assets/databricks-logo-white.svg" alt="Databricks" style="height:32px;width:auto;align-self:flex-start;">
+  <div style="display:flex;align-items:center;gap:16px;margin-top:48px;">
+    <div style="width:64px;height:6px;background:var(--db-lava);border-radius:3px;"></div>
+    <span class="eyebrow">Eastwind Gourmet · Specialty food retail</span>
+  </div>
+  <div style="margin-top:auto;margin-bottom:56px;max-width:760px;">
+    <div class="title" style="font-size:64px;line-height:1.05;">Forecast-driven replenishment</div>
+    <div style="margin-top:24px;font-size:24px;line-height:1.4;color:#B9C6CB;">You can’t forecast a gift box for a highway kiosk the way you do downtown.</div>
+  </div>
+  <img src="assets/illustration-nodal-02.svg" alt="" style="position:absolute;right:72px;top:96px;height:320px;opacity:.95;">
+  <div class="footer"><span>For the VP Merchandising and the CIO</span><span>October 2026</span></div>
+</div></section>
+
+<!-- 2 · The outcome -->
+<section class="page" id="s2"><div class="slide">
+  <span class="eyebrow">The outcome</span>
+  <div class="title">What you get</div>
+  <div class="rule"></div>
+  <div class="kpis">
+    <div class="kpi">
+      <span class="lab">Forecast error</span>
+      <span class="num">40–48%</span>
+      <span class="what">lower than today’s method, in every channel</span>
+      <span class="proof">WMAPE 0.24–0.25 vs 0.44–0.46 for last-year-same-week, across two holiday backtests</span>
+    </div>
+    <div class="kpi">
+      <span class="lab">Plan-for coverage</span>
+      <span class="num">91–92%</span>
+      <span class="what">of store-SKU-weeks land within the p90 plan-for quantity</span>
+      <span class="proof">Calibrated p90 band drives safety stock, so you know how much buffer you are buying</span>
+    </div>
+    <div class="kpi hl">
+      <span class="lab">Lost sales recovered · target</span>
+      <span class="num">$2–3M<span style="font-size:24px;font-weight:500;letter-spacing:0;">/yr</span></span>
+      <span class="what">10–15% of today’s $17.8M/yr lost sales</span>
+      <span class="proof">Conservative: the peak-season backtest cut modelled lost sales in every channel and every holiday window</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px;">
+    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> fuller shelves on peak gifts, and orders your managers trust.</div>
+    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one governed flow from POS to order, traceable end to end.</div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>2 / 9</span></div>
+</div></section>
+
+<!-- 3 · The problem -->
+<section class="page" id="s3"><div class="slide">
+  <span class="eyebrow">The problem</span>
+  <div class="title">Ordering by gut feel</div>
+  <div class="rule"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;flex:1;">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="h">80 stores, 3 channels, one gift box that sells three ways</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;">
+        <div class="card"><span class="lab">Downtown</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">32</span><span class="small">stores</span></div>
+        <div class="card"><span class="lab">Highway</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">26</span><span class="small">kiosks</span></div>
+        <div class="card"><span class="lab">Airport</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">22</span><span class="small">stores</span></div>
+      </div>
+      <div class="d" style="margin-top:8px;">Managers order from experience. Holiday peaks make the swings larger.</div>
+      <img src="assets/illustration-nodal-07.svg" alt="" style="height:120px;width:auto;align-self:flex-start;margin-top:auto;opacity:.9;">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:24px;">
+      <div class="h">You lose both ways</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card" style="border-top:4px solid var(--db-lava);"><span style="font-size:48px;font-weight:700;color:var(--db-lava);line-height:1;letter-spacing:-.02em;">$17.8M</span><span class="d">lost sales a year from stockouts</span></div>
+        <div class="card" style="border-top:4px solid var(--db-navy);"><span style="font-size:48px;font-weight:700;color:var(--db-navy);line-height:1;letter-spacing:-.02em;">$3.87M</span><span class="d">expired and marked down a year</span></div>
+      </div>
+      <div class="card" style="background:var(--db-navy);gap:8px;">
+        <span class="lab" style="color:#FFC9BF;">Peaks amplify it</span>
+        <span style="font-size:20px;line-height:1.4;color:#fff;">18.7–21.1% of peak-gift store-days stocked out in Mid-Autumn 2025, vs 8.6% overall. Peak gifts carry 57.5% of lost sales.</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>3 / 9</span></div>
+</div></section>
+
+<!-- 4 · Why it's hard -->
+<section class="page" id="s4"><div class="slide">
+  <span class="eyebrow">For the CIO</span>
+  <div class="title">Why it’s hard</div>
+  <div class="rule"></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;">
+    <div class="card" style="min-height:320px;">
+      <span class="mono" style="font-size:16px;color:var(--db-lava);">01</span>
+      <span class="h">Five siloed sources</span>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;">
+        <span class="chip">POS</span><span class="chip">ERP inventory</span><span class="chip">Product catalog</span><span class="chip">Store master</span><span class="chip">Holiday calendar</span>
+      </div>
+      <span class="d">Different owners, formats, and refresh cycles. Even store IDs differ: POS says <span class="mono">DT001</span>, ERP says <span class="mono">L0001</span>.</span>
+    </div>
+    <div class="card" style="min-height:320px;">
+      <span class="mono" style="font-size:16px;color:var(--db-lava);">02</span>
+      <span class="h">Stockouts hide demand</span>
+      <span class="d">When the shelf is empty, sales stop, so history understates what customers wanted.</span>
+      <span class="d" style="margin-top:auto;padding-top:16px;border-top:1px solid var(--db-line);">One mooncake line was out of stock 6 and 7 days in its two peak weeks.</span>
+    </div>
+    <div class="card" style="min-height:320px;">
+      <span class="mono" style="font-size:16px;color:var(--db-lava);">03</span>
+      <span class="h">Festivals move</span>
+      <span class="d">Lunar holidays shift week to week each year: Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025.</span>
+      <span class="d" style="margin-top:auto;padding-top:16px;border-top:1px solid var(--db-line);">Last-year-same-week under-forecasts peak gifts by 30–39%.</span>
+    </div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>4 / 9</span></div>
+</div></section>
+
+<!-- 5 · Architecture -->
+<section class="page" id="s5"><div class="slide">
+  <span class="eyebrow">Architecture</span>
+  <div class="title">One governed flow</div>
+  <div class="rule"></div>
+  <div class="arch">
+    <div class="node">
+      <span class="step">Raw files</span>
+      <span class="nt">Five sources</span>
+      <div class="src"><span>POS sales</span><span>ERP inventory</span><span>Product catalog</span><span>Store master</span><span>Holiday calendar</span></div>
+    </div>
+    <div class="node">
+      <img class="ic" src="assets/lakeflow-icon-full-color.svg" alt="">
+      <span class="nt">Lakeflow</span>
+      <ul><li>Incremental ingest</li><li>Bronze, silver, gold</li><li>Expectations and quarantine</li></ul>
+    </div>
+    <div class="node">
+      <img class="ic" src="assets/unity-catalog-icon-full-color.svg" alt="">
+      <span class="nt">Unity Catalog</span>
+      <ul><li>Governed tables</li><li>Least-privilege grants</li><li>Lineage to source</li></ul>
+    </div>
+    <div class="node">
+      <img class="ic" src="assets/mosaic-ai-icon-full-color.svg" alt="">
+      <span class="nt">ML forecast</span>
+      <ul><li>LightGBM, store × SKU × week</li><li>MLflow, @champion gate</li><li>Conformal p90 band</li></ul>
+      <img src="assets/mlflow-logo-black-rgb.svg" alt="MLflow" style="height:20px;width:auto;align-self:flex-start;margin-top:auto;opacity:.8;">
+    </div>
+    <div class="node">
+      <img class="ic" src="assets/lakebase-icon-full-color.svg" alt="">
+      <span class="nt">Lakebase</span>
+      <ul><li>Recommended orders</li><li>Manager decisions</li><li>Append-only audit trail</li></ul>
+    </div>
+    <div class="node dk">
+      <div style="display:flex;gap:8px;"><img class="ic" src="assets/apps-icon-full-color.svg" alt=""><img class="ic" src="assets/genie-icon-full-color.svg" alt=""></div>
+      <span class="nt">App + Genie Agent</span>
+      <ul><li>Managers review and approve</li><li>Planners ask in plain language</li></ul>
+    </div>
+  </div>
+  <!-- feedback loop: decisions back to gold -->
+  <svg width="1120" height="64" viewBox="0 0 1120 64" style="margin-top:8px;overflow:visible;">
+    <defs><marker id="ah" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#FF3621"/></marker></defs>
+    <path d="M 838 0 L 838 32 L 280 32 L 280 6" fill="none" stroke="#FF3621" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ah)"/>
+    <rect x="429" y="18" width="260" height="28" rx="4" fill="#F9F7F4"/>
+    <text x="559" y="37" text-anchor="middle" font-family="DM Sans" font-size="16" font-weight="700" fill="#1B3139">Decisions flow back to gold</text>
+  </svg>
+  <div class="small" style="margin-top:8px;">One weekly job refreshes data, scores the @champion model, builds orders, loads Lakebase, and ingests decisions.</div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>5 / 9</span></div>
+</div></section>
+
+<!-- 6 · How it tackles the problem -->
+<section class="page" id="s6"><div class="slide">
+  <span class="eyebrow">How it works</span>
+  <div class="title">Pain point to result</div>
+  <div class="rule"></div>
+  <table class="tbl">
+    <thead><tr><th style="width:22%;">Pain point</th><th style="width:38%;">Databricks capability</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Fragmented data</td><td>Lakeflow + Unity Catalog: one governed view</td><td>0 mismatched weeks; 40 bad rows quarantined</td></tr>
+      <tr><td>Hidden demand</td><td>Stockout-aware training excludes censored weeks</td><td>Peak-gift bias cut from 30–39% to 6–9%</td></tr>
+      <tr><td>Holiday swings</td><td>Festival-aligned features</td><td>Peak-gift error 0.25–0.31 vs 0.46–0.58</td></tr>
+      <tr><td>Distrust</td><td>Reasons in units, plus a p90 band on every line</td><td>Peak-gift demand within p90 in 90–95% of weeks</td></tr>
+      <tr><td>Slow decisions</td><td>One-click approve in the App, on Lakebase</td><td>Accept, adjust, or reject with a reason, all audited</td></tr>
+      <tr><td>Ad-hoc questions</td><td>Genie Agent on governed gold tables</td><td>11 of 11 benchmark questions correct, SQL shown</td></tr>
+    </tbody>
+  </table>
+  <div class="source">Error = WMAPE; baseline = last-year-same-week. Mid-Autumn 2025 and Lunar New Year 2026 backtests.</div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>6 / 9</span></div>
+</div></section>
+
+<!-- 7 · What managers see -->
+<section class="page" id="s7"><div class="slide">
+  <span class="eyebrow">The app</span>
+  <div class="title">What managers see</div>
+  <div class="rule" style="margin-bottom:24px;"></div>
+  <div style="display:grid;grid-template-columns:768px 1fr;gap:32px;align-items:start;">
+    <div class="shot">
+      <img src="assets/app-control-panel.png" alt="Eastwind Replenishment control panel with KPI strip, forecast chart, order need by store, and Ask Genie panel">
+      <div class="box" style="left:6px;top:47px;width:580px;height:105px;"></div>
+      <div class="box" style="left:353px;top:153px;width:233px;height:241px;"></div>
+      <div class="box" style="left:592px;top:24px;width:168px;height:404px;"></div>
+      <div class="mk" style="left:544px;top:31px;">1</div>
+      <div class="mk" style="left:337px;top:137px;">2</div>
+      <div class="mk" style="left:726px;top:8px;">3</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:24px;">
+      <div class="co"><div class="mk">1</div><div><div class="h">KPI strip</div><div class="d">Peak gifts at risk, forecast error, waste, and adoption at a glance.</div></div></div>
+      <div class="co"><div class="mk">2</div><div><div class="h">Order queue</div><div class="d">Ranked by sales at risk. Accept in one click, or adjust with a reason.</div>
+        <img src="assets/app-order-decision.png" alt="Order decision panel with Accept, Save adjusted quantity, and Reject" style="width:100%;margin-top:8px;border-radius:4px;border:1px solid var(--db-line);"></div></div>
+      <div class="co"><div class="mk">3</div><div><div class="h">Ask Genie</div><div class="d">Plain-language questions, answered with your access and the SQL shown.</div></div></div>
+    </div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · deployed Databricks App</span><span>7 / 9</span></div>
+</div></section>
+
+<!-- 8 · Impact and proof -->
+<section class="page" id="s8"><div class="slide">
+  <span class="eyebrow">Impact and proof</span>
+  <div class="title">Proven vs next</div>
+  <div class="rule" style="margin-bottom:24px;"></div>
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;">
+    <table class="tbl">
+      <thead><tr><th style="width:24%;">Success measure</th><th>Evidence</th><th style="width:16%;">Status</th><th style="width:22%;">Next</th></tr></thead>
+      <tbody>
+        <tr><td>Forecast accuracy by channel</td><td>WMAPE 23.6–26.6% vs 38.1–47.7% today</td><td><span class="pill ok">Proven</span></td><td>Track live by channel</td></tr>
+        <tr><td>Stockouts on peak gift SKUs</td><td>Modelled lost sales down in every window and channel<span class="sub">Baseline: 18.7–21.1% of peak-gift days out</span></td><td><span class="pill part">Simulated</span></td><td>Measure in the pilot</td></tr>
+        <tr><td>Expired and marked-down value</td><td>Flat: +$42k/yr in the backtest<span class="sub">Baseline: $3.87M/yr</span></td><td><span class="pill no">Not yet</span></td><td>Waste-aware policy, phase 2</td></tr>
+        <tr><td>Orders placed from forecast</td><td>Test decisions only so far</td><td><span class="pill no">Not yet</span></td><td>Track in the pilot</td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="background:var(--db-navy);padding:24px;gap:12px;">
+      <span class="lab" style="color:#FFC9BF;">Peak-season backtest</span>
+      <span style="font-size:48px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;">$26.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span>
+      <span style="font-size:16px;line-height:1.45;color:#fff;">lost sales avoided vs manual ordering, pooled across 25 holiday weeks</span>
+      <span style="font-size:12px;line-height:1.5;color:#B9C6CB;padding-top:12px;border-top:1px solid #33505A;">Peak-window annualised, not a whole-year estimate. It shows the $2–3M/yr target is conservative.</span>
+    </div>
+  </div>
+  <div class="source">Policy backtest is a simulation on synthetic data; a full-year replay comes before any finance claim.</div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>8 / 9</span></div>
+</div></section>
+
+<!-- 9 · Roadmap and ask -->
+<section class="page" id="s9"><div class="slide white">
+  <span class="eyebrow">Roadmap</span>
+  <div class="title">30 / 60 / 90 days</div>
+  <div class="rule"></div>
+  <div class="tl">
+    <div class="nd"><div class="dot"></div><span class="when">Day 30</span><span class="h">Governance pack</span><span class="d">Row filters by region, column masks on cost, persona groups, lineage in UC.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 60</span><span class="h">Waste-aware ordering</span><span class="d">Add shelf-life and waste limits to the order rule; replay a full year.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">10-store pilot</span><span class="d">Managers order from the app; you measure all four success measures live.</span></div>
+  </div>
+  <div style="margin-top:auto;margin-bottom:24px;background:var(--db-navy);border-radius:12px;padding:32px 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;">
+    <div>
+      <div class="lab" style="color:#FFC9BF;">The ask</div>
+      <div style="font-size:32px;font-weight:700;color:#fff;margin-top:8px;letter-spacing:-.01em;">Approve a one-region pilot</div>
+    </div>
+    <div style="font-size:16px;line-height:1.45;color:#C9D3D7;max-width:400px;">You get live proof on stockouts, waste, and adoption before a network-wide rollout.</div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>9 / 9</span></div>
+</div></section>
+
+</div>
+<script>
+  // index.html#s3 shows only slide 3 (used for per-slide previews)
+  (function () {
+    var m = /^#s(\d)$/.exec(location.hash);
+    if (!m) return;
+    var el = document.getElementById('s' + m[1]);
+    if (el) { document.body.classList.add('single'); el.classList.add('on'); }
+  })();
+</script>
+</body>
+</html>
