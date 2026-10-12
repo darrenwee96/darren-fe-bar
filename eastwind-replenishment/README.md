@@ -139,4 +139,4 @@ databricks bundle run app --profile fe-bar
 databricks apps get eastwind-replenishment --profile fe-bar   # app_status.state = RUNNING, url
 ```
 
-Validation and browser check output is recorded in `../evidence/app_checks.txt`.
+Validation and browser check output is recorded in `../evidence/EVIDENCE.txt` (section 9, Databricks App).
