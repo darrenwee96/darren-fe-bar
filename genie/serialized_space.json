@@ -39,7 +39,7 @@
       {
         "identifier": "darren_fe_bar_catalog.gold.business_impact_summary",
         "description": [
-          "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel. Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact, sum raw deltas and multiply by 52 / sum(window_weeks)."
+          "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel. Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact by channel, sum raw deltas and multiply by 52 / sum(window_weeks). For an all-channel total, sum channel-level pooled annualized values or use distinct fold weeks, not channel-duplicated window_weeks."
         ],
         "column_configs": [
           {

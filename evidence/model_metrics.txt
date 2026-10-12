@@ -28,7 +28,7 @@ Feature/schema controls
 - Feature schema hash: 70d705608de5bca30d35509a786f6d1c16e5389daa1691d8f2b47f8949403632
 - Previous champion v5 hash: eccd6537fa21130a8f4fa95bfe3a365c6f46b25e14d6c3c4782a115ed7c56a7d
 - Candidate mean observed WMAPE: 0.2462.
-- Previous champion like-for-like WMAPE on the new design rows: 0.216984. This is not a clean apples-to-apples business comparison because v5 was loaded against changed feature semantics, but it is logged and disclosed.
+- Previous champion like-for-like WMAPE on the new design rows: 0.216984. This is not a clean apples-to-apples business comparison because v5 was loaded against changed feature semantics, but it is logged and disclosed. On its own design, v5 was 0.2466, so v6 at 0.2462 is roughly equal on clean terms.
 - Schema migration was required and promotion was allowed only because the run explicitly passed allow_migration_promotion=true. Scheduled job defaults remain allow_migration_promotion=false.
 
 Full-OOS censoring check
@@ -37,7 +37,7 @@ Full-OOS censoring check
 - Training logged full_oos_null_targets_excluded=12,950. These rows are no longer refilled to zero in U and are excluded by trainable(actual.notna()).
 
 Holiday alignment checks
-- Event alignment now uses daily-offset overlap, not exact week offset. For a shifted weekday holiday, each target-week day maps to the prior event occurrence with the same days-to-event offset and blends the matched prior weeks by day count.
+- Event alignment now uses daily-offset overlap, not exact week offset. For a shifted weekday holiday, each target-week day maps to the prior event occurrence with the same days-to-event offset and blends the matched prior weeks by day count. The blend does not renormalize if a matched prior-year week is NULL, which is intentionally conservative and can depress some ratios, e.g. SKU-MC03 event-naive ratio 0.404.
 - L0001/SKU-MC01 current forecasts:
   - 2026-09-07: forecast 187.5, p90 269.1, event_naive 199.9.
   - 2026-09-14: forecast 416.1, p90 607.1, event_naive 417.7.

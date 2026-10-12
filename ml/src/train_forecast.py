@@ -118,6 +118,8 @@ for k, week_start in cal[["k", "week_start"]].itertuples(index=False):
     matches = {}
     week_days = cal_daily[(cal_daily["date"] >= week_start) & (cal_daily["date"] <= week_start + pd.Timedelta(days=6))]
     for d in week_days.dropna(subset=["next_event_type"]).itertuples():
+        # Post-festival days map through the next event's offset sequence; this
+        # preserves daily offsets even when the holiday weekday shifts year to year.
         ly_k = daily_offset_week.get((d.next_event_type, int(d.next_event_seq) - 1, int(d.days_to_next_event)))
         if ly_k is not None:
             matches[ly_k] = matches.get(ly_k, 0) + 1
