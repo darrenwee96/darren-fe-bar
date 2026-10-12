@@ -223,8 +223,8 @@ TABLES = {
     },
     f"{C}.gold.business_impact_summary": {
         "description": "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel. "
-        "Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact, sum raw deltas "
-        "and multiply by 52 / sum(window_weeks).",
+        "Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact by channel, sum raw deltas "
+        "and multiply by 52 / sum(window_weeks). For an all-channel total, sum channel-level pooled annualized values or use distinct fold weeks, not channel-duplicated window_weeks.",
         "columns": [
             col("fold", "Backtest fold.", match=True),
             col("channel_type", "Store channel.", match=True),

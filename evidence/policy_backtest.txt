@@ -8,7 +8,7 @@ Method implemented
 - Drops rows without synthetic truth instead of filling actual demand.
 - Replays weekly inventory by policy with carryover and shelf-life expiry at product unit cost.
 - Compares forecast-p90 order-up-to policy against the synthetic manual policy recorded in the generated data.
-- Reports raw in-window dollars by fold/channel and per-fold annualized values. Pooled annualization is computed as SUM(raw_delta) * 52 / SUM(window_weeks); annualized fold rates are not summed.
+- Reports raw in-window dollars by fold/channel and per-fold annualized values. Channel-level pooled annualization is computed as SUM(raw_delta) * 52 / SUM(window_weeks). All-channel totals use the distinct 25 replay weeks, not the 75 channel-duplicated week count.
 
 Raw in-window results by fold and channel
 fold    | channel  | weeks | forecast_lost | manual_lost | raw_lost_delta | forecast_waste | manual_waste | raw_waste_delta
@@ -24,19 +24,23 @@ channel  | raw_lost_delta | raw_waste_delta | pooled_window_weeks | pooled_ann_l
 AIRPORT  | $3,465,707     | -$1,903         | 25                  | $7,208,671            | -$3,957
 DOWNTOWN | $6,659,218     | $94,913         | 25                  | $13,851,173           | $197,419
 HIGHWAY  | $2,783,283     | -$72,705        | 25                  | $5,789,229            | -$151,225
-TOTAL    | $12,908,208    | $20,306         | 75                  | $8,949,691            | $14,079
+TOTAL    | $12,908,208    | $20,306         | 25                  | $26,849,073           | $42,237
+
+Corrected all-channel pooled totals
+- The TOTAL row uses 25 distinct replay weeks; it must not divide by 75 because the same weeks appear once per channel.
+- Correct lost-sales delta: $12,908,208 x 52 / 25 = $26,849,073/year.
+- Correct waste delta: $20,306 x 52 / 25 = $42,237/year.
 
 Replay-vs-actual manual gap
-- Ground-truth actual lost sales queried from /Volumes/darren_fe_bar_catalog/eval/ground_truth/ with list_price:
-  - Mid-Autumn 2025 window 2025-09-15..2025-10-07: $4,832,607.
-  - Mid-Autumn 2025 plus LNY 2026 windows queried here: $9,562,007.
-- These values differ from the $12.36M review note. I could not reproduce $12.36M with the current ground-truth export and the above date windows, so the evidence reports the live query result rather than forcing the prior number.
+- Ground-truth actual lost sales from /Volumes/darren_fe_bar_catalog/eval/ground_truth/ with list_price:
+  - 25 replay weeks used by the policy backtest: $12,359,963.
+  - Narrower event windows only: $9,562,007.
 - Corrected manual-policy raw lost sales across the replay windows is $15,528,880, which is higher than the actual lost-sales query. The replay is a policy-screening simulation, not a byte-for-byte replay of the generator's daily manual ordering.
 
 Honest readout
 - Forecast policy reduces modeled lost sales in every fold/channel.
 - Waste signs are mixed: MA2025 AIRPORT and DOWNTOWN improve waste; MA2025 HIGHWAY and all LNY2026 channels worsen waste.
-- Pooled total waste delta is small and positive at +$14k/year, but this should not be presented as proof of the industry-problem.md ~$1M waste claim.
+- Pooled total waste delta is small and positive at +$42k/year, but this should not be presented as proof of the industry-problem.md ~$1M waste claim.
 - The honest claim is operational: daily-overlap event baselines and uncensored features reduce stockout exposure; waste-aware order policy still needs refinement.
 
 Genie evidence
