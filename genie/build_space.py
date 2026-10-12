@@ -222,16 +222,25 @@ TABLES = {
         ],
     },
     f"{C}.gold.business_impact_summary": {
-        "description": "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel.",
+        "description": "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel. "
+        "Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact, sum raw deltas "
+        "and multiply by 52 / sum(window_weeks).",
         "columns": [
             col("fold", "Backtest fold.", match=True),
             col("channel_type", "Store channel.", match=True),
+            col("window_weeks", "Distinct target weeks in the fold window. Use as denominator for pooled annualization."),
             col("manual_lost_sales", "Lost sales under manual ordering, USD."),
             col("forecast_lost_sales", "Lost sales under forecast-driven ordering, USD."),
+            col("lost_sales_delta", "Raw in-window lost-sales reduction from forecast policy, USD."),
             col("manual_waste_value", "Waste value under manual ordering, USD."),
             col("forecast_waste_value", "Waste value under forecast-driven ordering, USD."),
-            col("annualized_lost_sales_delta", "Annualized lost-sales reduction from forecast policy, USD."),
-            col("annualized_waste_delta", "Annualized waste reduction from forecast policy, USD."),
+            col("waste_delta", "Raw in-window waste reduction from forecast policy, USD; negative means the forecast policy wastes more."),
+            col("annualized_lost_sales_forecast", "Per-fold annualized forecast-policy lost sales, USD."),
+            col("annualized_lost_sales_manual", "Per-fold annualized manual-policy lost sales, USD."),
+            col("annualized_waste_value_forecast", "Per-fold annualized forecast-policy waste, USD."),
+            col("annualized_waste_value_manual", "Per-fold annualized manual-policy waste, USD."),
+            col("annualized_lost_sales_delta", "Per-fold annualized lost-sales reduction from forecast policy, USD. Do not sum across folds."),
+            col("annualized_waste_delta", "Per-fold annualized waste reduction from forecast policy, USD. Do not sum across folds."),
         ],
     },
     f"{C}.silver.dim_location": {
@@ -303,7 +312,7 @@ SNIPPETS = {
     ],
     "filters": [
         ("Observed accuracy (default)", "forecast_accuracy.scored_against = 'observed_uncensored' AND forecast_accuracy.calibration = 'post_conformal'", ["accuracy", "real-world accuracy"]),
-        ("Mid-Autumn range", "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('TE03', 'GB01')", ["mooncakes", "Mid-Autumn products"]),
+        ("Mid-Autumn range", "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('SKU-TE03', 'SKU-GB01')", ["mooncakes", "Mid-Autumn products"]),
         ("Lines to order", "replenishment_recommendations_current.recommended_units > 0", ["orders to place"]),
         ("Manager overrides", "order_decisions_history.decision_status IN ('ADJUSTED', 'REJECTED')", ["overrides", "overridden"]),
         (
@@ -396,6 +405,7 @@ TEXT_INSTRUCTIONS = """## PURPOSE
 
 ## DISAMBIGUATION
 - "Mid-Autumn" products means category Mooncake unless the user names other SKUs; Mid-Autumn Festival 2026 is 2026-09-25.
+- For Mid-Autumn 2026 festival-week ratio checks, "festival week" means forecast_week 2026-09-21 and "lead-up week" means forecast_week 2026-09-07 unless the user names a different week.
 - "Override" means decision_status ADJUSTED or REJECTED.
 - "Accuracy" or "forecast error" means WMAPE (lower is better).
 - When no period is given for sales, stockouts, or waste, use the last 52 weeks of data and say so.
@@ -533,12 +543,37 @@ ORDER BY peak_gift_stockout_day_rate DESC""",
     (
         "How much annualized lost sales and waste reduction does the forecast policy show by channel?",
         f"""SELECT b.channel_type,
-       SUM(b.annualized_lost_sales_delta) AS annualized_lost_sales_reduction_usd,
-       SUM(b.annualized_waste_delta) AS annualized_waste_reduction_usd
+       SUM(b.lost_sales_delta) AS raw_lost_sales_reduction_usd,
+       SUM(b.waste_delta) AS raw_waste_reduction_usd,
+       SUM(b.lost_sales_delta) * 52 / SUM(b.window_weeks) AS pooled_annualized_lost_sales_reduction_usd,
+       SUM(b.waste_delta) * 52 / SUM(b.window_weeks) AS pooled_annualized_waste_reduction_usd
 FROM {C}.gold.business_impact_summary b
 GROUP BY b.channel_type
-ORDER BY annualized_lost_sales_reduction_usd DESC""",
-        "Must use business_impact_summary and report honest policy-backtest deltas by channel.",
+ORDER BY pooled_annualized_lost_sales_reduction_usd DESC""",
+        "Must use raw deltas and pooled annualization; do not sum per-fold annualized values.",
+    ),
+    (
+        "For current Mid-Autumn peak SKUs, what is the festival-week forecast ratio versus the 2026-09-07 lead-up week?",
+        f"""SELECT f.sku_id,
+       SUM(CASE WHEN f.forecast_week = DATE'2026-09-21' THEN f.forecast_units ELSE 0 END) AS festival_week_units,
+       SUM(CASE WHEN f.forecast_week = DATE'2026-09-07' THEN f.forecast_units ELSE 0 END) AS leadup_week_units,
+       SUM(CASE WHEN f.forecast_week = DATE'2026-09-21' THEN f.forecast_units ELSE 0 END)
+         / NULLIF(SUM(CASE WHEN f.forecast_week = DATE'2026-09-07' THEN f.forecast_units ELSE 0 END), 0) AS festival_to_leadup_ratio
+FROM {F} f
+JOIN {P} p ON f.sku_id = p.sku_id
+WHERE p.peak_gift_flag = true AND f.sku_id IN ('SKU-MC01', 'SKU-MC02', 'SKU-MC03', 'SKU-MC04', 'SKU-GB01', 'SKU-TE03')
+GROUP BY f.sku_id
+ORDER BY festival_to_leadup_ratio DESC""",
+        "Must compare festival week 2026-09-21 against lead-up week 2026-09-07 for current forecasts and include TE03/GB01 peak gifts.",
+    ),
+    (
+        "Show raw in-window policy lost sales and waste by fold and channel.",
+        f"""SELECT b.fold, b.channel_type, b.window_weeks,
+       b.forecast_lost_sales, b.manual_lost_sales, b.lost_sales_delta,
+       b.forecast_waste_value, b.manual_waste_value, b.waste_delta
+FROM {C}.gold.business_impact_summary b
+ORDER BY b.fold, b.channel_type""",
+        "Must report raw in-window dollars by fold/channel rather than summing annualized rates.",
     ),
     (
         "Show total expected demand by forecast week for current forecasts only.",

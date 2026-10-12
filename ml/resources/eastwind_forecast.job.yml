@@ -22,6 +22,7 @@ resources:
               experiment: ${resources.experiments.demand_forecasting.name}
               as_of: ${var.as_of}
               mode: score_only
+              allow_migration_promotion: "false"
           environment_key: ml_env
         - task_key: build_recommendations
           depends_on:
@@ -83,6 +84,7 @@ resources:
               experiment: ${resources.experiments.demand_forecasting.name}
               as_of: ${var.as_of}
               mode: train_score
+              allow_migration_promotion: "false"
           environment_key: ml_env
         - task_key: build_recommendations
           depends_on:

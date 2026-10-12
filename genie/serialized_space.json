@@ -39,19 +39,43 @@
       {
         "identifier": "darren_fe_bar_catalog.gold.business_impact_summary",
         "description": [
-          "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel."
+          "Policy backtest summary comparing forecast-driven replenishment with manual seasonal-naive ordering by fold and channel. Rows are fold-window summaries; do not sum annualized columns across folds. For pooled annualized impact, sum raw deltas and multiply by 52 / sum(window_weeks)."
         ],
         "column_configs": [
           {
             "column_name": "annualized_lost_sales_delta",
             "description": [
-              "Annualized lost-sales reduction from forecast policy, USD."
+              "Per-fold annualized lost-sales reduction from forecast policy, USD. Do not sum across folds."
+            ]
+          },
+          {
+            "column_name": "annualized_lost_sales_forecast",
+            "description": [
+              "Per-fold annualized forecast-policy lost sales, USD."
+            ]
+          },
+          {
+            "column_name": "annualized_lost_sales_manual",
+            "description": [
+              "Per-fold annualized manual-policy lost sales, USD."
             ]
           },
           {
             "column_name": "annualized_waste_delta",
             "description": [
-              "Annualized waste reduction from forecast policy, USD."
+              "Per-fold annualized waste reduction from forecast policy, USD. Do not sum across folds."
+            ]
+          },
+          {
+            "column_name": "annualized_waste_value_forecast",
+            "description": [
+              "Per-fold annualized forecast-policy waste, USD."
+            ]
+          },
+          {
+            "column_name": "annualized_waste_value_manual",
+            "description": [
+              "Per-fold annualized manual-policy waste, USD."
             ]
           },
           {
@@ -83,6 +107,12 @@
             ]
           },
           {
+            "column_name": "lost_sales_delta",
+            "description": [
+              "Raw in-window lost-sales reduction from forecast policy, USD."
+            ]
+          },
+          {
             "column_name": "manual_lost_sales",
             "description": [
               "Lost sales under manual ordering, USD."
@@ -92,6 +122,18 @@
             "column_name": "manual_waste_value",
             "description": [
               "Waste value under manual ordering, USD."
+            ]
+          },
+          {
+            "column_name": "waste_delta",
+            "description": [
+              "Raw in-window waste reduction from forecast policy, USD; negative means the forecast policy wastes more."
+            ]
+          },
+          {
+            "column_name": "window_weeks",
+            "description": [
+              "Distinct target weeks in the fold window. Use as denominator for pooled annualization."
             ]
           }
         ]
@@ -808,7 +850,7 @@
       {
         "id": "271f7cf102010192cba7df6753cb9c9f",
         "content": [
-          "## PURPOSE\n- Users are Eastwind Gourmet merchandising planners, store managers, and the VP Merchandising.\n\n## DISAMBIGUATION\n- \"Mid-Autumn\" products means category Mooncake unless the user names other SKUs; Mid-Autumn Festival 2026 is 2026-09-25.\n- \"Override\" means decision_status ADJUSTED or REJECTED.\n- \"Accuracy\" or \"forecast error\" means WMAPE (lower is better).\n- When no period is given for sales, stockouts, or waste, use the last 52 weeks of data and say so.\n\n## DATA QUALITY NOTES\n- In forecast_accuracy, method model_p90_coverage stores p90 coverage in the wmape column; it is not an error.\n- Use forecast_accuracy scored_against observed_uncensored unless the user asks about true or simulated demand.\n- Weeks with 2+ out-of-stock days are censored: their sales understate demand.\n\n## CONSTRAINTS\n- Recommendations are suggestions, not placed orders; committed quantities are final_order_units in order_decisions_history.\n\n## Instructions you must follow when providing summaries\n- State the week range or the as-of date used.\n- In SQL results, return unrounded values and rates as fractions between 0 and 1.\n- In the written summary, show money in USD rounded to whole dollars and rates as percentages with one decimal place.\n"
+          "## PURPOSE\n- Users are Eastwind Gourmet merchandising planners, store managers, and the VP Merchandising.\n\n## DISAMBIGUATION\n- \"Mid-Autumn\" products means category Mooncake unless the user names other SKUs; Mid-Autumn Festival 2026 is 2026-09-25.\n- For Mid-Autumn 2026 festival-week ratio checks, \"festival week\" means forecast_week 2026-09-21 and \"lead-up week\" means forecast_week 2026-09-07 unless the user names a different week.\n- \"Override\" means decision_status ADJUSTED or REJECTED.\n- \"Accuracy\" or \"forecast error\" means WMAPE (lower is better).\n- When no period is given for sales, stockouts, or waste, use the last 52 weeks of data and say so.\n\n## DATA QUALITY NOTES\n- In forecast_accuracy, method model_p90_coverage stores p90 coverage in the wmape column; it is not an error.\n- Use forecast_accuracy scored_against observed_uncensored unless the user asks about true or simulated demand.\n- Weeks with 2+ out-of-stock days are censored: their sales understate demand.\n\n## CONSTRAINTS\n- Recommendations are suggestions, not placed orders; committed quantities are final_order_units in order_decisions_history.\n\n## Instructions you must follow when providing summaries\n- State the week range or the as-of date used.\n- In SQL results, return unrounded values and rates as fractions between 0 and 1.\n- In the written summary, show money in USD rounded to whole dollars and rates as percentages with one decimal place.\n"
         ]
       }
     ],
@@ -1047,7 +1089,7 @@
           "id": "f439382023c553fd7a8f71a4772c9545",
           "display_name": "Mid-Autumn range",
           "sql": [
-            "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('TE03', 'GB01')"
+            "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('SKU-TE03', 'SKU-GB01')"
           ],
           "synonyms": [
             "mooncakes",
@@ -1098,6 +1140,23 @@
         ],
         "evaluation_note": [
           "Rate must be weighted by ranged_series across channels and weeks."
+        ]
+      },
+      {
+        "id": "4e54d680235a07c3e2879887308b3007",
+        "question": [
+          "Show raw in-window policy lost sales and waste by fold and channel."
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT b.fold, b.channel_type, b.window_weeks,\n       b.forecast_lost_sales, b.manual_lost_sales, b.lost_sales_delta,\n       b.forecast_waste_value, b.manual_waste_value, b.waste_delta\nFROM darren_fe_bar_catalog.gold.business_impact_summary b\nORDER BY b.fold, b.channel_type"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must report raw in-window dollars by fold/channel rather than summing annualized rates."
         ]
       },
       {
@@ -1225,12 +1284,12 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT b.channel_type,\n       SUM(b.annualized_lost_sales_delta) AS annualized_lost_sales_reduction_usd,\n       SUM(b.annualized_waste_delta) AS annualized_waste_reduction_usd\nFROM darren_fe_bar_catalog.gold.business_impact_summary b\nGROUP BY b.channel_type\nORDER BY annualized_lost_sales_reduction_usd DESC"
+              "SELECT b.channel_type,\n       SUM(b.lost_sales_delta) AS raw_lost_sales_reduction_usd,\n       SUM(b.waste_delta) AS raw_waste_reduction_usd,\n       SUM(b.lost_sales_delta) * 52 / SUM(b.window_weeks) AS pooled_annualized_lost_sales_reduction_usd,\n       SUM(b.waste_delta) * 52 / SUM(b.window_weeks) AS pooled_annualized_waste_reduction_usd\nFROM darren_fe_bar_catalog.gold.business_impact_summary b\nGROUP BY b.channel_type\nORDER BY pooled_annualized_lost_sales_reduction_usd DESC"
             ]
           }
         ],
         "evaluation_note": [
-          "Must use business_impact_summary and report honest policy-backtest deltas by channel."
+          "Must use raw deltas and pooled annualization; do not sum per-fold annualized values."
         ]
       },
       {
@@ -1265,6 +1324,23 @@
         ],
         "evaluation_note": [
           "p90 coverage is stored in the wmape column for method model_p90_coverage; target is 0.90."
+        ]
+      },
+      {
+        "id": "dfeea2b63c2101471b52371adb35e494",
+        "question": [
+          "For current Mid-Autumn peak SKUs, what is the festival-week forecast ratio versus the 2026-09-07 lead-up week?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT f.sku_id,\n       SUM(CASE WHEN f.forecast_week = DATE'2026-09-21' THEN f.forecast_units ELSE 0 END) AS festival_week_units,\n       SUM(CASE WHEN f.forecast_week = DATE'2026-09-07' THEN f.forecast_units ELSE 0 END) AS leadup_week_units,\n       SUM(CASE WHEN f.forecast_week = DATE'2026-09-21' THEN f.forecast_units ELSE 0 END)\n         / NULLIF(SUM(CASE WHEN f.forecast_week = DATE'2026-09-07' THEN f.forecast_units ELSE 0 END), 0) AS festival_to_leadup_ratio\nFROM darren_fe_bar_catalog.gold.demand_forecasts_current f\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.peak_gift_flag = true AND f.sku_id IN ('SKU-MC01', 'SKU-MC02', 'SKU-MC03', 'SKU-MC04', 'SKU-GB01', 'SKU-TE03')\nGROUP BY f.sku_id\nORDER BY festival_to_leadup_ratio DESC"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must compare festival week 2026-09-21 against lead-up week 2026-09-07 for current forecasts and include TE03/GB01 peak gifts."
         ]
       },
       {
