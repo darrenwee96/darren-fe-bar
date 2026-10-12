@@ -1,82 +1,144 @@
 @import '@databricks/appkit-ui/styles.css';
 
+/*
+ * Eastwind control-panel theme. Cool ink neutrals, one blue accent (forecast / primary actions) and a reserved
+ * status set (critical / warning / good) used only for order status, always with an icon + label.
+ * Validated with the dataviz palette validator: forecast blue vs last-year gray CVD ΔE 15.8 light / 15.6 dark;
+ * critical vs warning ΔE 24.4 (warning is sub-3:1 on light by design and always carries a label).
+ * Light is :root; dark applies with the .dark class (theme toggle) or the OS setting unless .light is set.
+ */
 :root {
-  /* --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  --radius: 0.75rem;
+  --background: oklch(0.982 0.004 255);
+  --foreground: oklch(0.22 0.025 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.22 0.025 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.22 0.025 260);
+  --primary: #1c5cab;
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
+  --secondary: oklch(0.955 0.008 255);
+  --secondary-foreground: oklch(0.26 0.03 260);
+  --muted: oklch(0.96 0.006 255);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.95 0.015 255);
+  --accent-foreground: oklch(0.26 0.03 260);
+  --destructive: #c53030;
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.603 0.135 166.892);
+  --success: #0b8a0b;
   --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.795 0.157 78.748);
-  --warning-foreground: oklch(0.199 0.027 238.732);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067); */
+  --warning: #fab219;
+  --warning-foreground: oklch(0.25 0.04 70);
+  --border: oklch(0.915 0.008 255);
+  --input: oklch(0.89 0.01 255);
+  --ring: #2a78d6;
+
+  --status-critical: #d03b3b;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+  --series-forecast: #2a78d6;
+  --series-reference: #8a8984;
+
+  --chart-cat-1: #2a78d6;
+  --chart-axis-label: hsla(230, 8%, 46%, 1);
+  --chart-axis-title: hsla(230, 25%, 16%, 1);
+  --chart-grid: hsla(230, 15%, 92%, 1);
+  --chart-tooltip-bg: hsla(0, 0%, 100%, 1);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.165 0.012 260);
+  --foreground: oklch(0.95 0.005 260);
+  --card: oklch(0.205 0.014 260);
+  --card-foreground: oklch(0.95 0.005 260);
+  --popover: oklch(0.225 0.014 260);
+  --popover-foreground: oklch(0.95 0.005 260);
+  --primary: #3987e5;
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.016 260);
+  --secondary-foreground: oklch(0.95 0.005 260);
+  --muted: oklch(0.25 0.014 260);
+  --muted-foreground: oklch(0.72 0.015 260);
+  --accent: oklch(0.28 0.02 260);
+  --accent-foreground: oklch(0.95 0.005 260);
+  --destructive: #e66767;
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: #3cc23c;
+  --success-foreground: oklch(0.15 0 0);
+  --warning: #fab219;
+  --warning-foreground: oklch(0.2 0.04 70);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: #3987e5;
+
+  --series-forecast: #3987e5;
+  --chart-cat-1: #3987e5;
+  --chart-axis-label: hsla(230, 8%, 66%, 1);
+  --chart-axis-title: hsla(230, 20%, 95%, 1);
+  --chart-grid: hsla(0, 0%, 100%, 0.08);
+  --chart-tooltip-bg: hsla(230, 16%, 15%, 1);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.92 0.004 286.32);
-    --primary-foreground: oklch(0.21 0.006 285.885);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --success: oklch(0.67 0.12 167);
-    --success-foreground: oklch(1 0 0);
-    --warning: oklch(0.83 0.165 85);
-    --warning-foreground: oklch(0.199 0.027 238.732);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938); */
+  :root:not(.light) {
+    color-scheme: dark;
+    --background: oklch(0.165 0.012 260);
+    --foreground: oklch(0.95 0.005 260);
+    --card: oklch(0.205 0.014 260);
+    --card-foreground: oklch(0.95 0.005 260);
+    --popover: oklch(0.225 0.014 260);
+    --popover-foreground: oklch(0.95 0.005 260);
+    --primary: #3987e5;
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.27 0.016 260);
+    --secondary-foreground: oklch(0.95 0.005 260);
+    --muted: oklch(0.25 0.014 260);
+    --muted-foreground: oklch(0.72 0.015 260);
+    --accent: oklch(0.28 0.02 260);
+    --accent-foreground: oklch(0.95 0.005 260);
+    --destructive: #e66767;
+    --destructive-foreground: oklch(0.99 0 0);
+    --success: #3cc23c;
+    --success-foreground: oklch(0.15 0 0);
+    --border: oklch(1 0 0 / 9%);
+    --input: oklch(1 0 0 / 14%);
+    --ring: #3987e5;
+    --series-forecast: #3987e5;
+    --chart-cat-1: #3987e5;
+    --chart-axis-label: hsla(230, 8%, 66%, 1);
+    --chart-axis-title: hsla(230, 20%, 95%, 1);
+    --chart-grid: hsla(0, 0%, 100%, 0.08);
+    --chart-tooltip-bg: hsla(230, 16%, 15%, 1);
   }
+}
+
+body {
+  font-family:
+    'Inter',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures wherever numbers line up. */
+.tabular-nums,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status + series colors as Tailwind utilities (bg-critical/10, text-forecast, ...). */
+@theme inline {
+  --color-critical: var(--status-critical);
+  --color-caution: var(--status-warning);
+  --color-good: var(--status-good);
+  --color-forecast: var(--series-forecast);
+  --color-reference: var(--series-reference);
 }

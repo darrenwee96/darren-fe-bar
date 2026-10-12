@@ -5,7 +5,8 @@ import { GenieContext } from './context';
 /** One Genie conversation for the whole app, so it survives page changes and closing the panel. */
 export function GenieProvider({ children }: { children: ReactNode }) {
   const chat = useGenieChat({ alias: 'default', persistInUrl: false });
-  const [open, setOpen] = useState(false);
+  // Docked open by default on wide screens, where the workspace still has room beside it.
+  const [open, setOpen] = useState(() => window.innerWidth >= 1600);
   const { sendMessage, status } = chat;
 
   const ask = useCallback(

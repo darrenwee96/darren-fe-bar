@@ -1,134 +1,182 @@
-import { createBrowserRouter, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
-import { useEffect, useState } from 'react';
-import { Badge, Button, Sheet, SheetContent, SheetHeader, SheetTitle, useIsMobile } from '@databricks/appkit-ui/react';
-import { Menu, Sparkles } from 'lucide-react';
-import { GeniePanel } from './genie/GeniePanel';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
+import { useCallback, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle, Badge, Button } from '@databricks/appkit-ui/react';
+import { Clock, Lock, Moon, Sparkles, Sun, TriangleAlert } from 'lucide-react';
+import { ForecastPanel } from './components/ForecastPanel';
+import { FilterBar } from './components/FilterBar';
+import { KpiStrip } from './components/KpiStrip';
+import { OrderQueue } from './components/OrderQueue';
+import { RecommendationSheet } from './components/RecommendationSheet';
+import { StoreNeedPanel } from './components/StoreNeedPanel';
+import { GenieDock } from './genie/GeniePanel';
 import { useGenie } from './genie/context';
 import { GenieProvider } from './genie/GenieProvider';
-import { ForecastPage } from './pages/ForecastPage';
-import { InventoryPage } from './pages/InventoryPage';
-import { OverviewPage } from './pages/OverviewPage';
-import { RecommendationsPage } from './pages/RecommendationsPage';
-import { StoreDetailPage } from './pages/StoreDetailPage';
-import { StoresPage } from './pages/StoresPage';
-import { fetchWhoami } from './lib/api';
+import { fetchFilterOptions, fetchSummary, fetchWhoami } from './lib/api';
+import { useGlobalFilters } from './lib/filters';
+import { formatDate, formatDateTime, titleCase } from './lib/format';
+import { useAsync } from './lib/useAsync';
+import { useTheme } from './lib/theme';
 
-const NAV = [
-  { to: '/', label: 'Overview', end: true },
-  { to: '/stores', label: 'Stores' },
-  { to: '/forecast', label: 'Forecast' },
-  { to: '/inventory', label: 'Inventory' },
-  { to: '/orders', label: 'Order approval' },
-];
-
-const linkClass =
-  (block: boolean) =>
-  ({ isActive }: { isActive: boolean }) =>
-    `${block ? 'block py-2' : 'py-1.5'} px-3 rounded-md text-sm font-medium transition-colors ${
-      isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-    }`;
-
-function NavLinks({
-  className,
-  block = false,
-  onClick,
-}: {
-  className?: string;
-  block?: boolean;
-  onClick?: () => void;
-}) {
+function Header({ email, freshness }: { email: string | null; freshness: string | null }) {
+  const { open, setOpen } = useGenie();
+  const { theme, toggle } = useTheme();
   return (
-    <nav className={className}>
-      {NAV.map((n) => (
-        <NavLink key={n.to} to={n.to} end={n.end} className={linkClass(block)} onClick={onClick}>
-          {n.label}
-        </NavLink>
-      ))}
-    </nav>
+    <header className="sticky top-0 z-30 flex h-[57px] items-center gap-4 border-b bg-card/95 px-4 backdrop-blur md:px-6">
+      <div className="flex items-center gap-2.5">
+        <div
+          aria-hidden
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#104281] text-sm font-bold text-primary-foreground shadow-sm"
+        >
+          E
+        </div>
+        <div className="leading-tight">
+          <h1 className="text-[15px] font-semibold text-foreground">Eastwind Replenishment</h1>
+          <p className="text-[11px] text-muted-foreground">Demand &amp; order control panel</p>
+        </div>
+      </div>
+      {freshness && (
+        <Badge variant="outline" className="hidden gap-1 font-normal text-muted-foreground lg:inline-flex">
+          <Clock className="h-3 w-3" aria-hidden /> {freshness}
+        </Badge>
+      )}
+      <div className="ml-auto flex items-center gap-2">
+        <Button variant={open ? 'secondary' : 'outline'} size="sm" onClick={() => setOpen(!open)} aria-pressed={open}>
+          <Sparkles className="mr-1 h-4 w-4" /> Ask Genie
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+        {email && (
+          <Badge
+            variant="secondary"
+            className="hidden max-w-[220px] truncate md:inline-flex"
+            title="Decisions you save are recorded under this identity"
+          >
+            {email}
+          </Badge>
+        )}
+      </div>
+    </header>
   );
 }
 
-function AskGenieButton() {
-  const { ask } = useGenie();
+function ControlPanel() {
+  const { filters, setFilter } = useGlobalFilters();
+  const [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const refresh = useCallback(() => setRevision((r) => r + 1), []);
+
+  const whoami = useAsync('whoami', fetchWhoami);
+  const options = useAsync('filters', fetchFilterOptions);
+  const filterKey = JSON.stringify(filters);
+  const summary = useAsync(`${filterKey}|${revision}`, () => fetchSummary(filters));
+
+  const scope = whoami.data?.scope;
+  const noScope = !!scope && scope.restricted && scope.regions.length === 0 && scope.locations.length === 0;
+  const store = options.data?.stores.find((s) => s.location_id === filters.location);
+  const scopeLabel =
+    store?.location_name ??
+    ([filters.region, filters.channel && titleCase(filters.channel), filters.category].filter(Boolean).join(' · ') ||
+      'All stores');
+  const s = summary.data;
+  const freshness = s?.as_of_date
+    ? `Order week ${formatDate(s.as_of_date)} · model v${s.model_version} · loaded ${formatDateTime(s.loaded_at)}`
+    : null;
+
   return (
-    <Button variant="outline" size="sm" onClick={() => ask()}>
-      <Sparkles className="mr-1 h-4 w-4" /> Ask Genie
-    </Button>
+    <div className="min-h-screen bg-background">
+      <Header email={whoami.data?.email ?? null} freshness={freshness} />
+      <div className="flex">
+        <div className="min-w-0 flex-1">
+          <div className="sticky top-[57px] z-20 border-b bg-background/90 px-4 py-2.5 backdrop-blur md:px-6">
+            <FilterBar options={options.data} />
+          </div>
+          <main className="space-y-4 p-4 md:px-6">
+            {whoami.error && (
+              <Alert variant="destructive">
+                <TriangleAlert className="h-4 w-4" />
+                <AlertTitle>Could not verify who you are</AlertTitle>
+                <AlertDescription>{whoami.error}</AlertDescription>
+              </Alert>
+            )}
+            {noScope && (
+              <Alert>
+                <Lock className="h-4 w-4" />
+                <AlertTitle>No planning scope assigned</AlertTitle>
+                <AlertDescription>
+                  Order lines and decisions are limited to the regions or stores you plan for, and none are assigned to{' '}
+                  {whoami.data?.email}. Ask an app admin to add you to replenishment.user_scope. Forecast and accuracy
+                  charts stay available.
+                </AlertDescription>
+              </Alert>
+            )}
+            {summary.error && !s && !whoami.error && (
+              <Alert variant="destructive">
+                <TriangleAlert className="h-4 w-4" />
+                <AlertTitle>Order recommendations unavailable</AlertTitle>
+                <AlertDescription>{summary.error}</AlertDescription>
+              </Alert>
+            )}
+            <KpiStrip filters={filters} summary={s} loading={summary.loading} error={summary.error} />
+            {/*
+              Charts share a row (forecast 3/5, store ranking 2/5) once the workspace is >= 1400px, else they stack, so they keep a proper aspect ratio at any
+              width, with or without the Genie dock; the queue spans the full width below. Container queries follow
+              the space actually left beside the dock.
+            */}
+            <div className="@container">
+              <div className="grid grid-cols-1 gap-4 @min-[1400px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
+                <StoreNeedPanel
+                  noScope={noScope}
+                  filters={filters}
+                  revision={revision}
+                  onSelect={(id) => setFilter('location', id)}
+                />
+              </div>
+            </div>
+            <OrderQueue
+              noScope={noScope}
+              filters={filters}
+              revision={revision}
+              onOpen={setSelected}
+              onChanged={refresh}
+            />
+          </main>
+        </div>
+        <GenieDock email={whoami.data?.email ?? null} filters={filters} storeName={store?.location_name} />
+      </div>
+
+      <RecommendationSheet
+        recommendationId={selected}
+        onClose={() => setSelected(null)}
+        onSaved={refresh}
+        onFocusStore={(id) => {
+          setFilter('location', id);
+          setSelected(null);
+        }}
+      />
+    </div>
   );
 }
 
-function Layout() {
-  const isMobile = useIsMobile();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchWhoami()
-      .then((w) => setEmail(w.email))
-      .catch(() => setEmail(null));
-  }, []);
-
+function Root() {
   return (
     <GenieProvider>
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="sticky top-0 z-10 border-b bg-background px-4 md:px-6 py-3 flex items-center gap-4">
-          <div className="shrink-0">
-            <h1 className="text-lg font-semibold text-foreground">Eastwind Gourmet · Demand &amp; Replenishment</h1>
-            <p className="text-xs text-muted-foreground">
-              Analyst workbench: sales, forecast, inventory, order approval
-            </p>
-          </div>
-          <NavLinks className="hidden lg:flex gap-1" />
-          <div className="ml-auto flex items-center gap-2">
-            <AskGenieButton />
-            {email && (
-              <Badge
-                variant="outline"
-                className="hidden md:inline-flex"
-                title="Decisions you save are recorded under this identity"
-              >
-                {email}
-              </Badge>
-            )}
-            <div className="lg:hidden">
-              <Sheet open={mobileNavOpen && isMobile} onOpenChange={setMobileNavOpen}>
-                <Button variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)}>
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Open navigation</span>
-                </Button>
-                <SheetContent side="left">
-                  <SheetHeader>
-                    <SheetTitle>Navigation</SheetTitle>
-                  </SheetHeader>
-                  <NavLinks className="flex flex-col gap-1 px-4" block onClick={() => setMobileNavOpen(false)} />
-                </SheetContent>
-              </Sheet>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 md:p-6">
-          <Outlet />
-        </main>
-        <GeniePanel email={email} />
-      </div>
+      <ControlPanel />
     </GenieProvider>
   );
 }
 
 const router = createBrowserRouter([
-  {
-    element: <Layout />,
-    children: [
-      { path: '/', element: <OverviewPage /> },
-      { path: '/stores', element: <StoresPage /> },
-      { path: '/stores/:locationId', element: <StoreDetailPage /> },
-      { path: '/forecast', element: <ForecastPage /> },
-      { path: '/inventory', element: <InventoryPage /> },
-      { path: '/orders', element: <RecommendationsPage /> },
-      { path: '/recommendations', element: <Navigate to="/orders" replace /> },
-    ],
-  },
+  { path: '/', element: <Root /> },
+  // Former page routes (/orders, /stores/:id, ...) all land on the single control panel.
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
 export default function App() {

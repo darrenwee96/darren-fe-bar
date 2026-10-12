@@ -1,188 +1,142 @@
-# eastwind-replenishment
+# Eastwind Replenishment: demand and order control panel
 
-A Databricks App powered by [AppKit](https://developers.databricks.com/docs/appkit/v0/), featuring React, TypeScript, and Tailwind CSS.
+A Databricks App (AppKit: React + TypeScript + Express) that planners and analysts at Eastwind Gourmet use to approve
+the weekly store orders the forecast recommends. It puts the decision and its evidence on one screen:
 
-**Enabled plugins:**
-- **Analytics** -- SQL query execution against Databricks SQL Warehouses
-- **Lakebase** -- Fully managed Postgres database for transactional (OLTP) workloads on Databricks
-- **Server** -- Express HTTP server with static file serving and Vite dev mode
+- **KPI strip:** peak gift lines needing an order, forecast error (WMAPE) by channel, waste and markdown value,
+  share of decided orders placed from the forecast, and pending decisions.
+- **Order queue:** store-SKU recommendations ranked by order need, then by sales lost if not ordered. Accept in one
+  click, or open the side sheet to adjust or reject with a reason. Every decision is written to Lakebase with
+  optimistic locking and an append-only audit trail.
+- **Forecast vs actual:** 26 weeks of actual units, the 6-week forecast with its p90 band, and the same week last year,
+  for whatever the filters select (network, region, channel, category, or one store). The side sheet shows the same
+  chart for a single store-SKU.
+- **Order need by store:** the top 10 stores by sales at stake. Click one to drill every panel down to that store.
+- **Ask Genie:** a docked natural-language panel over the curated Genie space. It runs on behalf of the signed-in user
+  and shows the generated SQL.
 
-## Prerequisites
+Global filters (region, channel, category, store) live in the URL, so a filtered view can be shared. There is a
+single view with drill-down and no tab pages.
 
-- Node.js v22+ and npm
-- Databricks CLI (for deployment)
-- Access to a Databricks workspace
+`stockout_risk = HIGH` is shown as **Order needed**: stock on hand plus inbound is below the expected demand until the
+next delivery, so the line needs an order to avoid a stockout. It does not mean a stockout is already likely.
+`MEDIUM` is **Below safety stock** and `LOW` is **Covered**.
 
-## Databricks Authentication
+## Plugins and resources
 
-### Local Development
+| Plugin      | Used for                                                      | Resource (`databricks.yml`)                                    |
+| ----------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
+| `analytics` | KPI, accuracy and forecast charts (`config/queries/*.sql`)    | `sql-warehouse` (`CAN_USE`)                                    |
+| `lakebase`  | Order queue, decisions, audit trail, planner scope (`/api/*`) | `postgres` branch + database (`CAN_CONNECT_AND_CREATE`)        |
+| `genie`     | Ask Genie panel                                               | `genie-space` (`CAN_RUN`), `user_api_scopes: dashboards.genie` |
+| `server`    | Express server, static client, custom routes                  | n/a                                                            |
 
-For local development, configure your environment variables by creating a `.env` file:
+### Warehouse queries (`config/queries`)
 
-```bash
-cp .env.example .env
+| Query                 | Source                                                 | Notes                                                                                                                                                |
+| --------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forecast_vs_actual`  | `gold.weekly_demand_features`, `gold.demand_forecasts` | Filters: region, channel, category, store, SKU. Reads only the **latest `forecast_run_id`**, so a rerun for the same as-of date never double-counts. |
+| `accuracy_by_channel` | `gold.forecast_accuracy`                               | WMAPE for the model vs same week last year, from the latest `backtest_run_id`.                                                                       |
+| `waste_kpis`          | `gold.weekly_demand_features`                          | Expired + markdown value, last 13 weeks vs a year earlier.                                                                                           |
+
+The app service principal needs `USE CATALOG` / `USE SCHEMA` and `SELECT` on these Gold tables.
+
+### Lakebase (`server/routes/replenishment-routes.ts`)
+
+| Table                           | Owner                   | Purpose                                                         |
+| ------------------------------- | ----------------------- | --------------------------------------------------------------- |
+| `serving.recommendations`       | `eastwind-forecast` job | Current recommendations (read-only to the app)                  |
+| `replenishment.order_decisions` | app service principal   | One current decision per line; `version` for optimistic locking |
+| `replenishment.decision_events` | app service principal   | Append-only audit trail                                         |
+| `replenishment.user_scope`      | app service principal   | Regions / stores each planner may see and decide                |
+
+The app creates the `replenishment` schema at startup. Deploy once before running locally, so the service principal
+owns it.
+
+### API
+
+| Route                                    | What it does                                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/whoami`                        | Verified user and resolved planning scope                                                                                            |
+| `GET /api/filters`                       | Regions, categories and stores inside the caller's scope                                                                             |
+| `GET /api/recommendations/summary`       | KPI counts and values for the filters                                                                                                |
+| `GET /api/recommendations/by-store`      | Top 10 stores by order need                                                                                                          |
+| `GET /api/recommendations`               | Paged queue. Filters: region, channel, category, location, risk, status, search, peakOnly                                            |
+| `GET /api/recommendations/:id`           | Line detail and audit trail                                                                                                          |
+| `POST /api/recommendations/:id/decision` | `{status, finalUnits?, reason?, expectedVersion}` returns 201/200, 400 (validation), 403 (out of scope), 404, or 409 (stale version) |
+
+### Identity
+
+All API routes go through `server/routes/identity.ts`. The app does not trust `x-forwarded-email` or
+`x-forwarded-user` on their own. The Databricks Apps proxy forwards the signed-in user's OAuth token as
+`x-forwarded-access-token` (`user_api_scopes` is set, and the platform adds `iam.current-user:read`). The server
+verifies that token with the workspace (`GET /api/2.0/preview/scim/v2/Me`) and uses the identity the workspace returns,
+cached for 5 minutes per token hash. Requests without a verifiable token get `401`. Scope checks and `decided_by` both
+use this identity.
+
+### Planner scope (server-side, fail-closed)
+
+Every Lakebase read and write applies the caller's scope from `replenishment.user_scope`. The UI is never the only
+filter: a client asking for another region gets nothing back, and a decision on an out-of-scope store returns `403`.
+**A user with no rows sees no order lines and cannot decide.** The panel tells them no scope is assigned; forecast and
+accuracy charts stay visible.
+
+| Row                     | Grants                                       |
+| ----------------------- | -------------------------------------------- |
+| `region = '*'`          | Every region and store (analysts / planners) |
+| `region = 'North'`      | One region                                   |
+| `location_id = 'L0022'` | One store                                    |
+
+At startup the app seeds, idempotently (`ON CONFLICT DO NOTHING`):
+
+- a `'*'` row for each email in `REPLENISHMENT_ANALYSTS` (`app.yaml`; currently the app owner)
+- two sample store managers: `north.manager@eastwind.example` (North region) and `daan3.manager@eastwind.example`
+  (store L0022)
+
+```sql
+-- Grant another analyst network-wide access, or limit a store manager to a region plus one store
+INSERT INTO replenishment.user_scope (user_email, region, note) VALUES ('analyst@example.com', '*', 'Planner');
+INSERT INTO replenishment.user_scope (user_email, region) VALUES ('manager@example.com', 'North');
+INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('manager@example.com', 'L0022');
+-- Revoke
+DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('manager@example.com');
 ```
 
-Edit `.env` and set the environment variables you need:
+The warehouse charts show aggregated history and forecasts and run as the app service principal. To restrict those
+per user too, add a Unity Catalog row filter on the Gold tables.
 
-```env
-DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-DATABRICKS_APP_PORT=8000
-# ... other environment variables, depending on the plugins you use
-```
+## Local development
 
-#### Lakebase Configuration
-
-The Lakebase plugin requires additional environment variables for PostgreSQL connectivity. To learn how to configure the Lakebase plugin, see the [Lakebase plugin documentation](https://developers.databricks.com/docs/appkit/v0/plugins/lakebase).
-
-### CLI Authentication
-
-The Databricks CLI requires authentication to deploy and manage apps. Configure authentication using one of these methods:
-
-#### OAuth U2M
-
-Interactive browser-based authentication with short-lived tokens:
-
-```bash
-databricks auth login --host https://your-workspace.cloud.databricks.com
-```
-
-This will open your browser to complete authentication. The CLI saves credentials to `~/.databrickscfg`.
-
-#### Configuration Profiles
-
-Use multiple profiles for different workspaces:
-
-```ini
-[DEFAULT]
-host = https://dev-workspace.cloud.databricks.com
-
-[production]
-host = https://prod-workspace.cloud.databricks.com
-client_id = prod-client-id
-client_secret = prod-client-secret
-```
-
-Deploy using a specific profile:
-
-```bash
-databricks bundle deploy --profile production
-```
-
-**Note:** Personal Access Tokens (PATs) are legacy authentication. OAuth is strongly recommended for better security.
-
-## Getting Started
-
-### Install Dependencies
+Prerequisites: Node.js 22+, the Databricks CLI authenticated to the workspace (`databricks auth login --profile fe-bar`).
 
 ```bash
 npm install
+cp .env.example .env      # set DATABRICKS_CONFIG_PROFILE, warehouse, Lakebase and Genie IDs
+npm run dev               # http://localhost:8000 (hot reload; runs typegen first)
 ```
 
-### Development
+Locally there is no proxy token. With `NODE_ENV=development` (`npm run dev`), the identity is `DEV_USER_EMAIL` from `.env`
+(default `local-developer`), and that identity needs a `user_scope` row like any other user.
 
-Run the app in development mode with hot reload:
+Checks:
 
 ```bash
-npm run dev
+npm run typecheck   # server + client tsc
+npm run lint        # eslint
+npm run test        # vitest: decision API validation, 409 locking, accept/adjust/reject, scope
+npm run build       # typegen + server (tsdown) + client (vite)
 ```
 
-The app will be available at the URL shown in the console output.
+## Deploy
 
-### Build
-
-Build both client and server for production:
+The bundle (`databricks.yml`, target `default`, profile `fe-bar`) declares the app and its warehouse, Lakebase and
+Genie resources.
 
 ```bash
-npm run build
+databricks apps validate --profile fe-bar
+databricks bundle deploy --profile fe-bar
+databricks bundle run app --profile fe-bar
+databricks apps get eastwind-replenishment --profile fe-bar   # app_status.state = RUNNING, url
 ```
 
-This creates:
-
-- `dist/server.js` - Compiled server bundle
-- `client/dist/` - Bundled client assets
-
-### Production
-
-Run the production build:
-
-```bash
-npm start
-```
-
-## Code Quality
-
-There are a few commands to help you with code quality:
-
-```bash
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
-npm run lint:fix
-
-# Formatting
-npm run format
-npm run format:fix
-```
-
-## Deployment with Databricks Asset Bundles
-
-### 1. Configure Bundle
-
-Update `databricks.yml` with your workspace settings:
-
-```yaml
-targets:
-  default:
-    workspace:
-      host: https://your-workspace.cloud.databricks.com
-```
-
-Make sure to replace all placeholder values in `databricks.yml` with your actual resource IDs.
-
-### 2. Deploy
-
-Deploy and start the app with a single command:
-
-```bash
-databricks apps deploy
-```
-
-`databricks apps deploy` validates the project, deploys it, starts the app, and prints its URL.
-
-### Deploy to Production
-
-1. Configure the production target in `databricks.yml`
-2. Deploy to production:
-
-```bash
-databricks apps deploy -t prod
-```
-
-> **Restarting a stopped app:** apps stop after a period of inactivity. To start one again without redeploying, run `databricks apps start <APP_NAME>`.
-
-## Project Structure
-
-```
-* client/          # React frontend
-  * src/           # Source code
-  * public/        # Static assets
-* server/          # Express backend
-  * server.ts      # Server entry point
-  * routes/        # Routes
-* shared/          # Shared types
-* config/          # Configuration
-  * queries/       # SQL query files
-* databricks.yml   # Bundle configuration
-* app.yaml         # App configuration
-* .env.example     # Environment variables example
-```
-
-## Tech Stack
-
-- **Backend**: Node.js, Express
-- **Frontend**: React.js, TypeScript, Vite, Tailwind CSS, React Router
-- **UI Components**: Radix UI, shadcn/ui
-- **Databricks**: AppKit SDK
+Validation and browser check output is recorded in `../evidence/app_checks.txt`.
