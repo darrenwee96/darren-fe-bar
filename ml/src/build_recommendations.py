@@ -134,6 +134,7 @@ SELECT
          THEN concat(CASE WHEN s.recent_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.recent_driver_units, 0), ' units from recent trend') END,
     CASE WHEN abs(s.last_year_driver_units) >= greatest(abs(s.holiday_driver_units), abs(s.baseline_driver_units))
          THEN concat(CASE WHEN s.last_year_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.last_year_driver_units, 0), ' units from last year') END,
+    concat(format_number(s.baseline_driver_units, 0), ' units from store-product baseline'),
     CASE WHEN ne.weeks_to_next_event <= 6 AND s.recent_weekly_units > 0
               AND s.demand_cover_units / (s.lead_weeks + 1) > 1.2 * s.recent_weekly_units
          THEN concat(ne.next_event_name, ' in ', ne.weeks_to_next_event, CASE WHEN ne.weeks_to_next_event = 1 THEN ' week' ELSE ' weeks' END) END,

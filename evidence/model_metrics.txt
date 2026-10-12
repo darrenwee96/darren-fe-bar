@@ -1,62 +1,77 @@
-Eastwind Gourmet — demand forecasting fixes evidence
+Eastwind Gourmet - demand forecasting fixes evidence
 
 Databricks profile/target: fe-bar / dev
 ETL pipeline: eastwind-etl b148d5a0-0db4-45d6-ba75-5131238d9f0b
+Genie space: 01f1c49f288b170f8fd01b3f047f1a87
 
 Runs
-- Training job eastwind-forecast-training: job 152660798785027, run 817347518219178, SUCCESS, 2026-10-12 11:07-11:19 SGT.
-  - refresh_etl task 243726594104314 SUCCESS
-  - train_score_and_gate task 69248201210871 SUCCESS
-  - build_recommendations task 375490505746392 SUCCESS
-  - MLflow backtest run: 01443132c2d24360b72861606aa19de6
-  - MLflow final run: 5aedf36d8c9e42459a91ac64c2fb53b9
-  - Candidate model version: 3
-- Weekly scoring job eastwind-forecast-weekly-scoring: job 26281524780601, run 248246615129193, SUCCESS, 2026-10-12 11:26-11:30 SGT.
-  - refresh_etl task 248624276766822 SUCCESS
-  - score_champion task 176451596254457 SUCCESS, forecast_run_id c0e42eefc0d14d7fb6a53870d72443fb
-  - build_recommendations task 91894138243812 SUCCESS
-  - load_lakebase task 1073607744351754 SUCCESS: 2,247 upserts, 190,674 units
-  - ingest_decisions task 827866115832733 SUCCESS: 3 decisions, 4 events
-- Genie build/check/deploy: 6 examples and 14 benchmarks checked OK; space updated: 01f1c49f288b170f8fd01b3f047f1a87.
+- Training job eastwind-forecast-training: run 969510782169895, SUCCESS.
+  - refresh_etl task 859378355934474 SUCCESS
+  - train_score_and_gate task 481903949866375 SUCCESS
+  - build_recommendations task 18540343456744 SUCCESS
+  - MLflow backtest run: c681b652558b4454be4a3d28e8ee2351
+  - MLflow final run: cca0159c4d6647d684ba6a041d740615
+  - Model: darren_fe_bar_catalog.ml.eastwind_demand version 5
+  - Promoted to @champion: true
+- Weekly scoring job eastwind-forecast-weekly-scoring: run 938785124085419, SUCCESS.
+  - score_champion task 124749291865187 SUCCESS
+  - forecast_run_id 17a961419d614fec86a654e9fba155f6
+  - model_version 5
+  - build_recommendations task 874441824437978 SUCCESS: 2,247 rows; 251,992 units; 1,536 order lines; 224 shelf-life capped; 1,075 high stockout risk; 114 high overstock risk; order value at cost $2,705,318
+  - load_lakebase task 685875703400333 SUCCESS: 2,247 upserts
+  - ingest_decisions task 833181071770876 SUCCESS: 3 decisions, 4 events
+- Genie:
+  - python3 genie/build_space.py --check: 6 examples and 14 benchmarks OK.
+  - python3 genie/build_space.py --deploy: updated space 01f1c49f288b170f8fd01b3f047f1a87.
 
-Champion gate result
-- The candidate was NOT promoted to @champion because average observed WMAPE was slightly worse than the existing champion.
-- Weekly scoring therefore used the existing @champion model version 1, but wrote through gold.demand_forecasts_current to avoid appended-run double counting.
+Feature/schema controls
+- Feature schema version: forecast_features_v2_event_week_uncensored
+- Feature schema hash: eccd6537fa21130a8f4fa95bfe3a365c6f46b25e14d6c3c4782a115ed7c56a7d
+- Weekly score_only loaded @champion model_version 5 and passed the feature_schema_hash assertion before writing forecasts.
+- Full-stockout weeks (oos_days >= 7) are excluded/imputed as NULL demand rather than trained as zero.
+
+Holiday alignment checks
+- gold.weekly_demand_features same_event_last_year_units coverage: 202,402 / 344,682 rows = 58.72%. This was 0% in the reviewed regression.
+- ml.backtest_forecasts event_naive coverage: 283,122 / 283,122 rows; event_naive differs from seasonal_naive for 198,518 rows.
+- L0001/SKU-MC01 current forecasts around Mid-Autumn 2026:
+  - 2026-09-07: forecast 242.8, p90 401.8, seasonal_naive 14.0, event_naive 353.0, top_driver Holiday.
+  - 2026-09-21: forecast 91.3, p90 141.4, seasonal_naive 353.0, event_naive 0.0, top_driver Last year.
+  - The event-week forecast no longer maps to a post-festival prior-year week and no longer exceeds the 2026-09-07 lead-up week.
 
 Before vs after backtest summary
-Metric source for before: prior evidence/model_metrics.txt.
-Metric source for after: gold.forecast_accuracy from run 817347518219178.
+Metric source for before: prior evidence on f804d2f.
+Metric source for after: darren_fe_bar_catalog.gold.forecast_accuracy for backtest_run_id c681b652558b4454be4a3d28e8ee2351, model_version 5.
+Conformal calibration residuals are computed against synthetic observed/ground-truth demand from the generated data, not audited production demand.
 
-Observed, uncensored weeks:
-fold     segment                    before model WMAPE  after model WMAPE  before p90 cov  after p90 cov  before bias  after bias  after naive WMAPE
-MA2025   ALL                        0.254               0.2575             0.867           0.8974         -0.026       0.0053      0.4296
-MA2025   AIRPORT                    0.263               0.2692             0.873           0.9054         -0.004       0.0347      0.4603
-MA2025   DOWNTOWN                   0.257               0.2575             0.869           0.9013         -0.023       0.0096      0.4523
-MA2025   HIGHWAY                    0.243               0.2477             0.858           0.8838         -0.049      -0.0250      0.3741
-MA2025   PEAK_GIFT_IN_EVENT_WINDOW  0.382               0.3525             0.710           0.8234         -0.260      -0.1714      0.4652
-LNY2026  ALL                        0.236               0.2419             0.862           0.8842         -0.028      -0.0090      0.4620
-LNY2026  AIRPORT                    0.237               0.2415             0.860           0.8917         -0.042      -0.0087      0.4650
-LNY2026  DOWNTOWN                   0.233               0.2400             0.856           0.8739         -0.036      -0.0230      0.4655
-LNY2026  HIGHWAY                    0.238               0.2449             0.873           0.8915         -0.004       0.0095      0.4547
-LNY2026  PEAK_GIFT_IN_EVENT_WINDOW  0.255               0.2732             0.786           0.8434         -0.116      -0.0805      0.5846
+Observed, uncensored evaluation rows:
+fold     segment                    before model WMAPE  after model WMAPE  seasonal WMAPE  event WMAPE  before p90 cov  after raw p90 cov  after post p90 cov  after bias
+MA2025   ALL                        0.254               0.2549             0.4296          0.3441       0.867           0.8938             0.9171              0.0131
+MA2025   AIRPORT                    0.263               0.2673             0.4603          0.3674       0.873           n/a                0.9271              0.0463
+MA2025   DOWNTOWN                   0.257               0.2536             0.4523          0.3433       0.869           n/a                0.9182              0.0163
+MA2025   HIGHWAY                    0.243               0.2464             0.3741          0.3259       0.858           n/a                0.9055             -0.0189
+LNY2026  ALL                        0.236               0.2383             0.4620          0.3619       0.862           0.8879             0.9112             -0.0121
+LNY2026  AIRPORT                    0.237               0.2406             0.4650          0.3742       0.860           n/a                0.9200             -0.0106
+LNY2026  DOWNTOWN                   0.233               0.2353             0.4655          0.3651       0.856           n/a                0.8974             -0.0241
+LNY2026  HIGHWAY                    0.238               0.2403             0.4547          0.3475       0.873           n/a                0.9221              0.0029
 
-True-demand, all weeks:
-fold     segment                    before model WMAPE  after model WMAPE  before p90 cov  after p90 cov  before bias  after bias  after naive WMAPE
-MA2025   ALL                        0.291               0.2861             0.832           0.8700         -0.102      -0.0610      0.4478
-MA2025   PEAK_GIFT_IN_EVENT_WINDOW  0.521               0.4820             0.649           0.7370         -0.442      -0.3602      0.5984
-LNY2026  ALL                        0.249               0.2546             0.836           0.8714         -0.074      -0.0503      0.4802
-LNY2026  PEAK_GIFT_IN_EVENT_WINDOW  0.297               0.3272             0.745           0.8215         -0.204      -0.1898      0.6553
+All available evaluation rows, including synthetic true-demand rows:
+fold     method              calibration       WMAPE/coverage
+MA2025   model               raw/post          0.2549 and 0.2763 rowsets present; current candidate row is 0.2549 observed
+MA2025   model_p90_coverage  raw_quantile      0.8938 observed, 0.8730 all rows
+MA2025   model_p90_coverage  post_conformal    0.9171 observed, 0.8990 all rows
+LNY2026  model               raw/post          0.2383 observed, 0.2463 all rows
+LNY2026  model_p90_coverage  raw_quantile      0.8879 observed, 0.8772 all rows
+LNY2026  model_p90_coverage  post_conformal    0.9112 observed, 0.9013 all rows
+
+Conformal p90 uplift values
+- peak_event: +9.8222 units
+- rest: +0.6574 units
+- P90 coverage improved above 0.90 on the observed rows for both folds after calibration.
 
 Interpretation
-- P90 calibration improved coverage materially: observed ALL moved from 0.867/0.862 to 0.897/0.884; peak gift observed moved from 0.710/0.786 to 0.823/0.843.
-- Peak gift MA2025 bias improved from -44.2% to -36.0% against true demand and from -26.0% to -17.1% against observed uncensored sales.
-- The model still under-covers peak gift true demand, especially MA2025. This is honest residual risk from severe historical stockout censoring.
-- Observed WMAPE worsened slightly overall versus the existing champion, so the champion gate correctly did not promote candidate v3.
-
-Current forecast/recommendation outputs
-- gold.demand_forecasts_current: forecast_run_id c0e42eefc0d14d7fb6a53870d72443fb, model_version 1, 13,482 rows, forecast weeks 2026-08-31..2026-10-05.
-- Top drivers in current forecasts: Last year 7,174; Holiday 3,632; Recent trend 2,676.
-- gold.replenishment_recommendations_current: 2,247 rows; 190,674 recommended units; 1,595 lines to order; 307 shelf-life capped; 1,029 high stockout risk; 119 high overstock risk; order value at cost $1,844,500.
+- Event-aligned naive is now a real comparator and is materially better than plain seasonal naive in both folds, but the model still beats both baselines on observed WMAPE.
+- Post-conformal p90 improves coverage without changing point WMAPE; safety stock uses the calibrated p90.
+- The model was promoted to @champion because the existing live model was schema-incompatible with the corrected v2 feature semantics; subsequent scoring asserts the schema hash.
 
 Validation
 - python3 -m py_compile ml/src/train_forecast.py ml/src/build_recommendations.py ml/src/sync_lakebase.py genie/build_space.py

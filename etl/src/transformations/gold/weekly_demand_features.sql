@@ -58,11 +58,12 @@ base AS (
     p.shelf_life_days,
     p.case_pack_units,
     p.lead_time_days,
+    p.unit_cost,
     p.list_price,
     coalesce(s.units_sold, 0) AS units_sold,
     CASE
       WHEN i.oos_days > 0 AND i.oos_days < 7 THEN coalesce(s.units_sold, 0) * 7.0 / greatest(i.in_stock_days, 1)
-      WHEN i.oos_days >= 7 THEN coalesce(s.units_sold, 0)
+      WHEN i.oos_days >= 7 THEN NULL
       ELSE coalesce(s.units_sold, 0)
     END AS demand_units_uncensored,
     coalesce(s.net_sales, 0) AS net_sales,
@@ -82,6 +83,7 @@ base AS (
     c.next_event_type,
     c.next_event_seq,
     c.weeks_to_next_event,
+    c.weeks_to_next_event_week,
     c.days_to_next_event,
     c.days_from_week_start_to_next_event,
     c.event_window_days_in_week,
@@ -112,7 +114,7 @@ SELECT
   avg(b.demand_units_uncensored) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 8 PRECEDING AND 1 PRECEDING) AS demand_roll_mean_8,
   sum(b.oos_days) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 4 PRECEDING AND 1 PRECEDING) AS oos_days_prev_4,
   sum(b.in_stock_days) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 4 PRECEDING AND 1 PRECEDING) AS in_stock_days_prev_4,
-  -- Event-aligned last year: same event type, previous occurrence, same daily offset from the event.
+  -- Event-aligned last year: same event type, previous occurrence, same Monday-week offset to the event week.
   ly.demand_units_uncensored AS same_event_last_year_units,
   ly.week_start AS same_event_last_year_week_start
 FROM base b
@@ -121,4 +123,4 @@ LEFT JOIN base ly
   AND ly.sku_id = b.sku_id
   AND ly.next_event_type = b.next_event_type
   AND ly.next_event_seq = b.next_event_seq - 1
-  AND ly.days_to_next_event = b.days_to_next_event;
+  AND ly.weeks_to_next_event_week = b.weeks_to_next_event_week;

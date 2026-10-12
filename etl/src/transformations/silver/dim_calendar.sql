@@ -45,6 +45,7 @@ SELECT
   n.ev.event_date AS next_event_date,
   datediff(n.ev.event_date, d.date) AS days_to_next_event,
   CAST(floor(datediff(n.ev.event_date, d.date) / 7) AS INT) AS weeks_to_next_event,
+  CAST(datediff(CAST(date_trunc('WEEK', n.ev.event_date) AS DATE), CAST(date_trunc('WEEK', d.date) AS DATE)) / 7 AS INT) AS weeks_to_next_event_week,
   datediff(n.ev.event_date, CAST(date_trunc('WEEK', d.date) AS DATE)) AS days_from_week_start_to_next_event,
   size(array_intersect(
     sequence(CAST(date_trunc('WEEK', d.date) AS DATE), date_add(CAST(date_trunc('WEEK', d.date) AS DATE), 6)),

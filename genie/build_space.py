@@ -93,6 +93,7 @@ TABLES = {
         "fold x scored_against x segment_type x segment x method.",
         "columns": [
             col("fold", "Backtest fold: MA2025 (Mid-Autumn 2025) or LNY2026 (Lunar New Year 2026).", match=True),
+            col("calibration", "raw_quantile before conformal p90 calibration or post_conformal after segmented conformal uplift.", match=True),
             col(
                 "scored_against",
                 "observed_uncensored = scored against recorded sales in weeks with < 2 stockout days (the "
@@ -301,7 +302,7 @@ SNIPPETS = {
         ),
     ],
     "filters": [
-        ("Observed accuracy (default)", "forecast_accuracy.scored_against = 'observed_uncensored'", ["accuracy", "real-world accuracy"]),
+        ("Observed accuracy (default)", "forecast_accuracy.scored_against = 'observed_uncensored' AND forecast_accuracy.calibration = 'post_conformal'", ["accuracy", "real-world accuracy"]),
         ("Mid-Autumn range", "replenishment_recommendations_current.category = 'Mooncake' OR replenishment_recommendations_current.sku_id IN ('TE03', 'GB01')", ["mooncakes", "Mid-Autumn products"]),
         ("Lines to order", "replenishment_recommendations_current.recommended_units > 0", ["orders to place"]),
         ("Manager overrides", "order_decisions_history.decision_status IN ('ADJUSTED', 'REJECTED')", ["overrides", "overridden"]),
@@ -345,7 +346,7 @@ LIMIT 10""",
        MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,
        MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape
 FROM {A} a
-WHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored'
+WHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'
 GROUP BY a.fold, CAST(a.segment AS INT)
 ORDER BY a.fold, weeks_ahead""",
         "Pivot model vs baseline accuracy; default to observed_uncensored.",
@@ -459,7 +460,7 @@ ORDER BY waste_usd DESC""",
        MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,
        MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape
 FROM {A} a
-WHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored'
+WHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'
 GROUP BY a.segment
 ORDER BY a.segment""",
         "Must use fold MA2025, segment_type CHANNEL, scored_against observed_uncensored.",
@@ -515,6 +516,7 @@ ORDER BY shelf_capped_stores DESC""",
         f"""SELECT a.fold, a.wmape AS p90_coverage
 FROM {A} a
 WHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'
+  AND a.calibration = 'post_conformal'
 ORDER BY a.fold""",
         "p90 coverage is stored in the wmape column for method model_p90_coverage; target is 0.90.",
     ),
@@ -523,7 +525,7 @@ ORDER BY a.fold""",
         f"""SELECT k.channel_type,
        SUM(k.peak_gift_stockout_day_rate * k.peak_gift_ranged_series) / SUM(k.peak_gift_ranged_series) AS peak_gift_stockout_day_rate
 FROM {K} k
-WHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-13'
+WHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-07'
 GROUP BY k.channel_type
 ORDER BY peak_gift_stockout_day_rate DESC""",
         "Must use peak_gift_stockout_day_rate, not overall stockout_day_rate, and filter the Mid-Autumn 2025 event window.",

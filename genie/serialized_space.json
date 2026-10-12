@@ -358,6 +358,14 @@
             ]
           },
           {
+            "column_name": "calibration",
+            "description": [
+              "raw_quantile before conformal p90 calibration or post_conformal after segmented conformal uplift."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
             "column_name": "fold",
             "description": [
               "Backtest fold: MA2025 (Mid-Autumn 2025) or LNY2026 (Lunar New Year 2026)."
@@ -847,7 +855,7 @@
           "How does forecast error change with how many weeks ahead we forecast, model vs last year?"
         ],
         "sql": [
-          "SELECT a.fold, CAST(a.segment AS INT) AS weeks_ahead,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.fold, CAST(a.segment AS INT)\nORDER BY a.fold, weeks_ahead"
+          "SELECT a.fold, CAST(a.segment AS INT) AS weeks_ahead,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'\nGROUP BY a.fold, CAST(a.segment AS INT)\nORDER BY a.fold, weeks_ahead"
         ],
         "usage_guidance": [
           "Pivot model vs baseline accuracy; default to observed_uncensored."
@@ -995,7 +1003,7 @@
           "id": "2721920d5de231538559f3c10d42088a",
           "display_name": "Observed accuracy (default)",
           "sql": [
-            "forecast_accuracy.scored_against = 'observed_uncensored'"
+            "forecast_accuracy.scored_against = 'observed_uncensored' AND forecast_accuracy.calibration = 'post_conformal'"
           ],
           "synonyms": [
             "accuracy",
@@ -1118,7 +1126,7 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT k.channel_type,\n       SUM(k.peak_gift_stockout_day_rate * k.peak_gift_ranged_series) / SUM(k.peak_gift_ranged_series) AS peak_gift_stockout_day_rate\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-13'\nGROUP BY k.channel_type\nORDER BY peak_gift_stockout_day_rate DESC"
+              "SELECT k.channel_type,\n       SUM(k.peak_gift_stockout_day_rate * k.peak_gift_ranged_series) / SUM(k.peak_gift_ranged_series) AS peak_gift_stockout_day_rate\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start BETWEEN DATE'2025-09-15' AND DATE'2025-10-07'\nGROUP BY k.channel_type\nORDER BY peak_gift_stockout_day_rate DESC"
             ]
           }
         ],
@@ -1200,7 +1208,7 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT a.segment AS channel_type,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.segment\nORDER BY a.segment"
+              "SELECT a.segment AS channel_type,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored' AND a.calibration = 'post_conformal'\nGROUP BY a.segment\nORDER BY a.segment"
             ]
           }
         ],
@@ -1251,7 +1259,7 @@
           {
             "format": "SQL",
             "content": [
-              "SELECT a.fold, a.wmape AS p90_coverage\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'\nORDER BY a.fold"
+              "SELECT a.fold, a.wmape AS p90_coverage\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'\n  AND a.calibration = 'post_conformal'\nORDER BY a.fold"
             ]
           }
         ],
