@@ -1,0 +1,14 @@
+resources:
+  schemas:
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: Raw source contracts ingested by Auto Loader from raw.landing; all columns as strings plus ingest metadata.
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: Conformed, typed, deduplicated dimensions and facts; quarantine tables hold rejected records with the rule they broke.
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: Stable contracts for ML, Genie, Lakebase, and the app.

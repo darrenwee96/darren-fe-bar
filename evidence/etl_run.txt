@@ -1,0 +1,54 @@
+Eastwind Gourmet ETL — Lakeflow pipeline run evidence
+Pipeline: eastwind-etl (bundle darren-fe-bar/etl, target dev, profile fe-bar), serverless, triggered
+Catalog darren_fe_bar_catalog; schemas bronze / silver / gold; source /Volumes/darren_fe_bar_catalog/raw/landing
+Datasets: 5 bronze streaming tables (Auto Loader), 6 silver materialized views + 1 private view, 2 gold materialized views
+
+Run 1 — update 5dedfd71-cfea-4c66-8276-ce5e2a871f94 COMPLETED 2026-10-09T16:13Z (history drop 2026-08-24 only)
+Run 2 — update f022136e-3210-412c-a998-a6d42cd39cf2 COMPLETED 2026-10-09T16:15Z (after uploading drop 2026-08-31)
+  Run 2 processed only the new files: only pos_sales_raw and inventory_raw had new data.
+
+Row counts                         after run 1    after run 2    delta
+  bronze.pos_sales_raw               1,838,149      1,850,228   +12,079  (= rows in the 2026-08-31 drop)
+  bronze.inventory_raw               2,397,045      2,412,774   +15,729  (= rows in the 2026-08-31 drop)
+  silver.fact_sales_daily            1,832,612      1,844,654   +12,042
+  silver.fact_sales_quarantine              40             40
+  silver.fact_inventory_daily        2,397,045      2,412,774
+  silver.dim_location                       80             80
+  silver.dim_product                        32             32
+  silver.dim_calendar                    1,718          1,718
+  gold.weekly_demand_features          342,435        344,682
+  gold.channel_weekly_kpis               1,705          1,716
+  latest sales date                 2026-08-23     2026-08-30
+
+Quarantine by rule (silver.fact_sales_quarantine) — exactly the planted defects
+  UNKNOWN_STORE            20   (store code DT099 not in the store master)
+  NEGATIVE_OR_BAD_UNITS    20   (returns posted as negative units)
+  Duplicate rows (0.3%) are not errors; they collapse to one row in fact_sales_daily.
+
+Reconciliation: gold.weekly_demand_features vs generator ground truth (eval.ground_truth), store-SKU-week
+  channel     series_weeks  silver_units   truth_observed  mismatched_weeks
+  AIRPORT          100,152     6,592,534        6,592,534                 0
+  DOWNTOWN         144,534    10,329,499       10,329,499                 0
+  HIGHWAY           99,996     7,851,652        7,851,652                 0
+  5,850 ground-truth rows have no Gold row: SKU-GB02 weeks before its 2025-03-03 launch (all zero
+  units; not stocked, so correctly outside the spine).
+
+Business totals from gold.channel_weekly_kpis (per year, 2.99 years) vs generator calibration
+  net sales      $160.78M  (calibration $160.79M)
+  expired value    $2.53M  at cost
+  markdown value   $1.33M  discount given
+  waste value      $3.87M  (calibration $3.87M)
+  stockout-day rate 8.57%  (calibration 8.6%)
+
+Feature spot check: L0001 (Zhongshan Shop) x SKU-MC01 around Mid-Autumn 2025 (event 2025-10-06)
+  week_start  wte  units_sold  units_lag_52  same_event_ly  oos_days  censored
+  2025-08-25    6          12            10              8         0  false
+  2025-09-01    5          11            84             16         0  false
+  2025-09-08    4          14           312             17         0  false
+  2025-09-15    3          85           146             10         0  false
+  2025-09-22    2         353             6             84         0  false
+  2025-09-29    1          72            17            312         6  true
+  2025-10-06    0           0            11            146         7  true
+  Lag-52 peaks the week of 2025-09-08 (Mid-Autumn 2024 was 09-17). The event-aligned feature peaks
+  the week before the 2025 festival. Manual ordering (last-year-same-week) then stocked out for 6
+  and 7 days in the two peak weeks, which Gold flags as censored.

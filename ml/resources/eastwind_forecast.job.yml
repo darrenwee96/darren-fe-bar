@@ -1,0 +1,52 @@
+resources:
+  jobs:
+    eastwind_forecast:
+      name: eastwind-forecast
+      description: Backtest, train, register (@champion), score six-week store-SKU forecasts, build order recommendations, and sync them with Lakebase.
+      tasks:
+        - task_key: train_and_score
+          notebook_task:
+            notebook_path: ../src/train_forecast.py
+            base_parameters:
+              catalog: ${var.catalog}
+              experiment: ${resources.experiments.demand_forecasting.name}
+              as_of: ${var.as_of}
+          environment_key: ml_env
+        - task_key: build_recommendations
+          depends_on:
+            - task_key: train_and_score
+          notebook_task:
+            notebook_path: ../src/build_recommendations.py
+            base_parameters:
+              catalog: ${var.catalog}
+          environment_key: ml_env
+        - task_key: load_lakebase
+          depends_on:
+            - task_key: build_recommendations
+          notebook_task:
+            notebook_path: ../src/sync_lakebase.py
+            base_parameters:
+              catalog: ${var.catalog}
+              lakebase_endpoint: ${var.lakebase_endpoint}
+              direction: load_recommendations
+              app_sp_client_id: ${var.app_sp_client_id}
+          environment_key: ml_env
+        - task_key: ingest_decisions
+          depends_on:
+            - task_key: load_lakebase
+          notebook_task:
+            notebook_path: ../src/sync_lakebase.py
+            base_parameters:
+              catalog: ${var.catalog}
+              lakebase_endpoint: ${var.lakebase_endpoint}
+              direction: ingest_decisions
+          environment_key: ml_env
+      environments:
+        - environment_key: ml_env
+          spec:
+            environment_version: "4"
+            dependencies:
+              - lightgbm==4.6.0
+              - mlflow>=3.1,<4
+              - databricks-sdk>=0.81
+              - psycopg[binary]>=3.2

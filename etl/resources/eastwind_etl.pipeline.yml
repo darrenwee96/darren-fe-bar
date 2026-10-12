@@ -1,0 +1,16 @@
+resources:
+  pipelines:
+    eastwind_etl:
+      name: eastwind-etl
+      catalog: ${var.catalog}
+      # Default schema is bronze; Silver and Gold datasets use schema-qualified names.
+      schema: ${resources.schemas.bronze.name}
+      serverless: true
+      continuous: false
+      development: true
+      root_path: ../src
+      libraries:
+        - glob:
+            include: ../src/transformations/**
+      configuration:
+        landing_path: ${var.landing_path}

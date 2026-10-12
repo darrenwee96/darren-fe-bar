@@ -1,0 +1,28 @@
+# Eastwind Gourmet forecasting: MLflow experiment + serverless training/scoring job.
+bundle:
+  name: eastwind-ml
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: The only catalog available in this workspace.
+    default: darren_fe_bar_catalog
+  lakebase_endpoint:
+    description: Lakebase endpoint resource path for the replenishment app database.
+    default: projects/eastwind-replenishment/branches/production/endpoints/primary
+  app_sp_client_id:
+    description: Service principal client ID of the eastwind-replenishment app (granted read on Lakebase serving schema).
+    default: "f4a2a131-92ee-4cf6-a1fa-189103f3f3cd"
+  as_of:
+    description: First forecast week (Monday after the last observed week).
+    default: "2026-08-31"
+
+targets:
+  dev:
+    default: true
+    # Not mode: development, to keep resource names stable alongside the ETL bundle.
+    workspace:
+      profile: fe-bar
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}

@@ -1,0 +1,56 @@
+bundle:
+  name: eastwind-replenishment
+
+variables:
+  sql_warehouse_id:
+    description: SQL Warehouse ID
+  postgres_branch:
+    description: Full Lakebase Postgres branch resource name. Obtain by running `databricks postgres list-branches {project-name}`, select the desired item from the output array and use its .name value. Requires the project resource name.
+  genie_space_id:
+    description: Genie space (Eastwind Gourmet Demand & Replenishment) built by ../genie/build_space.py
+  postgres_database:
+    description: Full Lakebase Postgres database resource name. Obtain by running `databricks postgres list-databases {branch-name}`, select the desired item from the output array and use its .name value. Requires the branch resource name.
+
+resources:
+  apps:
+    app:
+      name: 'eastwind-replenishment'
+      description: 'Eastwind Gourmet replenishment workbench: review and approve forecast-driven store orders'
+      source_code_path: ./
+
+      # Start the app automatically on deploy.
+      lifecycle:
+        started: true
+      # Genie questions run on behalf of the signed-in user, so answers respect their own data permissions.
+      user_api_scopes:
+        - dashboards.genie
+
+      # The resources which this app has access to.
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.sql_warehouse_id}
+            permission: CAN_USE
+        - name: postgres
+          postgres:
+            branch: ${var.postgres_branch}
+            database: ${var.postgres_database}
+            permission: CAN_CONNECT_AND_CREATE
+        - name: genie-space
+          genie_space:
+            name: eastwind-demand-replenishment
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+
+targets:
+  default:
+    default: true
+    workspace:
+      host: https://fevm-darren-fe-bar.cloud.databricks.com
+      profile: fe-bar
+
+    variables:
+      sql_warehouse_id: 221da0ceb437f8a8
+      genie_space_id: 01f1c49f288b170f8fd01b3f047f1a87
+      postgres_branch: projects/eastwind-replenishment/branches/production
+      postgres_database: projects/eastwind-replenishment/branches/production/databases/databricks-postgres

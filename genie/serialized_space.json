@@ -1,0 +1,1168 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "09af9ad4eaaa9d5e55ff56d08ebb71cb",
+        "question": [
+          "Which highway stores face the highest Mid-Autumn stockout risk?"
+        ]
+      },
+      {
+        "id": "134fc109dc86fcd091fcf201c19161c9",
+        "question": [
+          "How accurate is the forecast compared with last year's sales?"
+        ]
+      },
+      {
+        "id": "814a6fc3d1669211cd84a8ebaf7edc20",
+        "question": [
+          "Where did managers override the recommended order?"
+        ]
+      },
+      {
+        "id": "983cd4bcb997635430a9c3a17d683184",
+        "question": [
+          "What should we order this week, and what will it cost?"
+        ]
+      },
+      {
+        "id": "cc9266eab07282e79d827e03ad97ba29",
+        "question": [
+          "What did waste cost us by channel over the last year?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "darren_fe_bar_catalog.gold.channel_weekly_kpis",
+        "description": [
+          "One row per week (Monday week_start) x channel_type x region. Sum the money and unit columns across rows; rates must be weighted by ranged_series, never averaged."
+        ],
+        "column_configs": [
+          {
+            "column_name": "censored_series_share",
+            "description": [
+              "Share of store-SKUs with 2+ out-of-stock days that week (censored: sales understate demand)."
+            ],
+            "synonyms": [
+              "censored share"
+            ]
+          },
+          {
+            "column_name": "channel_type",
+            "description": [
+              "Store channel: DOWNTOWN, HIGHWAY or AIRPORT."
+            ],
+            "synonyms": [
+              "channel",
+              "format"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "expired_value",
+            "description": [
+              "Stock written off at expiry, at cost, USD."
+            ],
+            "synonyms": [
+              "expiry",
+              "write-off"
+            ]
+          },
+          {
+            "column_name": "markdown_value",
+            "description": [
+              "Discount given on near-expiry stock, USD."
+            ],
+            "synonyms": [
+              "markdowns"
+            ]
+          },
+          {
+            "column_name": "net_sales",
+            "description": [
+              "Net sales after markdown discounts, USD."
+            ],
+            "synonyms": [
+              "revenue",
+              "sales"
+            ]
+          },
+          {
+            "column_name": "peak_gift_net_sales",
+            "description": [
+              "Net sales of peak gift SKUs (mooncakes, LNY hampers, etc.), USD."
+            ]
+          },
+          {
+            "column_name": "ranged_series",
+            "description": [
+              "Number of store-SKU combinations ranged that week; the weight for the rate columns."
+            ]
+          },
+          {
+            "column_name": "region",
+            "description": [
+              "Store region: North, Central, South or East."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "stockout_day_rate",
+            "description": [
+              "Share of store-SKU-days with no stock on hand. Weighted roll-up: SUM(stockout_day_rate * ranged_series) / SUM(ranged_series)."
+            ],
+            "synonyms": [
+              "stockout rate",
+              "out of stock rate",
+              "OOS rate"
+            ]
+          },
+          {
+            "column_name": "units_sold",
+            "description": [
+              "Units sold."
+            ],
+            "synonyms": [
+              "volume"
+            ]
+          },
+          {
+            "column_name": "waste_value",
+            "description": [
+              "expired_value + markdown_value, USD."
+            ],
+            "synonyms": [
+              "waste",
+              "shrink"
+            ]
+          },
+          {
+            "column_name": "week_start",
+            "description": [
+              "Monday of the sales week."
+            ],
+            "synonyms": [
+              "week"
+            ]
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+        "description": [
+          "Current 6-week forecast per store-SKU-week from the @champion model, as of 2026-08-31. Join silver.dim_location / silver.dim_product for names, region, and category."
+        ],
+        "column_configs": [
+          {
+            "column_name": "as_of_date",
+            "description": [
+              "Forecast origin (last actual week ends the day before)."
+            ]
+          },
+          {
+            "column_name": "baseline_event_naive",
+            "description": [
+              "Units sold in the same week relative to the same holiday last year."
+            ]
+          },
+          {
+            "column_name": "baseline_seasonal_naive",
+            "description": [
+              "Units sold in the same calendar week last year."
+            ],
+            "synonyms": [
+              "last year"
+            ]
+          },
+          {
+            "column_name": "channel_type",
+            "description": [
+              "Store channel."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "forecast_p90",
+            "description": [
+              "90th-percentile demand: plan-for level with 10% chance of exceeding."
+            ],
+            "synonyms": [
+              "p90",
+              "upper"
+            ]
+          },
+          {
+            "column_name": "forecast_run_id",
+            "exclude": true
+          },
+          {
+            "column_name": "forecast_units",
+            "description": [
+              "Expected demand in units (mean)."
+            ],
+            "synonyms": [
+              "forecast",
+              "expected demand"
+            ]
+          },
+          {
+            "column_name": "forecast_week",
+            "description": [
+              "Monday of the forecast week."
+            ],
+            "synonyms": [
+              "week"
+            ]
+          },
+          {
+            "column_name": "generated_at",
+            "exclude": true
+          },
+          {
+            "column_name": "horizon",
+            "description": [
+              "Weeks ahead, 1-6."
+            ]
+          },
+          {
+            "column_name": "location_id",
+            "description": [
+              "Store key."
+            ]
+          },
+          {
+            "column_name": "model_name",
+            "exclude": true
+          },
+          {
+            "column_name": "sku_id",
+            "description": [
+              "Product key."
+            ]
+          },
+          {
+            "column_name": "top_driver",
+            "description": [
+              "Model feature that moved this forecast most."
+            ]
+          },
+          {
+            "column_name": "top_driver_contribution",
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.gold.forecast_accuracy",
+        "description": [
+          "Rolling-origin backtest accuracy of the forecast model and two baselines. Folds: MA2025 (Mid-Autumn 2025, festival 2025-10-06) and LNY2026 (Lunar New Year 2026, 2026-02-17). One row per fold x scored_against x segment_type x segment x method."
+        ],
+        "column_configs": [
+          {
+            "column_name": "actual_units",
+            "description": [
+              "Sum of actual units scored."
+            ]
+          },
+          {
+            "column_name": "backtest_run_id",
+            "exclude": true
+          },
+          {
+            "column_name": "bias",
+            "description": [
+              "(sum forecast - sum actual) / sum actual; negative = under-forecast. Null for p90 coverage."
+            ]
+          },
+          {
+            "column_name": "fold",
+            "description": [
+              "Backtest fold: MA2025 (Mid-Autumn 2025) or LNY2026 (Lunar New Year 2026)."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "generated_at",
+            "exclude": true
+          },
+          {
+            "column_name": "method",
+            "description": [
+              "model = LightGBM forecast; seasonal_naive = same calendar week last year; event_naive = same week relative to the same holiday last year; model_p90_coverage = share of actuals at or below the model's p90 (target 0.90), stored in the wmape column."
+            ],
+            "synonyms": [
+              "baseline"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "model_name",
+            "exclude": true
+          },
+          {
+            "column_name": "rows",
+            "description": [
+              "Store-SKU-week forecasts scored."
+            ]
+          },
+          {
+            "column_name": "scored_against",
+            "description": [
+              "observed_uncensored = scored against recorded sales in weeks with < 2 stockout days (the real-world measure, use by default); true_demand_all_weeks = scored against simulated true demand, only possible because the data is synthetic."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "segment",
+            "description": [
+              "Value within segment_type: ALL; AIRPORT/DOWNTOWN/HIGHWAY; '1'..'6'; or PEAK_GIFT_IN_EVENT_WINDOW (peak gift SKUs in the weeks around the holiday)."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "segment_type",
+            "description": [
+              "ALL, CHANNEL, HORIZON (weeks ahead 1-6) or SEGMENT."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "wmape",
+            "description": [
+              "Weighted MAPE = sum|actual - forecast| / sum(actual); lower is better. For method = model_p90_coverage this column is p90 coverage instead."
+            ],
+            "synonyms": [
+              "accuracy",
+              "error",
+              "forecast error"
+            ]
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.gold.order_decisions_history",
+        "description": [
+          "Current store-manager decision per recommendation, written in the replenishment app (Lakebase) and copied to Unity Catalog. A recommendation with no row here is still pending."
+        ],
+        "column_configs": [
+          {
+            "column_name": "decided_at",
+            "description": [
+              "When the decision was saved."
+            ]
+          },
+          {
+            "column_name": "decided_by",
+            "description": [
+              "Email of the manager who decided."
+            ]
+          },
+          {
+            "column_name": "decision_id",
+            "exclude": true
+          },
+          {
+            "column_name": "decision_status",
+            "description": [
+              "ACCEPTED (ordered as recommended), ADJUSTED (different quantity) or REJECTED (no order). Overrides = ADJUSTED + REJECTED."
+            ],
+            "synonyms": [
+              "decision"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "final_order_units",
+            "description": [
+              "Quantity the manager committed to."
+            ],
+            "synonyms": [
+              "final order"
+            ]
+          },
+          {
+            "column_name": "reason",
+            "description": [
+              "Manager's reason for adjusting or rejecting."
+            ],
+            "synonyms": [
+              "override reason"
+            ]
+          },
+          {
+            "column_name": "recommendation_id",
+            "description": [
+              "Joins replenishment_recommendations_current."
+            ]
+          },
+          {
+            "column_name": "recommended_units",
+            "description": [
+              "Recommended quantity at decision time."
+            ]
+          },
+          {
+            "column_name": "updated_at",
+            "exclude": true
+          },
+          {
+            "column_name": "version",
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.gold.replenishment_recommendations_current",
+        "description": [
+          "One current order recommendation per store-SKU (2,247 rows), as of 2026-08-31. recommended_units = units to order now in case packs; 0 means no order needed."
+        ],
+        "column_configs": [
+          {
+            "column_name": "cap_applied",
+            "description": [
+              "SHELF_LIFE = order cut so stock can sell before it expires; NONE otherwise."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "category",
+            "description": [
+              "Product category, e.g. Mooncake, Pastry, Hamper, Tea."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "channel_type",
+            "description": [
+              "Store channel."
+            ],
+            "synonyms": [
+              "channel"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "demand_6w_units",
+            "description": [
+              "Forecast demand over all 6 weeks."
+            ]
+          },
+          {
+            "column_name": "demand_cover_units",
+            "description": [
+              "Forecast demand over the cover period (lead time + 1 week)."
+            ]
+          },
+          {
+            "column_name": "est_expiry_value",
+            "description": [
+              "Current stock expected to expire unsold, at cost, USD."
+            ],
+            "synonyms": [
+              "expected waste"
+            ]
+          },
+          {
+            "column_name": "est_lost_sales_if_no_order",
+            "description": [
+              "Sales at risk at list price if nothing is ordered, USD."
+            ],
+            "synonyms": [
+              "sales at risk",
+              "lost sales"
+            ]
+          },
+          {
+            "column_name": "explanation_text",
+            "description": [
+              "Planner-facing explanation of the recommendation."
+            ]
+          },
+          {
+            "column_name": "forecast_run_id",
+            "exclude": true
+          },
+          {
+            "column_name": "inbound_units",
+            "description": [
+              "Stock already ordered and in transit."
+            ]
+          },
+          {
+            "column_name": "list_price",
+            "description": [
+              "Unit list price, USD."
+            ]
+          },
+          {
+            "column_name": "location_name",
+            "description": [
+              "Store name."
+            ],
+            "synonyms": [
+              "store"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "on_hand_units",
+            "description": [
+              "Stock on hand at the as-of date."
+            ]
+          },
+          {
+            "column_name": "overstock_risk",
+            "description": [
+              "HIGH = short-life stock exceeds what sells before expiry; MEDIUM = stock exceeds 6-week demand."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "peak_gift_flag",
+            "description": [
+              "True for the peak-season gift SKUs."
+            ]
+          },
+          {
+            "column_name": "raw_need_units",
+            "exclude": true
+          },
+          {
+            "column_name": "recommendation_id",
+            "description": [
+              "Key; joins order_decisions_history."
+            ]
+          },
+          {
+            "column_name": "recommended_units",
+            "description": [
+              "Units to order now, rounded up to case packs."
+            ],
+            "synonyms": [
+              "order quantity",
+              "order"
+            ]
+          },
+          {
+            "column_name": "region",
+            "description": [
+              "Store region."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "safety_units",
+            "description": [
+              "Safety stock from forecast uncertainty (p90 vs expected)."
+            ]
+          },
+          {
+            "column_name": "sellable_before_expiry_units",
+            "exclude": true
+          },
+          {
+            "column_name": "sku_name",
+            "description": [
+              "Product name."
+            ],
+            "synonyms": [
+              "product",
+              "item"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "stockout_risk",
+            "description": [
+              "HIGH = stock on hand + inbound is below cover-period demand; MEDIUM = below demand + safety stock; LOW otherwise. Measured before the recommended order."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "top_driver",
+            "description": [
+              "Plain-language main driver of the forecast."
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "unit_cost",
+            "description": [
+              "Unit cost, USD. Order value at cost = recommended_units * unit_cost."
+            ]
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.silver.dim_location",
+        "description": [
+          "One row per store (80)."
+        ],
+        "column_configs": [
+          {
+            "column_name": "capacity_tier",
+            "description": [
+              "Store size: S, M or L."
+            ],
+            "synonyms": [
+              "size"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "channel_type",
+            "description": [
+              "DOWNTOWN, HIGHWAY or AIRPORT."
+            ],
+            "synonyms": [
+              "channel"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "location_name",
+            "description": [
+              "Store name."
+            ],
+            "synonyms": [
+              "store"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "pos_store_code",
+            "exclude": true
+          },
+          {
+            "column_name": "region",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "timezone",
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "identifier": "darren_fe_bar_catalog.silver.dim_product",
+        "description": [
+          "One row per SKU (32)."
+        ],
+        "column_configs": [
+          {
+            "column_name": "case_pack_units",
+            "description": [
+              "Order multiple."
+            ]
+          },
+          {
+            "column_name": "category",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "lead_time_days",
+            "description": [
+              "Days from order to delivery."
+            ]
+          },
+          {
+            "column_name": "peak_gift_flag",
+            "description": [
+              "True for the peak-season gift SKUs."
+            ]
+          },
+          {
+            "column_name": "shelf_life_days",
+            "description": [
+              "Days from receipt to expiry."
+            ]
+          },
+          {
+            "column_name": "sku_name",
+            "description": [
+              "Product name."
+            ],
+            "synonyms": [
+              "product"
+            ],
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          }
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "text_instructions": [
+      {
+        "id": "271f7cf102010192cba7df6753cb9c9f",
+        "content": [
+          "## PURPOSE\n- Users are Eastwind Gourmet merchandising planners, store managers, and the VP Merchandising.\n\n## DISAMBIGUATION\n- \"Mid-Autumn\" products means category Mooncake unless the user names other SKUs; Mid-Autumn Festival 2026 is 2026-09-25.\n- \"Override\" means decision_status ADJUSTED or REJECTED.\n- \"Accuracy\" or \"forecast error\" means WMAPE (lower is better).\n- When no period is given for sales, stockouts, or waste, use the last 52 weeks of data and say so.\n\n## DATA QUALITY NOTES\n- In forecast_accuracy, method model_p90_coverage stores p90 coverage in the wmape column; it is not an error.\n- Use forecast_accuracy scored_against observed_uncensored unless the user asks about true or simulated demand.\n- Weeks with 2+ out-of-stock days are censored: their sales understate demand.\n\n## CONSTRAINTS\n- Recommendations are suggestions, not placed orders; committed quantities are final_order_units in order_decisions_history.\n\n## Instructions you must follow when providing summaries\n- State the week range or the as-of date used.\n- In SQL results, return unrounded values and rates as fractions between 0 and 1.\n- In the written summary, show money in USD rounded to whole dollars and rates as percentages with one decimal place.\n"
+        ]
+      }
+    ],
+    "example_question_sqls": [
+      {
+        "id": "24482161928fb5533cdc79a3666444ef",
+        "question": [
+          "Which airport stores have the most pastry sales at risk if we don't order?"
+        ],
+        "sql": [
+          "SELECT r.location_name, r.region, COUNT(*) AS high_risk_skus,\n       SUM(r.est_lost_sales_if_no_order) AS sales_at_risk_usd,\n       SUM(r.recommended_units) AS recommended_units\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nWHERE r.channel_type = 'AIRPORT' AND r.category = 'Pastry' AND r.stockout_risk = 'HIGH'\nGROUP BY r.location_name, r.region\nORDER BY sales_at_risk_usd DESC\nLIMIT 10"
+        ],
+        "usage_guidance": [
+          "Ranking stores by sales at risk for a channel and category."
+        ]
+      },
+      {
+        "id": "64e3a0312d49066d913ff1e022232c97",
+        "question": [
+          "How many recommendations has each region accepted, adjusted, or left pending?"
+        ],
+        "sql": [
+          "SELECT r.region, COALESCE(d.decision_status, 'PENDING') AS decision_status, COUNT(*) AS lines\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nLEFT JOIN darren_fe_bar_catalog.gold.order_decisions_history d ON r.recommendation_id = d.recommendation_id\nWHERE r.recommended_units > 0\nGROUP BY r.region, COALESCE(d.decision_status, 'PENDING')\nORDER BY r.region, decision_status"
+        ],
+        "usage_guidance": [
+          "Pending = recommendation with no decision row (LEFT JOIN)."
+        ]
+      },
+      {
+        "id": "79aae28b389a7dbc3ef2e16c27d820d5",
+        "question": [
+          "How have weekly net sales trended by channel over the last 12 weeks?"
+        ],
+        "sql": [
+          "SELECT k.week_start, k.channel_type, SUM(k.net_sales) AS net_sales\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start > DATE_SUB((SELECT MAX(x.week_start) FROM darren_fe_bar_catalog.gold.channel_weekly_kpis x), 84)\nGROUP BY k.week_start, k.channel_type\nORDER BY k.week_start, k.channel_type"
+        ],
+        "usage_guidance": [
+          "Time-series trend; relative window from the latest week in the data."
+        ]
+      },
+      {
+        "id": "cbfabe9e7eb38971f728c3509c70fa65",
+        "question": [
+          "How does forecast error change with how many weeks ahead we forecast, model vs last year?"
+        ],
+        "sql": [
+          "SELECT a.fold, CAST(a.segment AS INT) AS weeks_ahead,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS last_year_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.segment_type = 'HORIZON' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.fold, CAST(a.segment AS INT)\nORDER BY a.fold, weeks_ahead"
+        ],
+        "usage_guidance": [
+          "Pivot model vs baseline accuracy; default to observed_uncensored."
+        ]
+      },
+      {
+        "id": "f21294f0df89d6bdd6a482369a743c3e",
+        "question": [
+          "What is the weekly forecast for Pineapple Cake Box (10pc) in the North region compared with last year?"
+        ],
+        "sql": [
+          "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units,\n       SUM(f.forecast_p90) AS p90_units, SUM(f.baseline_seasonal_naive) AS last_year_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts f\nJOIN darren_fe_bar_catalog.silver.dim_location l ON f.location_id = l.location_id\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.sku_name = 'Pineapple Cake Box (10pc)' AND l.region = 'North'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
+        ],
+        "usage_guidance": [
+          "Forecast joined to store and product dimensions."
+        ]
+      },
+      {
+        "id": "f2236053b45dbfd0003cab79903d80a7",
+        "question": [
+          "How did waste compare with the previous year by region?"
+        ],
+        "sql": [
+          "WITH bounds AS (SELECT MAX(k.week_start) AS last_week FROM darren_fe_bar_catalog.gold.channel_weekly_kpis k),\nyearly AS (\n  SELECT k.region,\n         CASE WHEN k.week_start > DATE_SUB(b.last_week, 364) THEN 'last_52_weeks' ELSE 'prior_52_weeks' END AS period,\n         SUM(k.waste_value) AS waste_value, SUM(k.net_sales) AS net_sales\n  FROM darren_fe_bar_catalog.gold.channel_weekly_kpis k CROSS JOIN bounds b\n  WHERE k.week_start > DATE_SUB(b.last_week, 728)\n  GROUP BY ALL\n)\nSELECT y.region, y.period, y.waste_value AS waste_usd, y.waste_value / y.net_sales AS waste_share_of_sales\nFROM yearly y\nORDER BY y.region, y.period"
+        ],
+        "usage_guidance": [
+          "Year-over-year comparison with a CTE; rates computed from sums."
+        ]
+      }
+    ],
+    "join_specs": [
+      {
+        "id": "133254bfba00fcde008b6ad448ef77ba",
+        "left": {
+          "identifier": "darren_fe_bar_catalog.gold.order_decisions_history",
+          "alias": "order_decisions_history"
+        },
+        "right": {
+          "identifier": "darren_fe_bar_catalog.gold.replenishment_recommendations_current",
+          "alias": "replenishment_recommendations_current"
+        },
+        "sql": [
+          "`order_decisions_history`.`recommendation_id` = `replenishment_recommendations_current`.`recommendation_id`",
+          "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
+        ]
+      },
+      {
+        "id": "922a208c1aece157c5f21163abf8cee9",
+        "left": {
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "alias": "demand_forecasts"
+        },
+        "right": {
+          "identifier": "darren_fe_bar_catalog.gold.replenishment_recommendations_current",
+          "alias": "replenishment_recommendations_current"
+        },
+        "sql": [
+          "`demand_forecasts`.`location_id` = `replenishment_recommendations_current`.`location_id` AND `demand_forecasts`.`sku_id` = `replenishment_recommendations_current`.`sku_id`",
+          "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+        ]
+      },
+      {
+        "id": "a2d9b1cee9364b58ae0612f4ae2b7e7c",
+        "left": {
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "alias": "demand_forecasts"
+        },
+        "right": {
+          "identifier": "darren_fe_bar_catalog.silver.dim_location",
+          "alias": "dim_location"
+        },
+        "sql": [
+          "`demand_forecasts`.`location_id` = `dim_location`.`location_id`",
+          "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+        ]
+      },
+      {
+        "id": "b931f1888dc61cebde8a6674d1e14a68",
+        "left": {
+          "identifier": "darren_fe_bar_catalog.gold.demand_forecasts",
+          "alias": "demand_forecasts"
+        },
+        "right": {
+          "identifier": "darren_fe_bar_catalog.silver.dim_product",
+          "alias": "dim_product"
+        },
+        "sql": [
+          "`demand_forecasts`.`sku_id` = `dim_product`.`sku_id`",
+          "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+        ]
+      }
+    ],
+    "sql_snippets": {
+      "measures": [
+        {
+          "id": "09de959b50baa0db9ff9ebc0ef0b2e96",
+          "alias": "override_rate",
+          "display_name": "Override rate",
+          "sql": [
+            "COUNT_IF(order_decisions_history.decision_status IN ('ADJUSTED', 'REJECTED')) / COUNT(*)"
+          ],
+          "synonyms": [
+            "override share"
+          ]
+        },
+        {
+          "id": "17712e7b3ada3f261b91511c8d90800a",
+          "alias": "waste_rate",
+          "display_name": "Waste rate",
+          "sql": [
+            "SUM(channel_weekly_kpis.waste_value) / SUM(channel_weekly_kpis.net_sales)"
+          ],
+          "synonyms": [
+            "waste %",
+            "waste share"
+          ]
+        },
+        {
+          "id": "b01175e7fa4c8215dadc08ac55189df4",
+          "alias": "order_value_at_cost",
+          "display_name": "Order value at cost",
+          "sql": [
+            "SUM(replenishment_recommendations_current.recommended_units * replenishment_recommendations_current.unit_cost)"
+          ],
+          "synonyms": [
+            "order value",
+            "spend"
+          ]
+        },
+        {
+          "id": "e7d85b1cbb52bc12ae3cee71b0a11a79",
+          "alias": "stockout_rate_weighted",
+          "display_name": "Stockout day rate",
+          "sql": [
+            "SUM(channel_weekly_kpis.stockout_day_rate * channel_weekly_kpis.ranged_series) / SUM(channel_weekly_kpis.ranged_series)"
+          ],
+          "synonyms": [
+            "stockout rate",
+            "OOS rate"
+          ]
+        }
+      ],
+      "filters": [
+        {
+          "id": "2721920d5de231538559f3c10d42088a",
+          "display_name": "Observed accuracy (default)",
+          "sql": [
+            "forecast_accuracy.scored_against = 'observed_uncensored'"
+          ],
+          "synonyms": [
+            "accuracy",
+            "real-world accuracy"
+          ]
+        },
+        {
+          "id": "3889806cc7449a412c447ed6c942194a",
+          "display_name": "Last 52 weeks",
+          "sql": [
+            "channel_weekly_kpis.week_start > DATE_SUB((SELECT MAX(k.week_start) FROM darren_fe_bar_catalog.gold.channel_weekly_kpis k), 364)"
+          ],
+          "synonyms": [
+            "last year",
+            "past year",
+            "trailing 12 months"
+          ]
+        },
+        {
+          "id": "4fcf4a5691d0dd9b745854810875a090",
+          "display_name": "Manager overrides",
+          "sql": [
+            "order_decisions_history.decision_status IN ('ADJUSTED', 'REJECTED')"
+          ],
+          "synonyms": [
+            "overrides",
+            "overridden"
+          ]
+        },
+        {
+          "id": "6297129a8a36624b1e9503db0ade5814",
+          "display_name": "Lines to order",
+          "sql": [
+            "replenishment_recommendations_current.recommended_units > 0"
+          ],
+          "synonyms": [
+            "orders to place"
+          ]
+        },
+        {
+          "id": "f439382023c553fd7a8f71a4772c9545",
+          "display_name": "Mid-Autumn range",
+          "sql": [
+            "replenishment_recommendations_current.category = 'Mooncake'"
+          ],
+          "synonyms": [
+            "mooncakes",
+            "Mid-Autumn products"
+          ]
+        }
+      ],
+      "expressions": [
+        {
+          "id": "8a23eba41958c9784569d9046616cd3f",
+          "alias": "override_units",
+          "display_name": "Units changed by manager",
+          "sql": [
+            "order_decisions_history.final_order_units - order_decisions_history.recommended_units"
+          ]
+        }
+      ]
+    }
+  },
+  "benchmarks": {
+    "questions": [
+      {
+        "id": "142ea860242e6a2b91ec5961e383b827",
+        "question": [
+          "Which products had their recommended order capped by shelf life most often?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT r.sku_name, COUNT(*) AS shelf_capped_stores\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nWHERE r.cap_applied = 'SHELF_LIFE'\nGROUP BY r.sku_name\nORDER BY shelf_capped_stores DESC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "362b672ab0d625f47fb3330dc24e6f46",
+        "question": [
+          "Which region had the highest stockout day rate over the last 4 weeks?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT k.region,\n       SUM(k.stockout_day_rate * k.ranged_series) / SUM(k.ranged_series) AS stockout_day_rate\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start > DATE_SUB((SELECT MAX(x.week_start) FROM darren_fe_bar_catalog.gold.channel_weekly_kpis x), 28)\nGROUP BY k.region\nORDER BY stockout_day_rate DESC\nLIMIT 1"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Rate must be weighted by ranged_series across channels and weeks."
+        ]
+      },
+      {
+        "id": "682f36bdb941cf3c0ab5ede696ebac3b",
+        "question": [
+          "List each order line a manager overrode, with store, product, decision, recommended and final units, and reason."
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT r.location_name, r.sku_name, d.decision_status, d.recommended_units, d.final_order_units, d.reason\nFROM darren_fe_bar_catalog.gold.order_decisions_history d\nJOIN darren_fe_bar_catalog.gold.replenishment_recommendations_current r ON d.recommendation_id = r.recommendation_id\nWHERE d.decision_status IN ('ADJUSTED', 'REJECTED')\nORDER BY r.location_name"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Overrides are ADJUSTED and REJECTED decisions; should list store, SKU, quantities and reason."
+        ]
+      },
+      {
+        "id": "871f97ceab680fcdd71e46004401c4c3",
+        "question": [
+          "What are the top 10 highway stores by mooncake sales at risk from high stockout risk?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT r.location_name, r.region, COUNT(*) AS high_risk_mooncake_skus,\n       SUM(r.est_lost_sales_if_no_order) AS sales_at_risk_usd\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nWHERE r.channel_type = 'HIGHWAY' AND r.category = 'Mooncake' AND r.stockout_risk = 'HIGH'\nGROUP BY r.location_name, r.region\nORDER BY sales_at_risk_usd DESC\nLIMIT 10"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must filter HIGHWAY, Mooncake, stockout_risk HIGH and rank by sales at risk; Taian Service Area N should be first."
+        ]
+      },
+      {
+        "id": "87363916992c00386ccfa82578e7fc36",
+        "question": [
+          "What was waste as a percentage of net sales by channel over the last 52 weeks?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT k.channel_type, SUM(k.waste_value) AS waste_usd,\n       SUM(k.waste_value) / SUM(k.net_sales) AS waste_share_of_sales\nFROM darren_fe_bar_catalog.gold.channel_weekly_kpis k\nWHERE k.week_start > DATE_SUB((SELECT MAX(x.week_start) FROM darren_fe_bar_catalog.gold.channel_weekly_kpis x), 364)\nGROUP BY k.channel_type\nORDER BY waste_usd DESC"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Rate must be SUM(waste)/SUM(sales), not an average of weekly rates."
+        ]
+      },
+      {
+        "id": "9e2a1315823aad190cfb26b72dcabbac",
+        "question": [
+          "Which 5 downtown stores have the largest recommended order value at cost?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT r.location_name, SUM(r.recommended_units * r.unit_cost) AS order_value_at_cost_usd\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nWHERE r.channel_type = 'DOWNTOWN'\nGROUP BY r.location_name\nORDER BY order_value_at_cost_usd DESC\nLIMIT 5"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "a6aed28986d9fd53297b4c9584473359",
+        "question": [
+          "Compare the model's WMAPE with the same-week-last-year baseline by channel for the Mid-Autumn 2025 backtest."
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT a.segment AS channel_type,\n       MAX(CASE WHEN a.method = 'model' THEN a.wmape END) AS model_wmape,\n       MAX(CASE WHEN a.method = 'seasonal_naive' THEN a.wmape END) AS seasonal_naive_wmape\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.fold = 'MA2025' AND a.segment_type = 'CHANNEL' AND a.scored_against = 'observed_uncensored'\nGROUP BY a.segment\nORDER BY a.segment"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Must use fold MA2025, segment_type CHANNEL, scored_against observed_uncensored."
+        ]
+      },
+      {
+        "id": "d60280e724693b4fd915fae359dc532a",
+        "question": [
+          "What is total expected mooncake demand for each forecast week?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT f.forecast_week, SUM(f.forecast_units) AS expected_units\nFROM darren_fe_bar_catalog.gold.demand_forecasts f\nJOIN darren_fe_bar_catalog.silver.dim_product p ON f.sku_id = p.sku_id\nWHERE p.category = 'Mooncake'\nGROUP BY f.forecast_week\nORDER BY f.forecast_week"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Six forecast weeks from 2026-08-31; expected units sum forecast_units."
+        ]
+      },
+      {
+        "id": "def6b1ee0eec479728b2978ee8607443",
+        "question": [
+          "What share of actual demand fell at or below the model's p90 in each backtest?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT a.fold, a.wmape AS p90_coverage\nFROM darren_fe_bar_catalog.gold.forecast_accuracy a\nWHERE a.method = 'model_p90_coverage' AND a.segment_type = 'ALL' AND a.scored_against = 'observed_uncensored'\nORDER BY a.fold"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "p90 coverage is stored in the wmape column for method model_p90_coverage; target is 0.90."
+        ]
+      },
+      {
+        "id": "f31f43190d67b501f07827aa12a091da",
+        "question": [
+          "How many order lines are recommended and what is the order value at cost by channel?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT r.channel_type, COUNT_IF(r.recommended_units > 0) AS lines_to_order,\n       SUM(r.recommended_units * r.unit_cost) AS order_value_at_cost_usd\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nGROUP BY r.channel_type\nORDER BY order_value_at_cost_usd DESC"
+            ]
+          }
+        ],
+        "evaluation_note": [
+          "Lines to order are rows with recommended_units > 0; value = units x unit_cost."
+        ]
+      },
+      {
+        "id": "f35978509673753829f5591a5e9adb73",
+        "question": [
+          "How many store-SKUs are at high overstock risk and how much stock value is expected to expire?"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT COUNT(*) AS high_overstock_store_skus, SUM(r.est_expiry_value) AS expected_expiry_value_usd\nFROM darren_fe_bar_catalog.gold.replenishment_recommendations_current r\nWHERE r.overstock_risk = 'HIGH'"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

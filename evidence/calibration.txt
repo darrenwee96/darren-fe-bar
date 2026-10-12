@@ -1,0 +1,25 @@
+Eastwind Gourmet synthetic data — calibration
+seed=42  history=2023-09-04..2026-08-30  years=2.99
+
+series (ranged location-SKU): 2247   stores: 80   SKUs: 32
+channel scale factors: DOWNTOWN=4.684, HIGHWAY=4.478, AIRPORT=3.409
+
+metric                                   actual/yr                 target band  ok
+observed_revenue_per_year              160,794,712   140,000,000 – 180,000,000  PASS
+lost_sales_per_year                     17,849,200     14,000,000 – 26,000,000  PASS
+waste_value_per_year                     3,865,485       3,500,000 – 6,500,000  PASS
+
+by channel (per year)          true_rev     observed_rev      lost_sales   expiry_cost  markdown_disc
+  DOWNTOWN                    82,025,798       72,644,211       8,768,369     1,315,047        613,219
+  HIGHWAY                     45,057,150       40,401,191       4,306,020       542,936        349,940
+  AIRPORT                     52,893,072       47,749,311       4,774,812       675,394        368,949
+
+share of lost sales on peak gift SKUs: 57.5%
+stockout days / ranged series-days: 8.6%
+
+rows written per source and drop:
+  pos_sales         2026-08-24: 1,838,149  2026-08-31: 12,079
+  inventory_daily   2026-08-24: 2,397,045  2026-08-31: 15,729
+  products          2026-08-24: 32
+  locations         2026-08-24: 80
+  holidays          2026-08-24: 27

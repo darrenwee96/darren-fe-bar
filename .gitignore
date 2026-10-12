@@ -1,0 +1,16 @@
+# OS / editor
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Build / deps
+node_modules/
+dist/
+.databricks/
+
+# Orchestration
+.worktrees/
+.polly/

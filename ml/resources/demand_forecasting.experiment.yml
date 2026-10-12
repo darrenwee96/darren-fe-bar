@@ -1,0 +1,9 @@
+resources:
+  experiments:
+    demand_forecasting:
+      name: /Users/${workspace.current_user.userName}/eastwind-gourmet/demand_forecasting
+      tags:
+        - key: project
+          value: eastwind-gourmet
+        - key: model
+          value: darren_fe_bar_catalog.ml.eastwind_demand

@@ -1,0 +1,23 @@
+# Eastwind Gourmet ETL: landing volume -> Bronze -> Silver -> Gold (Lakeflow Spark Declarative Pipeline).
+bundle:
+  name: eastwind-etl
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: The only catalog available in this workspace; each medallion layer is a schema inside it.
+    default: darren_fe_bar_catalog
+  landing_path:
+    description: Volume holding the synthetic source-system file drops (<source>/<drop_date>/*.csv).
+    default: /Volumes/darren_fe_bar_catalog/raw/landing
+
+targets:
+  dev:
+    default: true
+    # Not mode: development: it prefixes schema names, and the single shared
+    # catalog needs the exact names bronze/silver/gold.
+    workspace:
+      profile: fe-bar
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}

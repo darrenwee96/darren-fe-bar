@@ -1,0 +1,41 @@
+Eastwind Gourmet — Lakebase load and decision write-back evidence
+Lakebase project eastwind-replenishment (Autoscaling, PG 17), branch production, database databricks_postgres,
+endpoint projects/eastwind-replenishment/branches/production/endpoints/primary
+App eastwind-replenishment (AppKit 0.76.1), service principal f4a2a131-92ee-4cf6-a1fa-189103f3f3cd
+URL https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+
+1) Delta -> Lakebase load (job eastwind-forecast, task load_lakebase, 2026-10-10T05:22Z)
+   {"delta_rows": 2247, "upserted": 2247, "deleted": 0, "lakebase_rows": 2247, "lakebase_units": 212638,
+    "as_of_date": "2026-08-31", "granted_to_app_sp": true}
+   Gold gold.replenishment_recommendations_current: 2,247 rows, 212,638 recommended units -> identical in serving.recommendations.
+
+2) App startup (deployed, as the app service principal)
+   [appkit:lakebase] Lakebase SP pool initialized
+   [replenishment] Schema replenishment is ready      (SP created and owns replenishment.*)
+
+3) API calls against the deployed app (OAuth user token; decided_by = signed-in user)
+   1) Accept Taichung Park x Classic Lotus (first decision, expectedVersion null)
+   {"decision_id":"a8222139-b680-464a-ab63-5bfaba850e18","recommendation_id":"623de0e7b3b5af16","as_of_date":"2026-08-31T00:00:00.000Z","location_id":"L0008","sku_id":"SKU-MC01","decision_status":"ACCEPTED","recommended_units":672,"final_order_units":672,"reason":null,"decided_by":"darren.wee@databricks.com","decided_at":"2026-10-10T05:23:18.574Z","updated_at":"2026-10-10T05:23:18.574Z","version":1}  [HTTP 201]
+   2) Adjust same line to 600 units (expectedVersion 1)
+   {"decision_id":"a8222139-b680-464a-ab63-5bfaba850e18","recommendation_id":"623de0e7b3b5af16","as_of_date":"2026-08-31T00:00:00.000Z","location_id":"L0008","sku_id":"SKU-MC01","decision_status":"ADJUSTED","recommended_units":672,"final_order_units":600,"reason":"Display space limited during renovation","decided_by":"darren.wee@databricks.com","decided_at":"2026-10-10T05:23:19.665Z","updated_at":"2026-10-10T05:23:19.665Z","version":2}  [HTTP 200]
+   3) Stale write with expectedVersion 1 again -> optimistic lock
+   {"error":"Someone else changed this order. Reload to see the latest decision.","currentVersion":2}  [HTTP 409]
+   4) Adjust without a reason -> validation
+   {"error":"An adjusted order needs the new quantity and a reason"}  [HTTP 400]
+   5) Reject Daan Shop 3 x Egg Yolk Lotus with reason
+   {"decision_id":"1b09b0d0-566b-48ce-903d-270c3d24a065","recommendation_id":"1fdae3f412deef49","as_of_date":"2026-08-31T00:00:00.000Z","location_id":"L0022","sku_id":"SKU-MC02","decision_status":"REJECTED","recommended_units":624,"final_order_units":0,"reason":"Store closing for refit 14-28 Sep","decided_by":"darren.wee@databricks.com","decided_at":"2026-10-10T05:23:22.826Z","updated_at":"2026-10-10T05:23:22.826Z","version":1}  [HTTP 201]
+   6) Accept Tamsui Shop 3 x Egg Yolk Lotus
+   {"decision_id":"ba252b37-8322-4310-a4bb-1a420022e98f","recommendation_id":"0fa69332bdf11178","as_of_date":"2026-08-31T00:00:00.000Z","location_id":"L0026","sku_id":"SKU-MC02","decision_status":"ACCEPTED","recommended_units":488,"final_order_units":488,"reason":null,"decided_by":"darren.wee@databricks.com","decided_at":"2026-10-10T05:23:23.851Z","updated_at":"2026-10-10T05:23:23.851Z","version":1}  [HTTP 201]
+   7) Detail + audit trail for Taichung Park line
+     decision: ADJUSTED 600 v2 by darren.wee@databricks.com
+     event: 2026-10-10T05:23:19.665Z ACCEPTED 672 -> ADJUSTED 600 | Display space limited during renovation
+     event: 2026-10-10T05:23:18.574Z None None -> ACCEPTED 672 | None
+   8) Summary after decisions
+      {'decided_lines': '3', 'accepted': '1', 'adjusted': '1', 'rejected': '1'}
+
+4) Lakebase -> Delta (task ingest_decisions)
+   {"decisions": 3, "events": 4, "by_status": {"ADJUSTED": 1, "REJECTED": 1, "ACCEPTED": 1}}
+   gold.order_decisions_history:
+   {'decided_by': 'darren.wee@databricks.com', 'decision_status': 'ADJUSTED', 'events': '2', 'final_order_units': '600', 'location_id': 'L0008', 'reason': 'Display space limited during renovation', 'recommendation_id': '623de0e7b3b5af16', 'recommended_units': '672', 'sku_id': 'SKU-MC01', 'version': '2'}
+   {'decided_by': 'darren.wee@databricks.com', 'decision_status': 'REJECTED', 'events': '1', 'final_order_units': '0', 'location_id': 'L0022', 'reason': 'Store closing for refit 14-28 Sep', 'recommendation_id': '1fdae3f412deef49', 'recommended_units': '624', 'sku_id': 'SKU-MC02', 'version': '1'}
+   {'decided_by': 'darren.wee@databricks.com', 'decision_status': 'ACCEPTED', 'events': '1', 'final_order_units': '488', 'location_id': 'L0026', 'reason': '', 'recommendation_id': '0fa69332bdf11178', 'recommended_units': '488', 'sku_id': 'SKU-MC02', 'version': '1'}

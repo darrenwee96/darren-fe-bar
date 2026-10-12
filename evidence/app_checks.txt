@@ -1,0 +1,41 @@
+Eastwind Gourmet — Databricks App checks (eastwind-replenishment, AppKit 0.76.1)
+
+databricks apps validate --profile fe-bar
+  Generating types ✅ · AST-grep lint ✅ · Type checking ✅ · Building ✅ · Running tests ✅ — All validation checks passed
+npm run typecheck ✅ · npm run lint (eslint) ✅ · npm run lint:ast-grep: No ast-grep lint violations found
+
+Warehouse queries (config/queries, executed as the app service principal), typegen against warehouse 221da0ceb437f8a8:
+  overview_kpis, accuracy_by_channel, weekly_sales_by_channel, mooncake_outlook, sku_weekly, sku_forecast — all described OK
+  overview_kpis -> model_wmape 0.2449 vs seasonal_naive 0.3984; stockout_day_rate 0.0744; waste 474,243 on 38.36M net sales (last 13 weeks)
+  accuracy_by_channel -> AIRPORT 25.0 vs 39.7 · DOWNTOWN 24.5 vs 40.7 · HIGHWAY 24.0 vs 38.8 (WMAPE %, model vs same week last year)
+
+Unity Catalog grants for the app service principal (least privilege):
+  USE CATALOG darren_fe_bar_catalog; USE SCHEMA gold;
+  SELECT on gold.forecast_accuracy, gold.channel_weekly_kpis, gold.demand_forecasts, gold.weekly_demand_features
+  (first deploy failed at build with INSUFFICIENT_PERMISSIONS: no USE CATALOG — fixed by these grants)
+
+Deployment: RUNNING / SUCCEEDED. Pages verified in a browser (local dev against the same warehouse and Lakebase):
+  Overview — headline "1,042 store-SKUs face a stockout before Mid-Autumn; $3.63M of sales at risk without these orders";
+    KPIs 212,638 units / 1,354 lines / $2.28M at cost; 1,042 high risk; 188 shelf-capped; decisions 3 / 1,354;
+    WMAPE 24.5% vs 39.8%; charts: mooncake outlook, accuracy by channel, weekly sales by channel.
+  Recommended orders — 1,455 actionable lines, 25 per page, filters (search, region, channel, risk, decision);
+    detail sheet with explanation, stock and policy stats, weekly chart, 6-week forecast table (expected / p90 / last year),
+    accept / adjust / reject, audit trail.
+Fix found during browser check: AppKit charts draw NULL as 0, so the detail chart's actual and forecast series were
+  split into one continuous series plus a forecast table.
+
+=== Redesign 2026-10-12: analyst workbench + Genie widget ===
+Pages: Overview · Stores (+ store drill-down /stores/:id) · Forecast · Inventory · Order approval · Ask Genie panel on every page
+Warehouse queries: 19 in config/queries (all run with default params against warehouse 221da0ceb437f8a8; typegen OK)
+New resources: genie_space 01f1c49f288b170f8fd01b3f047f1a87 (CAN_RUN) + user_api_scopes [dashboards.genie] (Genie runs on behalf of the user)
+UC grant added: SELECT on gold.replenishment_recommendations_current to the app service principal
+Checks: tsc (client + server) OK · eslint OK · appkit lint OK · databricks apps validate: all checks passed
+Deploy: RUNNING / ACTIVE; resources sql-warehouse, postgres, genie-space; scopes include dashboards.genie
+Browser verification (local dev against the same warehouse, Lakebase, Genie space):
+  - Overview: KPIs vs last year, weekly sales actual vs last year, channel scorecard
+  - Stores: $3.63M sales at risk; top-12 bar; stockout heatmap region x channel; sortable 80-store scorecard; drill-down with weekly units (actual/forecast/LY) and SKU stock table
+  - Forecast: 1,097,571 units next 6 weeks (+3.5% vs LY); forecast peaks ~2 weeks before last year's Mid-Autumn peak; category outlook; accuracy by horizon and segment per fold
+  - Inventory: 1,042 high stockout / 103 high overstock; risk heatmap; weeks of cover by category; stockout and waste trends; top-25 exceptions open the order sheet
+  - Genie panel: "Which stores have the largest recommended order value at cost?" answered with expandable SQL + chart/table
+Bugs found and fixed during verification: warehouse JSON returns numerics as strings (useNumeric hook);
+  categorical BarCharts default to horizontal (orientation pinned); four chart titles corrected to match the data.
