@@ -16,7 +16,6 @@ import { useGlobalFilters } from './lib/filters';
 import { formatDate, formatDateTime, titleCase } from './lib/format';
 import { useAsync } from './lib/useAsync';
 import { useTheme } from './lib/theme';
-import { cn } from './lib/utils';
 
 function Header({ email, freshness }: { email: string | null; freshness: string | null }) {
   const { open, setOpen } = useGenie();
@@ -69,7 +68,6 @@ function Header({ email, freshness }: { email: string | null; freshness: string 
 
 function ControlPanel() {
   const { filters, setFilter } = useGlobalFilters();
-  const { open: genieOpen } = useGenie();
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const refresh = useCallback(() => setRevision((r) => r + 1), []);
@@ -89,11 +87,6 @@ function ControlPanel() {
     ? `Order week ${formatDate(s.as_of_date)} · model v${s.model_version} · loaded ${formatDateTime(s.loaded_at)}`
     : null;
 
-  // Two columns (queue | charts) only when there is room; the Genie dock takes 400-440px.
-  const wide = genieOpen ? 'min-[1760px]:grid-cols-[minmax(0,1fr)_400px]' : 'xl:grid-cols-[minmax(0,1fr)_400px]';
-  const chartsOrder = genieOpen ? 'order-first min-[1760px]:order-none' : 'order-first xl:order-none';
-  const chartsLayout = genieOpen ? 'md:grid-cols-2 min-[1760px]:grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-1';
-
   return (
     <div className="min-h-screen bg-background">
       <Header email={whoami.data?.email ?? null} freshness={freshness} />
@@ -111,11 +104,17 @@ function ControlPanel() {
               </Alert>
             )}
             <KpiStrip filters={filters} summary={s} loading={summary.loading} error={summary.error} />
-            <div className={cn('grid grid-cols-1 items-start gap-4', wide)}>
-              <OrderQueue filters={filters} revision={revision} onOpen={setSelected} onChanged={refresh} />
-              <div className={cn('grid grid-cols-1 gap-4', chartsOrder, chartsLayout)}>
-                <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
-                <StoreNeedPanel filters={filters} revision={revision} onSelect={(id) => setFilter('location', id)} />
+            {/*
+              Container queries, so the layout follows the space actually left beside the Genie dock:
+              queue | charts side by side when the workspace is >= 1560px, otherwise charts on top, queue full width.
+            */}
+            <div className="@container">
+              <div className="grid grid-cols-1 items-start gap-4 @min-[1560px]:grid-cols-[minmax(0,1fr)_400px]">
+                <OrderQueue filters={filters} revision={revision} onOpen={setSelected} onChanged={refresh} />
+                <div className="order-first grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[1560px]:order-none @min-[1560px]:grid-cols-1">
+                  <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
+                  <StoreNeedPanel filters={filters} revision={revision} onSelect={(id) => setFilter('location', id)} />
+                </div>
               </div>
             </div>
           </main>

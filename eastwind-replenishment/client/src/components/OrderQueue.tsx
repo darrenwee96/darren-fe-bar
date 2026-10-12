@@ -135,7 +135,7 @@ export function OrderQueue({
       title="Order queue"
       meta={
         data
-          ? `${formatInt(total)} lines · sorted by order need, then sales lost if not ordered`
+          ? `${formatInt(total)} lines needing attention · by order need, then sales lost if not ordered`
           : 'Store-SKU order recommendations'
       }
       source="Recommendations: Lakebase serving.recommendations · decisions + audit trail: Lakebase replenishment.*"
@@ -247,7 +247,7 @@ export function OrderQueue({
                       {titleCase(r.channel_type)} · {r.region}
                     </div>
                   </TableCell>
-                  <TableCell className="max-w-[300px] align-top">
+                  <TableCell className="max-w-[260px] align-top">
                     <div className="flex items-center gap-1.5 text-foreground">
                       <span className="truncate">{r.sku_name}</span>
                       {r.peak_gift_flag && (
@@ -299,12 +299,14 @@ export function OrderQueue({
                             <Check className="mr-1 h-3.5 w-3.5" /> Accept
                           </Button>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2.5"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
                             onClick={() => onOpen(r.recommendation_id)}
+                            aria-label={`Review ${r.sku_name} for ${r.location_name}`}
+                            title="Review, adjust or reject"
                           >
-                            Review
+                            <ChevronRight className="h-4 w-4" />
                           </Button>
                         </>
                       ) : (

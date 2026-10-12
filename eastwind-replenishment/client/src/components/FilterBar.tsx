@@ -99,7 +99,7 @@ export function FilterBar({ options }: { options: FilterOptions | null }) {
         value={filters.location}
         onChange={set('location')}
         allLabel={`All stores (${stores.length})`}
-        options={stores.map((s) => ({ value: s.location_id, label: s.location_name, hint: s.region }))}
+        options={stores.map((s) => ({ value: s.location_id, label: s.location_name }))}
         className="w-[210px]"
       />
       {active > 0 && (

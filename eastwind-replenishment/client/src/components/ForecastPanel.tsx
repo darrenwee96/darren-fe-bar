@@ -80,7 +80,7 @@ export function ForecastPanel({ filters, scopeLabel }: { filters: ScopeFilters; 
       {rows && rows.length > 0 && (
         <ScenarioChart
           rows={rows}
-          height={270}
+          height={320}
           ariaLabel={`Weekly units for ${scopeLabel}: actual, forecast with p90 band, last year`}
         />
       )}
