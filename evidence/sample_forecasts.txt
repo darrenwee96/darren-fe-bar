@@ -1,62 +1,31 @@
 Eastwind Gourmet - current six-week forecasts
 
 Source: darren_fe_bar_catalog.gold.demand_forecasts_current
-Weekly scoring run: 938785124085419, task score_champion 124749291865187
-forecast_run_id 17a961419d614fec86a654e9fba155f6, model_version 5 (@champion), as_of 2026-08-31
+Weekly scoring run: 856491626271166
+forecast_run_id e8260bd8b83f4367a58db45ad0110c54, model_version 6 (@champion), as_of 2026-08-31
 Rows: 13,482 = 2,247 store-SKUs x 6 weeks. Mid-Autumn 2026 is Friday 2026-09-25.
 
 1) L0001 Zhongshan Shop x SKU-MC01 Classic Lotus Mooncake Box
-forecast_week | horizon | forecast | p90   | seasonal_naive | event_naive | top_driver
-2026-09-07    | 2       | 242.8    | 401.8 | 14.0           | 353.0       | Holiday
-2026-09-21    | 4       | 91.3     | 141.4 | 353.0          | 0.0         | Last year
+forecast_week | forecast | p90   | seasonal_naive | event_naive | top_driver
+2026-09-07    | 187.5    | 269.1 | 14.0           | 199.9       | Holiday
+2026-09-14    | 416.1    | 607.1 | 85.0           | 417.7       | Holiday
+2026-09-21    | 240.6    | 468.3 | 353.0          | 288.0       | Holiday
 
-The 2026-09-21 festival-week forecast no longer maps to the 2025 post-festival week. The event-aligned signal now peaks in the 2026-09-07 lead-up window and the 2026-09-21 forecast is lower.
+The prior regression where 2026-09-21 had event_naive=0.0 is fixed. The event-week forecast is now 1.28x the 2026-09-07 lead-up week for this store-SKU, though the aggregate all-store ratios still vary by SKU and not every peak SKU reaches the generator-curve-implied ~1.5x relationship.
 
-2) Peak-gift forecast totals by SKU and week
-forecast_week | sku_id   | forecast_units | p90_units | event_naive | rows
-2026-08-31    | SKU-GB01 | 1,550          | 2,286     | 1,993       | 54
-2026-08-31    | SKU-MC01 | 2,880          | 8,386     | 7,389       | 80
-2026-08-31    | SKU-MC02 | 2,238          | 6,416     | 5,861       | 80
-2026-08-31    | SKU-MC03 | 1,333          | 4,177     | 3,834       | 54
-2026-08-31    | SKU-MC04 | 1,693          | 4,086     | 3,940       | 44
-2026-08-31    | SKU-TE03 | 4,147          | 5,864     | 5,262       | 80
-2026-09-07    | SKU-GB01 | 3,046          | 5,380     | 3,706       | 54
-2026-09-07    | SKU-MC01 | 11,265         | 24,138    | 19,572      | 80
-2026-09-07    | SKU-MC02 | 8,831          | 20,721    | 16,543      | 80
-2026-09-07    | SKU-MC03 | 2,355          | 7,489     | 5,124       | 54
-2026-09-07    | SKU-MC04 | 6,229          | 11,669    | 10,942      | 44
-2026-09-07    | SKU-TE03 | 6,625          | 10,621    | 8,910       | 80
-2026-09-14    | SKU-GB01 | 4,059          | 6,664     | 4,627       | 54
-2026-09-14    | SKU-MC01 | 18,286         | 24,475    | 12,374      | 80
-2026-09-14    | SKU-MC02 | 15,868         | 22,603    | 12,629      | 80
-2026-09-14    | SKU-MC03 | 8,773          | 10,836    | 2,452       | 54
-2026-09-14    | SKU-MC04 | 8,511          | 11,567    | 6,625       | 44
-2026-09-14    | SKU-TE03 | 8,181          | 13,013    | 10,810      | 80
-2026-09-21    | SKU-GB01 | 2,119          | 4,051     | 1,387       | 54
-2026-09-21    | SKU-MC01 | 6,366          | 8,910     | 185         | 80
-2026-09-21    | SKU-MC02 | 6,414          | 8,603     | 303         | 80
-2026-09-21    | SKU-MC03 | 2,138          | 4,712     | 1,866       | 54
-2026-09-21    | SKU-MC04 | 2,880          | 3,856     | 86          | 44
-2026-09-21    | SKU-TE03 | 5,360          | 7,700     | 3,681       | 80
-2026-09-28    | SKU-GB01 | 1,095          | 1,625     | 4,627       | 54
-2026-09-28    | SKU-MC01 | 511            | 995       | 12,374      | 80
-2026-09-28    | SKU-MC02 | 420            | 872       | 12,629      | 80
-2026-09-28    | SKU-MC03 | 229            | 492       | 2,452       | 54
-2026-09-28    | SKU-MC04 | 293            | 503       | 6,625       | 44
-2026-09-28    | SKU-TE03 | 3,567          | 5,172     | 10,810      | 80
-2026-10-05    | SKU-GB01 | 1,080          | 1,630     | 1,387       | 54
-2026-10-05    | SKU-MC01 | 462            | 989       | 185         | 80
-2026-10-05    | SKU-MC02 | 390            | 887       | 303         | 80
-2026-10-05    | SKU-MC03 | 247            | 502       | 1,866       | 54
-2026-10-05    | SKU-MC04 | 276            | 525       | 86          | 44
-2026-10-05    | SKU-TE03 | 3,527          | 5,334     | 3,681       | 80
+2) Peak-gift 2026-09-21 / 2026-09-07 forecast ratios by SKU
+sku_id   | festival_week_units | leadup_week_units | forecast_ratio | event_naive_ratio
+SKU-GB01 | 2,615.7             | 2,623.8            | 0.997          | 1.042
+SKU-MC01 | 8,356.6             | 10,482.5           | 0.797          | 1.444
+SKU-MC02 | 7,892.7             | 8,206.3            | 0.962          | 1.556
+SKU-MC03 | 2,322.3             | 3,966.2            | 0.586          | 0.404
+SKU-MC04 | 4,123.3             | 5,691.0            | 0.725          | 1.424
+SKU-TE03 | 6,282.9             | 6,059.1            | 1.037          | 0.997
 
 3) Recommendations generated from current forecasts
-Rows 2,247; recommended units 251,992; lines to order 1,536; shelf-life capped 224; high stockout risk 1,075; high overstock risk 114; order value at cost $2,705,318.
+Rows 2,247; recommended units 278,410; lines to order 1,561; shelf-life capped 70; high stockout risk 1,087; high overstock risk 92; order value at cost $3,204,091.
 
-4) Genie validation
-python3 genie/build_space.py --check passed all 6 examples and 14 benchmarks, including:
-- current forecast totals from gold.demand_forecasts_current
-- peak gift stockout day rate
-- Mid-Autumn 2025 benchmark window ending 2025-10-07
-- policy backtest business impact summary
+4) Notes
+- The current view gold.demand_forecasts_current points at latest forecast_run_id e8260bd8b83f4367a58db45ad0110c54.
+- The model promoted for this run is v6 with feature schema hash 70d705608de5bca30d35509a786f6d1c16e5389daa1691d8f2b47f8949403632.
+- The remaining forecast-shape risk is explicit: the daily-offset event baseline is fixed, but the learned model still dampens some aggregate festival-week SKU forecasts below the generator curve.

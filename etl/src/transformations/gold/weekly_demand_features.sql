@@ -97,6 +97,30 @@ base AS (
   LEFT JOIN sales_weekly s ON s.location_id = i.location_id AND s.sku_id = i.sku_id AND s.week_start = i.week_start
   LEFT JOIN opening_stock o ON o.location_id = i.location_id AND o.sku_id = i.sku_id AND o.week_start = i.week_start
   WHERE i.week_start <= w.last_week
+),
+event_aligned_ly AS (
+  SELECT
+    b.location_id,
+    b.sku_id,
+    b.week_start,
+    -- Blend prior-event weekly demand by matching each target-week day to the
+    -- prior event occurrence at the same daily offset. This handles shifted
+    -- weekdays, e.g. Fri Mid-Autumn 2026 spans two Mon-grain 2025 weeks.
+    SUM(ly.demand_units_uncensored) / 7.0 AS same_event_last_year_units,
+    min(ly.week_start) AS same_event_last_year_week_start
+  FROM base b
+  JOIN silver.dim_calendar td
+    ON td.date BETWEEN b.week_start AND date_add(b.week_start, 6)
+  JOIN silver.dim_calendar lyd
+    ON lyd.next_event_type = td.next_event_type
+    AND lyd.next_event_seq = td.next_event_seq - 1
+    AND lyd.days_to_next_event = td.days_to_next_event
+  LEFT JOIN base ly
+    ON ly.location_id = b.location_id
+    AND ly.sku_id = b.sku_id
+    AND ly.week_start = CAST(date_trunc('WEEK', lyd.date) AS DATE)
+  WHERE td.next_event_type IS NOT NULL
+  GROUP BY b.location_id, b.sku_id, b.week_start
 )
 SELECT
   b.*,
@@ -114,13 +138,11 @@ SELECT
   avg(b.demand_units_uncensored) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 8 PRECEDING AND 1 PRECEDING) AS demand_roll_mean_8,
   sum(b.oos_days) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 4 PRECEDING AND 1 PRECEDING) AS oos_days_prev_4,
   sum(b.in_stock_days) OVER (PARTITION BY b.location_id, b.sku_id ORDER BY b.week_start ROWS BETWEEN 4 PRECEDING AND 1 PRECEDING) AS in_stock_days_prev_4,
-  -- Event-aligned last year: same event type, previous occurrence, same Monday-week offset to the event week.
-  ly.demand_units_uncensored AS same_event_last_year_units,
-  ly.week_start AS same_event_last_year_week_start
+  -- Event-aligned last year: daily-offset overlap blend across prior-event weeks.
+  e.same_event_last_year_units,
+  e.same_event_last_year_week_start
 FROM base b
-LEFT JOIN base ly
-  ON ly.location_id = b.location_id
-  AND ly.sku_id = b.sku_id
-  AND ly.next_event_type = b.next_event_type
-  AND ly.next_event_seq = b.next_event_seq - 1
-  AND ly.weeks_to_next_event_week = b.weeks_to_next_event_week;
+LEFT JOIN event_aligned_ly e
+  ON e.location_id = b.location_id
+  AND e.sku_id = b.sku_id
+  AND e.week_start = b.week_start;

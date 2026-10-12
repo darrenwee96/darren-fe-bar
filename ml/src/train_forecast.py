@@ -17,6 +17,7 @@ dbutils.widgets.text("catalog", "darren_fe_bar_catalog")
 dbutils.widgets.text("experiment", "/Users/darren.wee@databricks.com/eastwind-gourmet/demand_forecasting")
 dbutils.widgets.text("as_of", "2026-08-31")
 dbutils.widgets.text("mode", "train_score")
+dbutils.widgets.text("allow_migration_promotion", "false")
 
 import json
 import hashlib
@@ -36,6 +37,7 @@ CATALOG = dbutils.widgets.get("catalog")
 EXPERIMENT = dbutils.widgets.get("experiment")
 AS_OF = pd.Timestamp(dbutils.widgets.get("as_of"))
 MODE = dbutils.widgets.get("mode")
+ALLOW_MIGRATION_PROMOTION = dbutils.widgets.get("allow_migration_promotion").lower() == "true"
 MODEL_NAME = f"{CATALOG}.ml.eastwind_demand"
 HORIZON = 6
 CENSORED_OOS_DAYS = 2
@@ -76,6 +78,12 @@ cal = (
     .toPandas()
 )
 cal["week_start"] = pd.to_datetime(cal["week_start"])
+cal_daily = (
+    spark.table(f"{CATALOG}.silver.dim_calendar")
+    .select("date", "next_event_type", "next_event_seq", "days_to_next_event")
+    .toPandas()
+)
+cal_daily["date"] = pd.to_datetime(cal_daily["date"])
 
 BASE = hist["week_start"].min()
 hist["k"] = ((hist["week_start"] - BASE).dt.days // 7).astype(int)
@@ -91,16 +99,29 @@ S = len(series)
 # Dense matrices: units and out-of-stock days by series x week; NaN where the SKU is not stocked.
 U = np.full((S, K_HIST), np.nan)
 OOS = np.zeros((S, K_HIST))
-U[hist["s"], hist["k"]] = hist["demand_units_uncensored"].fillna(hist["units_sold"])
+U[hist["s"], hist["k"]] = hist["demand_units_uncensored"]
 OOS[hist["s"], hist["k"]] = hist["oos_days"]
 INSTOCK = np.zeros((S, K_HIST))
 INSTOCK[hist["s"], hist["k"]] = hist["in_stock_days"].fillna(7)
+full_oos_null_targets = int(hist[(hist["oos_days"] >= 7) & hist["demand_units_uncensored"].isna()].shape[0])
+print(f"full_oos_null_targets_excluded={full_oos_null_targets}")
 
 cal["k"] = ((cal["week_start"] - BASE).dt.days // 7).astype(int)
 cal_by_k = cal.set_index("k")
-# (event_type, event_seq, weeks_to_event) -> week index, for event-aligned "same week last year".
-event_week = {(r.next_event_type, int(r.next_event_seq), int(r.weeks_to_next_event_week)): int(r.k)
-              for r in cal.dropna(subset=["next_event_type"]).itertuples()}
+cal_daily["week_k"] = ((cal_daily["date"].dt.to_period("W").dt.start_time - BASE).dt.days // 7).astype(int)
+daily_offset_week = {
+    (r.next_event_type, int(r.next_event_seq), int(r.days_to_next_event)): int(r.week_k)
+    for r in cal_daily.dropna(subset=["next_event_type"]).itertuples()
+}
+event_overlap = {}
+for k, week_start in cal[["k", "week_start"]].itertuples(index=False):
+    matches = {}
+    week_days = cal_daily[(cal_daily["date"] >= week_start) & (cal_daily["date"] <= week_start + pd.Timedelta(days=6))]
+    for d in week_days.dropna(subset=["next_event_type"]).itertuples():
+        ly_k = daily_offset_week.get((d.next_event_type, int(d.next_event_seq) - 1, int(d.days_to_next_event)))
+        if ly_k is not None:
+            matches[ly_k] = matches.get(ly_k, 0) + 1
+    event_overlap[int(k)] = [(ly_k, days / 7.0) for ly_k, days in sorted(matches.items())]
 print(f"series={S} history_weeks={K_HIST} base={BASE.date()} as_of={AS_OF.date()}")
 
 # COMMAND ----------
@@ -119,7 +140,8 @@ NUM_FEATURES = [
     "t_in_event_window", "t_week_of_year",
 ]
 FEATURES = CAT_FEATURES + NUM_FEATURES
-FEATURE_SCHEMA_HASH = hashlib.sha256("|".join(FEATURES).encode()).hexdigest()
+FEATURE_SCHEMA_VERSION = "forecast_features_v3_daily_event_overlap_no_full_oos_refill"
+FEATURE_SCHEMA_HASH = hashlib.sha256((FEATURE_SCHEMA_VERSION + "|" + "|".join(FEATURES)).encode()).hexdigest()
 CATEGORIES = {c: sorted(series[c].unique().tolist()) for c in CAT_FEATURES if c != "t_next_event_type"}
 CATEGORIES["t_next_event_type"] = sorted(cal["next_event_type"].dropna().unique().tolist())
 
@@ -145,6 +167,17 @@ def window_mean(lo, hi):
     return np.nanmean(U[:, lo:hi], axis=1) if hi > lo else np.full(S, np.nan)
 
 
+def event_aligned_week_value(k):
+    values = np.zeros(S, dtype=float)
+    weights = np.zeros(S, dtype=float)
+    for ly_k, weight in event_overlap.get(int(k), []):
+        v = week_col(U, ly_k)
+        valid = ~np.isnan(v)
+        values[valid] += v[valid] * weight
+        weights[valid] += weight
+    return np.where(weights > 0, values, np.nan)
+
+
 def design(origins):
     """One row per series x origin x horizon. Origin o = first forecast week; data known through o-1."""
     static = series[["location_id", "sku_id", "channel_type", "region", "capacity_tier", "category",
@@ -162,7 +195,6 @@ def design(origins):
         for h in range(1, HORIZON + 1):
             t = o + h - 1
             c = cal_by_k.loc[t]
-            ly_k = event_week.get((c.next_event_type, int(c.next_event_seq) - 1, int(c.weeks_to_next_event_week)), -1)
             df = static.copy()
             df["origin_week"] = BASE + pd.Timedelta(weeks=o)
             df["target_week"] = BASE + pd.Timedelta(weeks=t)
@@ -170,7 +202,7 @@ def design(origins):
             for name, v in origin.items():
                 df[name] = v
             df["t_lag_52"] = week_col(U, t - 52)
-            df["t_same_event_ly"] = week_col(U, ly_k)
+            df["t_same_event_ly"] = event_aligned_week_value(t)
             df["t_next_event_type"] = c.next_event_type
             df["t_weeks_to_next_event"] = int(c.weeks_to_next_event)
             df["t_weeks_to_next_event_week"] = int(c.weeks_to_next_event_week)
@@ -392,6 +424,8 @@ truth["target_week"] = pd.to_datetime(truth["target_week"])
 
 with mlflow.start_run(run_name="backtest") as backtest_run:
     mlflow.log_params({"horizon_weeks": HORIZON, "censored_oos_days": CENSORED_OOS_DAYS, "features": len(FEATURES),
+                       "feature_schema_version": FEATURE_SCHEMA_VERSION, "feature_schema_hash": FEATURE_SCHEMA_HASH,
+                       "full_oos_null_targets_excluded": full_oos_null_targets,
                        "mean_objective": "tweedie(1.3)", "p90_objective": "quantile(0.9)",
                        "mean_rounds": MEAN_ROUNDS, "p90_rounds": P90_ROUNDS, **{f"lgb_{k}": v for k, v in PARAMS.items()}})
     fold_tables_raw, fold_preds, fold_summary = [], [], {}
@@ -460,6 +494,9 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
     mean_model, p90_model = models
     mlflow.log_params({"mode": MODE, "train_rows": len(train), "train_target_weeks": f"{train.target_week.min().date()}..{train.target_week.max().date()}",
                        "as_of": str(AS_OF.date()), "backtest_run_id": backtest_run.info.run_id,
+                       "feature_schema_version": FEATURE_SCHEMA_VERSION, "feature_schema_hash": FEATURE_SCHEMA_HASH,
+                       "allow_migration_promotion": ALLOW_MIGRATION_PROMOTION,
+                       "full_oos_null_targets_excluded": full_oos_null_targets,
                        "mean_objective": "tweedie(1.3)", "p90_objective": "quantile(0.9)",
                        "mean_rounds": MEAN_ROUNDS, "p90_rounds": P90_ROUNDS,
                        **{f"p90_conformal_uplift_{k}": v for k, v in p90_calibration.items()}})
@@ -482,7 +519,7 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
     client = MlflowClient(registry_uri="databricks-uc")
     version = info.registered_model_version
     client.set_model_version_tag(MODEL_NAME, version, "feature_schema_hash", FEATURE_SCHEMA_HASH)
-    client.set_model_version_tag(MODEL_NAME, version, "feature_schema_version", "forecast_features_v2_event_week_uncensored")
+    client.set_model_version_tag(MODEL_NAME, version, "feature_schema_version", FEATURE_SCHEMA_VERSION)
     current_champion = None
     champion_feature_hash = None
     try:
@@ -506,8 +543,12 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
             mlflow.set_tag("champion_gate_warning", f"failed like-for-like champion scoring: {str(e)[:200]}")
     schema_migration_required = current_champion is None or champion_feature_hash != FEATURE_SCHEMA_HASH
     promote = MODE != "score_only" and (
-        schema_migration_required or (champion_wmape is not None and candidate_wmape <= champion_wmape + PROMOTE_TOLERANCE)
+        (schema_migration_required and ALLOW_MIGRATION_PROMOTION)
+        or (not schema_migration_required and champion_wmape is not None and candidate_wmape <= champion_wmape + PROMOTE_TOLERANCE)
+        or current_champion is None
     )
+    if schema_migration_required and not ALLOW_MIGRATION_PROMOTION:
+        mlflow.set_tag("champion_gate_warning", "schema migration detected; promotion requires allow_migration_promotion=true")
     if promote:
         client.set_registered_model_alias(MODEL_NAME, "champion", version)
     mlflow.log_params({"model_version": version, "previous_champion_version": current_champion,
@@ -515,6 +556,7 @@ with mlflow.start_run(run_name="final_train_and_score") as final_run:
                        "candidate_feature_schema_hash": FEATURE_SCHEMA_HASH,
                        "champion_feature_schema_hash": champion_feature_hash,
                        "schema_migration_required": schema_migration_required,
+                       "allow_migration_promotion": ALLOW_MIGRATION_PROMOTION,
                        "candidate_mean_wmape": candidate_wmape, "champion_mean_wmape": champion_wmape,
                        "promoted_to_champion": promote})
     client.update_model_version(MODEL_NAME, version, description=(
@@ -654,6 +696,8 @@ policy_summary = policy_summary.rename(columns={
     "waste_value_manual": "manual_waste_value",
     "waste_value_forecast": "forecast_waste_value",
 })
+policy_summary["lost_sales_delta"] = policy_summary["manual_lost_sales"] - policy_summary["forecast_lost_sales"]
+policy_summary["waste_delta"] = policy_summary["manual_waste_value"] - policy_summary["forecast_waste_value"]
 spark.createDataFrame(policy_summary).write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
     f"{CATALOG}.gold.business_impact_summary"
 )

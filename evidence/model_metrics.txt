@@ -1,80 +1,98 @@
 Eastwind Gourmet - demand forecasting fixes evidence
 
 Databricks profile/target: fe-bar / dev
-ETL pipeline: eastwind-etl b148d5a0-0db4-45d6-ba75-5131238d9f0b
 Genie space: 01f1c49f288b170f8fd01b3f047f1a87
 
 Runs
-- Training job eastwind-forecast-training: run 969510782169895, SUCCESS.
-  - refresh_etl task 859378355934474 SUCCESS
-  - train_score_and_gate task 481903949866375 SUCCESS
-  - build_recommendations task 18540343456744 SUCCESS
-  - MLflow backtest run: c681b652558b4454be4a3d28e8ee2351
-  - MLflow final run: cca0159c4d6647d684ba6a041d740615
-  - Model: darren_fe_bar_catalog.ml.eastwind_demand version 5
-  - Promoted to @champion: true
-- Weekly scoring job eastwind-forecast-weekly-scoring: run 938785124085419, SUCCESS.
-  - score_champion task 124749291865187 SUCCESS
-  - forecast_run_id 17a961419d614fec86a654e9fba155f6
-  - model_version 5
-  - build_recommendations task 874441824437978 SUCCESS: 2,247 rows; 251,992 units; 1,536 order lines; 224 shelf-life capped; 1,075 high stockout risk; 114 high overstock risk; order value at cost $2,705,318
-  - load_lakebase task 685875703400333 SUCCESS: 2,247 upserts
-  - ingest_decisions task 833181071770876 SUCCESS: 3 decisions, 4 events
+- Failed training attempt: run 409721950765040 failed in refresh_etl before training. Root cause was a SQL parse error in weekly_demand_features.sql; fixed before rerun.
+- Training job eastwind-forecast-training: run 235471966557438, SUCCESS.
+  - refresh_etl task 496558900719224 SUCCESS
+  - train_score_and_gate task 823018332832508 SUCCESS
+  - build_recommendations task 942233070186683 SUCCESS
+  - MLflow backtest run: 6e9b484c77ff4e6e8fad1babdde4db22
+  - MLflow final run: b375e8acd12342b6a1fea39855ce0636
+  - Model: darren_fe_bar_catalog.ml.eastwind_demand version 6
+  - Promoted to @champion: true, with explicit notebook parameter allow_migration_promotion=true
+- Weekly scoring job eastwind-forecast-weekly-scoring: run 856491626271166, SUCCESS.
+  - score_champion task: final_run_id e8260bd8b83f4367a58db45ad0110c54
+  - model_version 6, forecast_run_id e8260bd8b83f4367a58db45ad0110c54
+  - build_recommendations: 2,247 rows; 278,410 units; 1,561 order lines; 70 shelf-life capped; 1,087 high stockout risk; 92 high overstock risk; order value at cost $3,204,091
+  - load_lakebase: 2,247 upserts
+  - ingest_decisions: 3 decisions, 4 events
 - Genie:
-  - python3 genie/build_space.py --check: 6 examples and 14 benchmarks OK.
+  - python3 genie/build_space.py --check: 6 examples and 16 benchmarks OK.
   - python3 genie/build_space.py --deploy: updated space 01f1c49f288b170f8fd01b3f047f1a87.
 
 Feature/schema controls
-- Feature schema version: forecast_features_v2_event_week_uncensored
-- Feature schema hash: eccd6537fa21130a8f4fa95bfe3a365c6f46b25e14d6c3c4782a115ed7c56a7d
-- Weekly score_only loaded @champion model_version 5 and passed the feature_schema_hash assertion before writing forecasts.
-- Full-stockout weeks (oos_days >= 7) are excluded/imputed as NULL demand rather than trained as zero.
+- Feature schema version: forecast_features_v3_daily_event_overlap_no_full_oos_refill
+- Feature schema hash: 70d705608de5bca30d35509a786f6d1c16e5389daa1691d8f2b47f8949403632
+- Previous champion v5 hash: eccd6537fa21130a8f4fa95bfe3a365c6f46b25e14d6c3c4782a115ed7c56a7d
+- Candidate mean observed WMAPE: 0.2462.
+- Previous champion like-for-like WMAPE on the new design rows: 0.216984. This is not a clean apples-to-apples business comparison because v5 was loaded against changed feature semantics, but it is logged and disclosed.
+- Schema migration was required and promotion was allowed only because the run explicitly passed allow_migration_promotion=true. Scheduled job defaults remain allow_migration_promotion=false.
+
+Full-OOS censoring check
+- gold.weekly_demand_features rows with oos_days >= 7: 12,950.
+- demand_units_uncensored NULL for those rows: 12,950 / 12,950.
+- Training logged full_oos_null_targets_excluded=12,950. These rows are no longer refilled to zero in U and are excluded by trainable(actual.notna()).
 
 Holiday alignment checks
-- gold.weekly_demand_features same_event_last_year_units coverage: 202,402 / 344,682 rows = 58.72%. This was 0% in the reviewed regression.
-- ml.backtest_forecasts event_naive coverage: 283,122 / 283,122 rows; event_naive differs from seasonal_naive for 198,518 rows.
-- L0001/SKU-MC01 current forecasts around Mid-Autumn 2026:
-  - 2026-09-07: forecast 242.8, p90 401.8, seasonal_naive 14.0, event_naive 353.0, top_driver Holiday.
-  - 2026-09-21: forecast 91.3, p90 141.4, seasonal_naive 353.0, event_naive 0.0, top_driver Last year.
-  - The event-week forecast no longer maps to a post-festival prior-year week and no longer exceeds the 2026-09-07 lead-up week.
+- Event alignment now uses daily-offset overlap, not exact week offset. For a shifted weekday holiday, each target-week day maps to the prior event occurrence with the same days-to-event offset and blends the matched prior weeks by day count.
+- L0001/SKU-MC01 current forecasts:
+  - 2026-09-07: forecast 187.5, p90 269.1, event_naive 199.9.
+  - 2026-09-14: forecast 416.1, p90 607.1, event_naive 417.7.
+  - 2026-09-21: forecast 240.6, p90 468.3, event_naive 288.0.
+- The earlier bad 2026-09-21 event_naive=0.0 is fixed. The production model still does not fully match the requested true-curve implication that 09-21 should be about 1.5x 09-07 for every peak SKU.
+- Generator curve reference from src/data_generation/generate.py lines 156-168: days_before 1..8 are plateau 1.0, event day is 0.4, post-event Mid-Autumn days are 0.02. This implies the festival week can be materially above a ramp week depending on the compared lead-up week and SKU/channel mix.
+- Live forecast ratio checks, 2026-09-21 / 2026-09-07:
+  - L0001/SKU-MC01: 240.6 / 187.5 = 1.283.
+  - SKU-MC01 all stores: 0.797; event-naive ratio 1.444.
+  - SKU-MC02 all stores: 0.962; event-naive ratio 1.556.
+  - SKU-MC03 all stores: 0.586; event-naive ratio 0.404.
+  - SKU-MC04 all stores: 0.725; event-naive ratio 1.424.
+  - SKU-GB01 all stores: 0.997; event-naive ratio 1.042.
+  - SKU-TE03 all stores: 1.037; event-naive ratio 0.997.
 
-Before vs after backtest summary
-Metric source for before: prior evidence on f804d2f.
-Metric source for after: darren_fe_bar_catalog.gold.forecast_accuracy for backtest_run_id c681b652558b4454be4a3d28e8ee2351, model_version 5.
-Conformal calibration residuals are computed against synthetic observed/ground-truth demand from the generated data, not audited production demand.
+Backtest summary, observed uncensored rows
+fold     segment                    model WMAPE  seasonal WMAPE  event WMAPE  p90 coverage  model bias
+MA2025   ALL                        0.2537       0.4431          0.3337       0.9155        0.0287
+MA2025   AIRPORT                    0.2664       0.4767          0.3578       0.9252        0.0647
+MA2025   DOWNTOWN                   0.2525       0.4692          0.3347       0.9173        0.0323
+MA2025   HIGHWAY                    0.2448       0.3810          0.3123       0.9031       -0.0063
+MA2025   PEAK_GIFT_IN_EVENT_WINDOW  0.3143       0.4637          0.3448       0.9020       -0.0944
+LNY2026  ALL                        0.2387       0.4636          0.3266       0.9121        0.0012
+LNY2026  AIRPORT                    0.2402       0.4662          0.3361       0.9199        0.0029
+LNY2026  DOWNTOWN                   0.2362       0.4681          0.3281       0.9019       -0.0092
+LNY2026  HIGHWAY                    0.2408       0.4554          0.3169       0.9189        0.0137
+LNY2026  PEAK_GIFT_IN_EVENT_WINDOW  0.2537       0.5844          0.3240       0.9471       -0.0577
 
-Observed, uncensored evaluation rows:
-fold     segment                    before model WMAPE  after model WMAPE  seasonal WMAPE  event WMAPE  before p90 cov  after raw p90 cov  after post p90 cov  after bias
-MA2025   ALL                        0.254               0.2549             0.4296          0.3441       0.867           0.8938             0.9171              0.0131
-MA2025   AIRPORT                    0.263               0.2673             0.4603          0.3674       0.873           n/a                0.9271              0.0463
-MA2025   DOWNTOWN                   0.257               0.2536             0.4523          0.3433       0.869           n/a                0.9182              0.0163
-MA2025   HIGHWAY                    0.243               0.2464             0.3741          0.3259       0.858           n/a                0.9055             -0.0189
-LNY2026  ALL                        0.236               0.2383             0.4620          0.3619       0.862           0.8879             0.9112             -0.0121
-LNY2026  AIRPORT                    0.237               0.2406             0.4650          0.3742       0.860           n/a                0.9200             -0.0106
-LNY2026  DOWNTOWN                   0.233               0.2353             0.4655          0.3651       0.856           n/a                0.8974             -0.0241
-LNY2026  HIGHWAY                    0.238               0.2403             0.4547          0.3475       0.873           n/a                0.9221              0.0029
-
-All available evaluation rows, including synthetic true-demand rows:
-fold     method              calibration       WMAPE/coverage
-MA2025   model               raw/post          0.2549 and 0.2763 rowsets present; current candidate row is 0.2549 observed
-MA2025   model_p90_coverage  raw_quantile      0.8938 observed, 0.8730 all rows
-MA2025   model_p90_coverage  post_conformal    0.9171 observed, 0.8990 all rows
-LNY2026  model               raw/post          0.2383 observed, 0.2463 all rows
-LNY2026  model_p90_coverage  raw_quantile      0.8879 observed, 0.8772 all rows
-LNY2026  model_p90_coverage  post_conformal    0.9112 observed, 0.9013 all rows
+Backtest summary, synthetic true-demand all weeks
+fold     segment                    model WMAPE  seasonal WMAPE  event WMAPE  p90 coverage  model bias
+MA2025   ALL                        0.2694       0.4588          0.3387       0.8972       -0.0260
+MA2025   PEAK_GIFT_IN_EVENT_WINDOW  0.3845       0.5966          0.3629       0.8658       -0.2330
+LNY2026  ALL                        0.2434       0.4806          0.3268       0.9037       -0.0244
+LNY2026  PEAK_GIFT_IN_EVENT_WINDOW  0.2688       0.6544          0.3302       0.9373       -0.0849
 
 Conformal p90 uplift values
-- peak_event: +9.8222 units
-- rest: +0.6574 units
-- P90 coverage improved above 0.90 on the observed rows for both folds after calibration.
+- peak_event: +12.4266 units
+- rest: +0.3015 units
+- Conformal residuals use synthetic generated true demand, not audited production demand.
 
-Interpretation
-- Event-aligned naive is now a real comparator and is materially better than plain seasonal naive in both folds, but the model still beats both baselines on observed WMAPE.
-- Post-conformal p90 improves coverage without changing point WMAPE; safety stock uses the calibrated p90.
-- The model was promoted to @champion because the existing live model was schema-incompatible with the corrected v2 feature semantics; subsequent scoring asserts the schema hash.
+Genie NL probes
+- "For current Mid-Autumn peak SKUs, what is the festival-week forecast ratio versus the 2026-09-07 lead-up week?"
+  - Conversation 01f1c605e7d413fe86a37b7adedb436f, message 01f1c605e7dc1f51b888746158f71749.
+  - Genie SQL used gold.demand_forecasts_current joined to dim_product and compared forecast_week 2026-09-21 vs 2026-09-07.
+  - Answer: Mooncake peak SKUs 18,571.5 / 22,655.0 = 82.0%.
+- "How much annualized lost sales and waste reduction does the forecast policy show by channel?"
+  - Conversation 01f1c6059c63100eb9f39b9538d1c7b4, message 01f1c6059c6c149a90c53cf12f7cfc9e.
+  - Genie SQL used SUM(raw_delta) * 52 / SUM(window_weeks), not SUM(annualized_delta).
+  - Answer: AIRPORT lost +$7.21M, waste -$4k; DOWNTOWN lost +$13.85M, waste +$197k; HIGHWAY lost +$5.79M, waste -$151k.
+- "Show raw in-window policy lost sales and waste by fold and channel."
+  - Conversation 01f1c6059c641406962beacc62623394, message 01f1c6059c6d19ef83a315b88dbbc3b0.
+  - Genie SQL selected raw forecast/manual lost sales and waste from gold.business_impact_summary by fold/channel.
 
 Validation
 - python3 -m py_compile ml/src/train_forecast.py ml/src/build_recommendations.py ml/src/sync_lakebase.py genie/build_space.py
 - databricks bundle validate --strict -t dev --profile fe-bar (etl): OK
 - databricks bundle validate --strict -t dev --profile fe-bar (ml): OK, with non-blocking recommendation to split each job into a separate .job.yml file.
-- python3 genie/build_space.py --check: 6 examples and 14 benchmarks OK.
+- python3 genie/build_space.py --check: 6 examples and 16 benchmarks OK.

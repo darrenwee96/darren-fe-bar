@@ -33,7 +33,7 @@ forecast AS (
   SELECT f.* FROM gold.demand_forecasts_current f JOIN run USING (forecast_run_id)
 ),
 product AS (
-  SELECT *, CAST(lead_time_days / 7 AS INT) AS lead_weeks, CAST(floor(shelf_life_days / 7) AS INT) AS shelf_weeks
+  SELECT *, CAST(ceil(lead_time_days / 7.0) AS INT) AS lead_weeks, CAST(ceil(shelf_life_days / 7.0) AS INT) AS shelf_weeks
   FROM silver.dim_product
 ),
 position AS (
@@ -134,7 +134,8 @@ SELECT
          THEN concat(CASE WHEN s.recent_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.recent_driver_units, 0), ' units from recent trend') END,
     CASE WHEN abs(s.last_year_driver_units) >= greatest(abs(s.holiday_driver_units), abs(s.baseline_driver_units))
          THEN concat(CASE WHEN s.last_year_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.last_year_driver_units, 0), ' units from last year') END,
-    concat(format_number(s.baseline_driver_units, 0), ' units from store-product baseline'),
+    CASE WHEN abs(s.baseline_driver_units) >= greatest(abs(s.holiday_driver_units), abs(s.recent_driver_units), abs(s.last_year_driver_units))
+         THEN concat(CASE WHEN s.baseline_driver_units >= 0 THEN '+' ELSE '' END, format_number(s.baseline_driver_units, 0), ' units from store-product baseline') END,
     CASE WHEN ne.weeks_to_next_event <= 6 AND s.recent_weekly_units > 0
               AND s.demand_cover_units / (s.lead_weeks + 1) > 1.2 * s.recent_weekly_units
          THEN concat(ne.next_event_name, ' in ', ne.weeks_to_next_event, CASE WHEN ne.weeks_to_next_event = 1 THEN ' week' ELSE ' weeks' END) END,
