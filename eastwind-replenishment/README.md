@@ -44,13 +44,21 @@ them from `/api/whoami` to word its hints. Counts are for the 31 Aug 2026 order 
 The two swing rules skip orders under `minCasesForSwing` (2) cases. A line can match several rules: in total
 **231 lines (15%) need review and 1,330 (85%) are routine** ($1.72M at cost). Raise a threshold to show fewer lines.
 
-**Bulk accept** (`POST /api/recommendations/bulk-accept`, used by _Accept all routine_ and _Accept selected_) runs in
-one transaction and applies the single-line rules to each line: verified identity, the caller's scope (403 per line),
-the line exists (404), it has something to order (422) and the version the client saw is still current (409, also
-when someone else decided the line a moment earlier). Each accepted line gets its own `order_decisions` row and
-`decision_events` row with `decision_source = 'bulk'`. Lines that fail are returned one by one and listed in the
-dialog, never dropped. The response is 200 when every line was accepted, 207 when some were not, 403 when none are in
-the caller's scope; an empty or duplicate selection is 400 and a missing identity 401.
+**Accept all routine** (`POST /api/recommendations/accept-routine`) never takes line ids from the browser. The client
+sends only the filters plus the count and snapshot it showed in the confirmation (from `GET .../routine`, which
+returns counts and a fingerprint of the set, not ids). The server recomputes the pending routine set from
+`EXCEPTION_RULES` inside the caller's verified scope; if its count or snapshot differs from what the user saw (a
+reload, someone else's decision, a different scope), it answers 409 `ROUTINE_CHANGED` with both counts and saves
+nothing. Ids injected into the body are ignored, so exception lines cannot be accepted this way and a caller cannot
+reach outside their scope.
+
+**Accept selected** (`POST /api/recommendations/bulk-accept`, the ticked Needs review lines) sends ids with the version
+each row showed. Both paths run in one transaction and apply the single-line rules to each line: verified identity,
+the caller's scope (403 per line), the line exists (404), it has something to order (422) and the version the client
+saw is still current (409, also when someone else decided the line a moment earlier). Each accepted line gets its own
+`order_decisions` row and `decision_events` row with `decision_source = 'bulk'`. Lines that fail are returned one by
+one and listed in the dialog, never dropped. The response is 200 when every line was accepted, 207 when some were
+not, 403 when none are in the caller's scope; an empty or duplicate selection is 400 and a missing identity 401.
 
 `stockout_risk = HIGH` is shown as **Order needed**: stock on hand plus inbound is below the expected demand until the
 next delivery, so the line needs an order to avoid a stockout. It does not mean a stockout is already likely.
@@ -75,7 +83,8 @@ next delivery, so the line needs an order to avoid a stockout. It does not mean 
 The server also runs one warehouse query of its own (`LAST_YEAR_COVER_SQL` in `server/routes/exceptions.ts`, over
 `gold.replenishment_recommendations_current` and `gold.demand_forecasts`) to copy last year's festival-aligned demand
 per line into Lakebase `replenishment.line_context`. It runs at startup and whenever `serving.recommendations` is
-reloaded (checked every 5 minutes). The app service principal needs `USE CATALOG` / `USE SCHEMA` and `SELECT` on these
+reloaded (checked every 5 minutes). The warehouse answer is validated before anything is written: an empty, missing
+or malformed result fails the refresh and the previous rows stay; a valid set replaces them in one transaction. The app service principal needs `USE CATALOG` / `USE SCHEMA` and `SELECT` on these
 Gold tables.
 
 ### Lakebase (`server/routes/replenishment-routes.ts`)
@@ -95,17 +104,18 @@ to `order_decisions` and `decision_events`, and creates `line_context`. The Gold
 
 ### API
 
-| Route                                    | What it does                                                                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/whoami`                        | Verified user, resolved planning scope and the exception thresholds                                                                                    |
-| `GET /api/filters`                       | Regions, categories and stores inside the caller's scope                                                                                               |
-| `GET /api/recommendations/summary`       | KPI counts and values for the filters                                                                                                                  |
-| `GET /api/recommendations/by-store`      | Top 10 stores by order need                                                                                                                            |
-| `GET /api/recommendations`               | Paged queue. Filters: region, channel, category, location, risk, status, search, peakOnly, `segment` (`EXCEPTIONS` grouped by store, `ROUTINE`, `ALL`) |
-| `GET /api/recommendations/routine`       | Pending routine lines in scope + filters (what _Accept all routine_ submits)                                                                           |
-| `POST /api/recommendations/bulk-accept`  | `{items: [{id, expectedVersion}]}` (1-2,000) returns 200, 207 (per-line 403/404/409/422 listed), 403 (none in scope), 400, 401                         |
-| `GET /api/recommendations/:id`           | Line detail and audit trail                                                                                                                            |
-| `POST /api/recommendations/:id/decision` | `{status, finalUnits?, reason?, expectedVersion}` returns 201/200, 400 (validation), 403 (out of scope), 404, or 409 (stale version)                   |
+| Route                                      | What it does                                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/whoami`                          | Verified user, resolved planning scope and the exception thresholds                                                                                    |
+| `GET /api/filters`                         | Regions, categories and stores inside the caller's scope                                                                                               |
+| `GET /api/recommendations/summary`         | KPI counts and values for the filters                                                                                                                  |
+| `GET /api/recommendations/by-store`        | Top 10 stores by order need                                                                                                                            |
+| `GET /api/recommendations`                 | Paged queue. Filters: region, channel, category, location, risk, status, search, peakOnly, `segment` (`EXCEPTIONS` grouped by store, `ROUTINE`, `ALL`) |
+| `GET /api/recommendations/routine`         | Count, units, value and snapshot of the pending routine lines in scope + filters (no ids)                                                              |
+| `POST /api/recommendations/accept-routine` | `{filters, expected: {count, snapshot}}`; server recomputes the set; 200, 207, 409 `ROUTINE_CHANGED` (nothing saved), 400, 401                         |
+| `POST /api/recommendations/bulk-accept`    | `{items: [{id, expectedVersion}]}` (1-2,000) returns 200, 207 (per-line 403/404/409/422 listed), 403 (none in scope), 400, 401                         |
+| `GET /api/recommendations/:id`             | Line detail and audit trail                                                                                                                            |
+| `POST /api/recommendations/:id/decision`   | `{status, finalUnits?, reason?, expectedVersion}` returns 201/200, 400 (validation), 403 (out of scope), 404, or 409 (stale version)                   |
 
 ### Identity
 
@@ -136,22 +146,22 @@ At startup the app seeds, idempotently (`ON CONFLICT DO NOTHING`):
   (store L0022)
 
 **Add a network-wide analyst or evaluator** with a one-line change: append their workspace email to
-`REPLENISHMENT_ANALYSTS` in `app.yaml` (comma-separated), then redeploy.
+`REPLENISHMENT_ANALYSTS` in `app.yaml` (comma-separated, keeping the emails already listed), then redeploy.
 
 ```yaml
 - name: REPLENISHMENT_ANALYSTS
-  value: 'darren.wee@databricks.com,evaluator@example.com'
+  value: '<email1>,<email2>'
 ```
 
 Removing an email from the list does not revoke access; delete the row (below). Without a deploy, grant directly:
 
 ```sql
 -- Grant another analyst network-wide access, or limit a store manager to a region plus one store
-INSERT INTO replenishment.user_scope (user_email, region, note) VALUES ('analyst@example.com', '*', 'Planner');
-INSERT INTO replenishment.user_scope (user_email, region) VALUES ('manager@example.com', 'North');
-INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('manager@example.com', 'L0022');
+INSERT INTO replenishment.user_scope (user_email, region, note) VALUES ('<email>', '*', 'Planner');
+INSERT INTO replenishment.user_scope (user_email, region) VALUES ('<email>', 'North');
+INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('<email>', 'L0022');
 -- Revoke
-DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('manager@example.com');
+DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('<email>');
 ```
 
 The warehouse charts show aggregated history and forecasts and run as the app service principal. To restrict those

@@ -254,10 +254,11 @@ export interface RoutinePending {
   truncated: boolean;
   units: number;
   valueAtCost: number;
-  items: BulkItem[];
+  /** Fingerprint of the exact routine set; sent back on confirm so the server can detect a change. */
+  snapshot: string;
 }
 
-/** Pending routine lines in your scope + filters, exactly as "Accept all routine" will submit them. */
+/** Count, units, value and snapshot of the pending routine lines in your scope + filters (no line ids). */
 export function fetchRoutinePending(filters: ScopeFilters) {
   return request<RoutinePending>(`/api/recommendations/routine?${query(filters)}`);
 }
@@ -282,11 +283,26 @@ export interface BulkOutcome {
  * Accept many lines at their recommended quantity. Answers 200 (all accepted), 207 (some lines refused, listed per
  * line) or 403 (none in your scope) with the same body, so partial results are never lost.
  */
-export async function bulkAccept(items: BulkItem[]): Promise<BulkOutcome> {
-  const res = await fetch('/api/recommendations/bulk-accept', {
+export function bulkAccept(items: BulkItem[]): Promise<BulkOutcome> {
+  return postBulk('/api/recommendations/bulk-accept', { items });
+}
+
+/**
+ * Accept every pending routine line for these filters. The server recomputes the set inside your scope and only
+ * proceeds if it still matches the count + snapshot you confirmed; otherwise it answers 409 and saves nothing.
+ */
+export function acceptRoutine(
+  filters: ScopeFilters,
+  expected: { count: number; snapshot: string }
+): Promise<BulkOutcome> {
+  return postBulk('/api/recommendations/accept-routine', { filters, expected });
+}
+
+async function postBulk(url: string, payload: unknown): Promise<BulkOutcome> {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify(payload),
   });
   const body: unknown = await res.json().catch(() => ({}));
   if (typeof body === 'object' && body !== null && 'results' in body && Array.isArray(body.results)) {

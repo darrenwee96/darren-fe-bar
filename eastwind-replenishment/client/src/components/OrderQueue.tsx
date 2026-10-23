@@ -281,7 +281,17 @@ export function OrderQueue({
         onChanged();
         return;
       }
-      setBulk({ kind: 'routine', items: routine.items, units: routine.units, valueAtCost: routine.valueAtCost });
+      if (routine.truncated) {
+        setNotice({ tone: 'error', text: 'Too many routine lines to accept at once; narrow the filters first.' });
+        return;
+      }
+      setBulk({
+        kind: 'routine',
+        filters,
+        expected: { count: routine.count, snapshot: routine.snapshot },
+        units: routine.units,
+        valueAtCost: routine.valueAtCost,
+      });
     } catch (e) {
       setNotice({ tone: 'error', text: e instanceof Error ? e.message : 'Could not load routine lines' });
     } finally {
@@ -636,6 +646,7 @@ export function OrderQueue({
           setSelected(new Map());
           onChanged();
         }}
+        onStale={onChanged}
       />
     </Panel>
   );

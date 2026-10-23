@@ -13,18 +13,31 @@ import {
   Spinner,
 } from '@databricks/appkit-ui/react';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
-import { bulkAccept, type BulkItem, type BulkLineResult, type BulkOutcome } from '../lib/api';
+import {
+  acceptRoutine,
+  ApiError,
+  bulkAccept,
+  type BulkItem,
+  type BulkLineResult,
+  type BulkOutcome,
+  type ScopeFilters,
+} from '../lib/api';
 import { formatInt, formatUsd } from '../lib/format';
 
-export interface BulkRequest {
-  /** "routine" = Accept all routine; "selected" = the lines ticked in Needs review. */
-  kind: 'routine' | 'selected';
-  items: BulkItem[];
+interface BulkRequestBase {
   units: number;
   valueAtCost: number;
   /** Human label for a line id, used to list lines that could not be accepted. */
   labelFor?: (id: string) => string;
 }
+
+/**
+ * "routine" = Accept all routine: only the filters and the count + snapshot shown are sent; the server recomputes the
+ * set. "selected" = the lines ticked in Needs review, sent by id with the version each row showed.
+ */
+export type BulkRequest =
+  | (BulkRequestBase & { kind: 'routine'; filters: ScopeFilters; expected: { count: number; snapshot: string } })
+  | (BulkRequestBase & { kind: 'selected'; items: BulkItem[] });
 
 const WHY: Record<BulkLineResult['status'], string> = {
   200: 'Accepted',
@@ -44,12 +57,15 @@ export function BulkAcceptDialog({
   email,
   onClose,
   onDone,
+  onStale,
 }: {
   request: BulkRequest | null;
   email: string | null;
   onClose: () => void;
   /** Called after a save attempt that accepted at least one line, so panels refresh. */
   onDone: (outcome: BulkOutcome) => void;
+  /** Called when the server reports the lines changed since the user looked (nothing saved), so panels refresh. */
+  onStale: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
@@ -61,7 +77,7 @@ export function BulkAcceptDialog({
     setSaving(false);
   }, [request]);
 
-  const n = request?.items.length ?? 0;
+  const n = !request ? 0 : request.kind === 'routine' ? request.expected.count : request.items.length;
   const what = request?.kind === 'routine' ? 'routine lines' : 'selected lines';
 
   async function confirm() {
@@ -69,11 +85,15 @@ export function BulkAcceptDialog({
     setSaving(true);
     setError(null);
     try {
-      const result = await bulkAccept(request.items);
+      const result =
+        request.kind === 'routine'
+          ? await acceptRoutine(request.filters, request.expected)
+          : await bulkAccept(request.items);
       setOutcome(result);
       if (result.accepted > 0) onDone(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
+      if (e instanceof ApiError && e.status === 409) onStale();
     } finally {
       setSaving(false);
     }
@@ -133,13 +153,13 @@ export function BulkAcceptDialog({
         )}
         {error && (
           <Alert variant="destructive" className="py-2">
-            <AlertDescription>{error}. Nothing was saved.</AlertDescription>
+            <AlertDescription>{/[.!]$/.test(error) ? error : `${error}. Nothing was saved.`}</AlertDescription>
           </Alert>
         )}
 
         <AlertDialogFooter>
-          {outcome ? (
-            <Button onClick={onClose}>Done</Button>
+          {outcome || error ? (
+            <Button onClick={onClose}>{outcome ? 'Done' : 'Close'}</Button>
           ) : (
             <>
               <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>

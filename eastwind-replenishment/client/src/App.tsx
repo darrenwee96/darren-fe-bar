@@ -95,7 +95,7 @@ function NoScope({ email }: { email: string | undefined }) {
           <EmptyTitle>You don&apos;t have any stores assigned yet</EmptyTitle>
           <EmptyDescription>
             Order lines and decisions are limited to the regions or stores you plan for, and none are assigned to{' '}
-            {email ?? 'you'} yet. Ask your replenishment app admin to add you. The forecast chart below stays available.
+            {email || 'you'} yet. Ask your replenishment app admin to add you. The forecast chart below stays available.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

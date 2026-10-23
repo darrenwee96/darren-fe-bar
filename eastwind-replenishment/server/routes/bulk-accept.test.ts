@@ -4,7 +4,7 @@ import type { Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { IdentityOptions } from './identity';
 import { EXCEPTION_RULES, exceptionReasonsSql } from './exceptions';
-import { parseContextRows } from './line-context';
+import { parseContextRows, refreshLineContext } from './line-context';
 import { registerReplenishmentRoutes, type Lakebase } from './replenishment-routes';
 
 const PLANNER = 'planner@eastwind.example';
@@ -20,6 +20,8 @@ interface Rec {
   region: string;
   location_id: string;
   recommended_units: number;
+  /** No exception rule fires (what the exception SQL would compute on Lakebase). */
+  routine?: boolean;
 }
 interface Decision {
   decision_id: string;
@@ -39,7 +41,11 @@ const RECS: Rec[] = [
   { recommendation_id: 'n-3', region: 'North', location_id: 'L0021', recommended_units: 48 },
   { recommendation_id: 's-1', region: 'South', location_id: 'L0031', recommended_units: 864 },
   { recommendation_id: 'z-0', region: 'North', location_id: 'L0021', recommended_units: 0 },
+  { recommendation_id: 'r-1', region: 'North', location_id: 'L0001', recommended_units: 24, routine: true },
+  { recommendation_id: 'r-2', region: 'North', location_id: 'L0021', recommended_units: 36, routine: true },
+  { recommendation_id: 'r-3', region: 'South', location_id: 'L0031', recommended_units: 12, routine: true },
 ];
+const EXCEPTION_IDS = ['n-1', 'n-2', 'n-3', 's-1'];
 
 /**
  * Stateful in-memory Lakebase for the bulk path: recommendations, decisions and events live in arrays, and each SQL
@@ -65,6 +71,29 @@ function fakeLakebase(
   const respond = (text: string, params: unknown[] = []) => {
     calls.push({ text, params });
     if (text.includes('FROM replenishment.user_scope')) return { rows: scope[String(params[0]).toLowerCase()] ?? [] };
+    if (text.includes('cardinality(x.exception_reasons) = 0') && text.includes('ORDER BY r.recommendation_id')) {
+      // ROUTINE_PENDING_SQL: filters ($1-$4) and scope ($5-$7) applied as the SQL does.
+      const [region, , , location, restricted, regions, locations] = params as [
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+        boolean,
+        string[],
+        string[],
+      ];
+      return {
+        rows: RECS.filter(
+          (r) =>
+            r.routine &&
+            r.recommended_units > 0 &&
+            !decisions.some((d) => d.recommendation_id === r.recommendation_id) &&
+            (region === null || r.region === region) &&
+            (location === null || r.location_id === location) &&
+            (!restricted || regions.includes(r.region) || locations.includes(r.location_id))
+        ).map((r) => ({ ...r, as_of_date: '2026-08-31', value_at_cost: r.recommended_units * 10 })),
+      };
+    }
     if (text.includes('AS in_scope') && text.includes('ANY($1::text[])')) {
       const [ids, restricted, regions, locations] = params as [string[], boolean, string[], string[]];
       return {
@@ -299,19 +328,143 @@ describe('POST /api/recommendations/bulk-accept', () => {
   });
 });
 
+interface RoutineSummary {
+  count: number;
+  units: number;
+  valueAtCost: number;
+  snapshot: string;
+  items?: unknown;
+}
+
+async function routineSummary(base: string, user: string, query = '') {
+  const res = await fetch(`${base}/api/recommendations/routine${query}`, {
+    headers: { 'x-forwarded-access-token': `tok:${user}` },
+  });
+  return { status: res.status, body: (await res.json()) as RoutineSummary };
+}
+
+async function acceptRoutine(base: string, body: unknown, user = PLANNER) {
+  const res = await fetch(`${base}/api/recommendations/accept-routine`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-forwarded-access-token': `tok:${user}` },
+    body: JSON.stringify(body),
+  });
+  return {
+    status: res.status,
+    body: (await res.json()) as Outcome & { code?: string; expectedCount?: number; currentCount?: number },
+  };
+}
+
 describe('GET /api/recommendations/routine', () => {
-  it('lists pending routine lines inside the caller scope for "Accept all routine"', async () => {
+  it('summarises pending routine lines inside the caller scope and never hands out line ids', async () => {
     const { db, calls } = fakeLakebase();
     const base = await start(db);
-    const res = await fetch(`${base}/api/recommendations/routine?region=North`, {
-      headers: { 'x-forwarded-access-token': `tok:${NORTH}` },
-    });
+    const res = await routineSummary(base, NORTH, '?region=North');
     expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ count: 2, units: 60 });
+    expect(res.body.snapshot).toMatch(/^[0-9a-f]{16}$/);
+    expect(res.body.items).toBeUndefined();
     const sql = calls.find((c) => c.text.includes('ORDER BY r.recommendation_id'));
     expect(sql?.text).toContain('cardinality(x.exception_reasons) = 0');
     expect(sql?.text).toContain('d.decision_status IS NULL');
     // Filters, then the server-side scope ($5-$7).
     expect(sql?.params).toEqual(['North', null, null, null, true, ['North'], []]);
+  });
+});
+
+describe('POST /api/recommendations/accept-routine (server-side routine set)', () => {
+  it('accepts exactly the routine set the server computes, as bulk decisions (200)', async () => {
+    const { db, decisions, events } = fakeLakebase();
+    const base = await start(db);
+    const seen = (await routineSummary(base, PLANNER)).body;
+    expect(seen.count).toBe(3);
+    const res = await acceptRoutine(base, { filters: {}, expected: { count: seen.count, snapshot: seen.snapshot } });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ requested: 3, accepted: 3, acceptedUnits: 72 });
+    expect(decisions.map((d) => d.recommendation_id).sort()).toEqual(['r-1', 'r-2', 'r-3']);
+    expect(events).toHaveLength(3);
+  });
+
+  it('ignores line ids injected into the request: exception lines are never accepted through routine mode', async () => {
+    const { db, decisions } = fakeLakebase();
+    const base = await start(db);
+    const seen = (await routineSummary(base, PLANNER)).body;
+    const res = await acceptRoutine(base, {
+      filters: {},
+      expected: { count: seen.count, snapshot: seen.snapshot },
+      items: EXCEPTION_IDS.map((id) => ({ id, expectedVersion: null })),
+      ids: EXCEPTION_IDS,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.results.map((r) => r.id).sort()).toEqual(['r-1', 'r-2', 'r-3']);
+    expect(decisions.some((d) => EXCEPTION_IDS.includes(d.recommendation_id))).toBe(false);
+  });
+
+  it('cannot widen scope: a region manager only ever accepts routine lines in their own region', async () => {
+    const { db, calls, decisions } = fakeLakebase();
+    const base = await start(db);
+    // Asking for another region inside the caller's scope finds nothing to accept.
+    const south = (await routineSummary(base, NORTH, '?region=South')).body;
+    expect(south.count).toBe(0);
+    // Replaying the network-wide planner's snapshot (which includes South) is refused as a changed set.
+    const planner = (await routineSummary(base, PLANNER)).body;
+    const replay = await acceptRoutine(
+      base,
+      { filters: {}, expected: { count: planner.count, snapshot: planner.snapshot } },
+      NORTH
+    );
+    expect(replay.status).toBe(409);
+    expect(replay.body).toMatchObject({ code: 'ROUTINE_CHANGED', expectedCount: 3, currentCount: 2 });
+    expect(decisions).toHaveLength(0);
+    // Their own snapshot accepts only the North routine lines, and the SQL carried their scope.
+    const own = (await routineSummary(base, NORTH)).body;
+    const res = await acceptRoutine(
+      base,
+      { filters: {}, expected: { count: own.count, snapshot: own.snapshot } },
+      NORTH
+    );
+    expect(res.status).toBe(200);
+    expect(decisions.map((d) => d.recommendation_id).sort()).toEqual(['r-1', 'r-2']);
+    const routineSql = calls.filter((c) => c.text.includes('cardinality(x.exception_reasons) = 0')).reverse()[0];
+    expect(routineSql?.params.slice(4)).toEqual([true, ['North'], []]);
+  });
+
+  it('reports a changed set (409) and saves nothing when the lines changed after the user looked', async () => {
+    const { db, decisions, events } = fakeLakebase();
+    const base = await start(db);
+    const seen = (await routineSummary(base, PLANNER)).body;
+    // Another planner decides r-2 in the meantime.
+    decisions.push({
+      decision_id: 'd-x',
+      recommendation_id: 'r-2',
+      decision_status: 'REJECTED',
+      final_order_units: 0,
+      version: 1,
+    });
+    const res = await acceptRoutine(base, { filters: {}, expected: { count: seen.count, snapshot: seen.snapshot } });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ code: 'ROUTINE_CHANGED', expectedCount: 3, currentCount: 2 });
+    expect(res.body.error).toContain('Nothing was saved');
+    expect(decisions).toHaveLength(1);
+    expect(events).toHaveLength(0);
+    // Same count but a different set (a swap) is caught by the snapshot, not only by the count.
+    const swapped = await acceptRoutine(base, { filters: {}, expected: { count: 2, snapshot: seen.snapshot } });
+    expect(swapped.status).toBe(409);
+  });
+
+  it('rejects a missing or malformed snapshot / count (400) and an unauthenticated caller (401)', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    expect((await acceptRoutine(base, { filters: {} })).status).toBe(400);
+    expect((await acceptRoutine(base, { expected: { count: 0, snapshot: 'abcdefabcdefabcd' } })).status).toBe(400);
+    expect((await acceptRoutine(base, { expected: { count: 3, snapshot: 'not-a-hash' } })).status).toBe(400);
+    const unauth = await fetch(`${base}/api/recommendations/accept-routine`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-email': PLANNER },
+      body: JSON.stringify({ expected: { count: 3, snapshot: 'abcdefabcdefabcd' } }),
+    });
+    expect(unauth.status).toBe(401);
+    expect(calls.some((c) => c.text.includes('INSERT'))).toBe(false);
   });
 });
 
@@ -325,19 +478,88 @@ describe('exception rules', () => {
     expect(() => exceptionReasonsSql({ ...EXCEPTION_RULES, highOrderValue: Number.NaN })).toThrow();
   });
 
-  it('parses warehouse rows for line_context, skipping rows without an id', () => {
+  it('parses well-formed warehouse rows for line_context', () => {
     expect(
       parseContextRows({
         data: [
           { recommendation_id: 'a', forecast_run_id: 'run', last_year_cover_units: '42.5' },
           { recommendation_id: 'b', forecast_run_id: 'run', last_year_cover_units: null },
-          { forecast_run_id: 'run', last_year_cover_units: '1' },
         ],
       })
     ).toEqual([
       { recommendation_id: 'a', forecast_run_id: 'run', last_year_cover_units: 42.5 },
       { recommendation_id: 'b', forecast_run_id: 'run', last_year_cover_units: null },
     ]);
-    expect(parseContextRows(undefined)).toEqual([]);
+  });
+
+  it('rejects an empty, missing or malformed warehouse result as a whole', () => {
+    expect(() => parseContextRows(undefined)).toThrow();
+    expect(() => parseContextRows({})).toThrow();
+    expect(() => parseContextRows({ data: [] })).toThrow();
+    expect(() =>
+      parseContextRows({
+        data: [{ recommendation_id: 'a', last_year_cover_units: '1' }, { last_year_cover_units: '1' }],
+      })
+    ).toThrow(/row 1 has no recommendation_id/);
+    expect(() => parseContextRows({ data: [{ recommendation_id: 'a', last_year_cover_units: 'abc' }] })).toThrow();
+  });
+});
+
+describe('line_context refresh', () => {
+  /** Lakebase with existing context rows; records every statement so a DELETE can be detected. */
+  function contextDb() {
+    let rows = [{ recommendation_id: 'old', last_year_cover_units: 10 }];
+    const statements: string[] = [];
+    let pending: typeof rows | null = null;
+    const run = (text: string, params: unknown[] = []) => {
+      statements.push(text);
+      if (text === 'BEGIN') pending = [...rows];
+      if (text.startsWith('DELETE FROM replenishment.line_context')) pending = [];
+      if (text.includes('INSERT INTO replenishment.line_context')) {
+        const [ids, , units] = params as [string[], unknown[], number[]];
+        pending = [
+          ...(pending ?? []),
+          ...ids.map((id, i) => ({ recommendation_id: id, last_year_cover_units: units[i] })),
+        ];
+      }
+      if (text === 'COMMIT' && pending) rows = pending;
+      if (text === 'ROLLBACK') pending = null;
+      return Promise.resolve({ rows: [] });
+    };
+    const db: Lakebase = {
+      query: (t, p) => run(t, p),
+      pool: { connect: () => Promise.resolve({ query: (t: string, p?: unknown[]) => run(t, p), release: () => {} }) },
+    };
+    return { db, statements, rows: () => rows };
+  }
+
+  it('keeps the existing rows when the warehouse returns nothing, an empty set or a malformed result', async () => {
+    for (const answer of [undefined, null, {}, { data: [] }, { data: [{ forecast_run_id: 'run' }] }]) {
+      const ctx = contextDb();
+      await expect(refreshLineContext(ctx.db, { query: () => Promise.resolve(answer) })).rejects.toThrow();
+      expect(ctx.rows()).toEqual([{ recommendation_id: 'old', last_year_cover_units: 10 }]);
+      expect(ctx.statements.some((t) => t.startsWith('DELETE'))).toBe(false);
+    }
+  });
+
+  it('keeps the existing rows when the warehouse call itself fails', async () => {
+    const ctx = contextDb();
+    await expect(
+      refreshLineContext(ctx.db, { query: () => Promise.reject(new Error('warehouse down')) })
+    ).rejects.toThrow('warehouse down');
+    expect(ctx.rows()).toHaveLength(1);
+    expect(ctx.statements).toHaveLength(0);
+  });
+
+  it('replaces the rows in one transaction when the new set is well-formed', async () => {
+    const ctx = contextDb();
+    const written = await refreshLineContext(ctx.db, {
+      query: () =>
+        Promise.resolve({ data: [{ recommendation_id: 'new', forecast_run_id: 'run', last_year_cover_units: '7' }] }),
+    });
+    expect(written).toBe(1);
+    expect(ctx.rows()).toEqual([{ recommendation_id: 'new', last_year_cover_units: 7 }]);
+    expect(ctx.statements[0]).toBe('BEGIN');
+    expect(ctx.statements[ctx.statements.length - 1]).toBe('COMMIT');
   });
 });

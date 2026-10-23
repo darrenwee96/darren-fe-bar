@@ -17,6 +17,7 @@
 // any selection of lines, can be accepted in bulk; every line still gets its own decision row, audit event, version
 // check and scope check, and the response reports each line that could not be accepted.
 
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Application, Response } from 'express';
 import { EXCEPTION_RULES, exceptionReasonsSql } from './exceptions';
@@ -324,11 +325,57 @@ const BY_STORE_SQL = `
 
 /** Pending routine lines in scope + filters: what "Accept all routine" will submit, line by line. */
 const ROUTINE_PENDING_SQL = `
-  SELECT r.recommendation_id, r.recommended_units, r.recommended_units * r.unit_cost AS value_at_cost
+  SELECT r.recommendation_id, r.as_of_date::text AS as_of_date, r.recommended_units,
+         r.recommended_units * r.unit_cost AS value_at_cost
   ${LINES_FROM}
   WHERE ${FILTER_SQL} AND ${IS_ROUTINE} AND d.decision_status IS NULL
   ORDER BY r.recommendation_id
   LIMIT ${BULK_MAX_LINES + 1}`;
+
+/**
+ * "Accept all routine" sends only the filters plus the count and snapshot it showed the user; the server works out the
+ * routine set itself (exception rules, caller's verified scope) and never reads line ids from the client.
+ */
+const AcceptRoutineBody = z.object({
+  filters: ScopeFilters.default({}),
+  expected: z.object({
+    count: z.number().int().min(1, 'There are no routine lines to accept'),
+    snapshot: z.string().regex(/^[0-9a-f]{16}$/, 'Invalid routine snapshot'),
+  }),
+});
+
+export interface RoutineSet {
+  ids: string[];
+  count: number;
+  truncated: boolean;
+  units: number;
+  valueAtCost: number;
+  /** Fingerprint of exactly which lines are routine and pending (order week + sorted ids). */
+  snapshot: string;
+}
+
+/** The pending routine lines in the caller's scope + filters, computed from EXCEPTION_RULES on the server. */
+export async function routineSet(
+  db: Lakebase,
+  filters: z.infer<typeof ScopeFilters>,
+  scope: Scope
+): Promise<RoutineSet> {
+  const { rows } = await db.query(ROUTINE_PENDING_SQL, filterParams(filters, scope));
+  const lines = rows.slice(0, BULK_MAX_LINES);
+  const ids = lines.map((r) => String(r.recommendation_id)).sort();
+  const week = lines.length > 0 ? String(lines[0].as_of_date) : '';
+  return {
+    ids,
+    count: ids.length,
+    truncated: rows.length > BULK_MAX_LINES,
+    units: lines.reduce((sum, r) => sum + Number(r.recommended_units), 0),
+    valueAtCost: lines.reduce((sum, r) => sum + Number(r.value_at_cost), 0),
+    snapshot: createHash('sha256')
+      .update(`${week}|${ids.join(',')}`)
+      .digest('hex')
+      .slice(0, 16),
+  };
+}
 
 const OPTIONS_SQL = `
   SELECT DISTINCT r.location_id, r.location_name, r.region, r.channel_type, r.category
@@ -488,19 +535,59 @@ export function registerReplenishmentRoutes(
     }
     try {
       const scope = await resolveScope(db, userOf(res));
-      const { rows } = await db.query(ROUTINE_PENDING_SQL, filterParams(parsed.data, scope));
-      const lines = rows.slice(0, BULK_MAX_LINES);
+      const set = await routineSet(db, parsed.data, scope);
+      // Counts + snapshot only: the ids stay on the server, which recomputes them when the user confirms.
       res.json({
-        count: lines.length,
-        truncated: rows.length > BULK_MAX_LINES,
-        units: lines.reduce((sum, r) => sum + Number(r.recommended_units), 0),
-        valueAtCost: lines.reduce((sum, r) => sum + Number(r.value_at_cost), 0),
-        // Pending lines have no decision yet, so each is submitted expecting no prior version.
-        items: lines.map((r) => ({ id: String(r.recommendation_id), expectedVersion: null })),
+        count: set.count,
+        truncated: set.truncated,
+        units: set.units,
+        valueAtCost: set.valueAtCost,
+        snapshot: set.snapshot,
       });
     } catch (err) {
       console.error('Failed to list routine lines:', err);
       res.status(servingUnavailable(err) ? 503 : 500).json({ error: unavailable(err, 'Failed to list routine lines') });
+    }
+  });
+
+  app.post('/api/recommendations/accept-routine', auth, async (req, res) => {
+    const parsed = AcceptRoutineBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+      return;
+    }
+    const { filters, expected } = parsed.data;
+    const user = userOf(res);
+    try {
+      const scope = await resolveScope(db, user);
+      const current = await routineSet(db, filters, scope);
+      if (current.truncated) {
+        res.status(400).json({ error: `More than ${BULK_MAX_LINES} routine lines; narrow the filters first` });
+        return;
+      }
+      if (current.snapshot !== expected.snapshot || current.count !== expected.count) {
+        // The data changed since the user confirmed (a reload, someone else's decision, a new rule result):
+        // accept nothing and say so, rather than accepting a set the user never saw.
+        res.status(409).json({
+          error: `The routine lines changed since you looked (you saw ${expected.count}, there are now ${current.count}). Nothing was saved; review and try again.`,
+          code: 'ROUTINE_CHANGED',
+          expectedCount: expected.count,
+          currentCount: current.count,
+        });
+        return;
+      }
+      // Pending lines have no decision yet, so each is accepted expecting no prior version; bulkAccept re-checks
+      // scope and version per line inside its transaction.
+      const outcome = await bulkAccept(
+        db,
+        user,
+        scope,
+        current.ids.map((id) => ({ id, expectedVersion: null }))
+      );
+      res.status(outcome.accepted === outcome.requested ? 200 : 207).json(outcome);
+    } catch (err) {
+      console.error('Failed to accept routine lines:', err);
+      res.status(500).json({ error: 'Failed to save decisions; nothing was saved' });
     }
   });
 
