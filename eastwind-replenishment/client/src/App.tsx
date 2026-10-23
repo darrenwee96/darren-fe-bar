@@ -43,7 +43,7 @@ function Header({ email, summary }: { email: string | null; summary: Summary | n
       <div className="flex min-w-0 items-center gap-2.5">
         <div
           aria-hidden
-          className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#1b3139] text-[13px] font-bold text-white dark:bg-[#eeede9] dark:text-[#0b2026]"
+          className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground"
         >
           E
           <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-lava ring-2 ring-card" />
