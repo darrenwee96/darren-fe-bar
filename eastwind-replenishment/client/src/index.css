@@ -1,121 +1,165 @@
 @import '@databricks/appkit-ui/styles.css';
 
 /*
- * Eastwind control-panel theme. Cool ink neutrals, one blue accent (forecast / primary actions) and a reserved
- * status set (critical / warning / good) used only for order status, always with an icon + label.
- * Validated with the dataviz palette validator: forecast blue vs last-year gray CVD ΔE 15.8 light / 15.6 dark;
- * critical vs warning ΔE 24.4 (warning is sub-3:1 on light by design and always carries a label).
+ * Eastwind control-panel theme on the Databricks brand: warm oat surfaces, navy ink, one lava accent (brand mark,
+ * focus, the selected tab), restrained 8-12px radii and soft navy-tinted shadows. DM Sans with tabular figures.
+ *
+ * Colour jobs (dataviz method):
+ *   - Chart series follow IBCS scenario notation: actual = navy ink, last year = warm gray, forecast = Databricks
+ *     blue (dashed) with its p90 band in the same hue. Validated with the dataviz validator: forecast vs last year
+ *     CVD ΔE 23.0 light / 17.3 dark, all >= 3:1 against the surface.
+ *   - Status colours are reserved for risk (critical / warning / good) and always ship with an icon + label.
+ *     Critical vs warning CVD ΔE 22.5 light / 16.3 dark; warning amber is under 3:1 on light by design, so it never
+ *     carries meaning without its label.
  * Light is :root; dark applies with the .dark class (theme toggle) or the OS setting unless .light is set.
  */
+
+@font-face {
+  font-family: 'DM Sans';
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/dm-sans-regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/dm-sans-medium.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-weight: 600 700;
+  font-display: swap;
+  src: url('/fonts/dm-sans-bold.ttf') format('truetype');
+}
+
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.982 0.004 255);
-  --foreground: oklch(0.22 0.025 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.025 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.025 260);
-  --primary: #1c5cab;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.955 0.008 255);
-  --secondary-foreground: oklch(0.26 0.03 260);
-  --muted: oklch(0.96 0.006 255);
-  --muted-foreground: oklch(0.5 0.02 260);
-  --accent: oklch(0.95 0.015 255);
-  --accent-foreground: oklch(0.26 0.03 260);
-  --destructive: #c53030;
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: #0b8a0b;
-  --success-foreground: oklch(1 0 0);
-  --warning: #fab219;
-  --warning-foreground: oklch(0.25 0.04 70);
-  --border: oklch(0.915 0.008 255);
-  --input: oklch(0.89 0.01 255);
-  --ring: #2a78d6;
+  --radius: 0.625rem;
+  --background: #f9f7f4;
+  --foreground: #1b3139;
+  --card: #ffffff;
+  --card-foreground: #1b3139;
+  --popover: #ffffff;
+  --popover-foreground: #1b3139;
+  --primary: #1b3139;
+  --primary-foreground: #ffffff;
+  --secondary: #eeede9;
+  --secondary-foreground: #1b3139;
+  --muted: #f3f1ed;
+  --muted-foreground: #5a5755;
+  --accent: #eeede9;
+  --accent-foreground: #1b3139;
+  --destructive: #bd2b26;
+  --destructive-foreground: #ffffff;
+  --success: #00875c;
+  --success-foreground: #ffffff;
+  --warning: #e69b00;
+  --warning-foreground: #3a2a00;
+  --border: #e4e2dd;
+  --input: #d9d6d0;
+  --ring: #ff3621;
 
-  --status-critical: #d03b3b;
-  --status-warning: #fab219;
-  --status-good: #0ca30c;
-  --series-forecast: #2a78d6;
-  --series-reference: #8a8984;
+  --brand-lava: #ff3621;
+  --shadow-card: 0 1px 2px rgba(27, 49, 57, 0.05), 0 1px 3px rgba(27, 49, 57, 0.07);
 
-  --chart-cat-1: #2a78d6;
-  --chart-axis-label: hsla(230, 8%, 46%, 1);
-  --chart-axis-title: hsla(230, 25%, 16%, 1);
-  --chart-grid: hsla(230, 15%, 92%, 1);
-  --chart-tooltip-bg: hsla(0, 0%, 100%, 1);
+  --status-critical: #bd2b26;
+  --status-warning: #e69b00;
+  --status-good: #00a972;
+  --series-actual: #1b3139;
+  --series-forecast: #4359ff;
+  --series-reference: #8a8580;
+
+  --chart-cat-1: #4359ff;
+  --chart-axis-label: #5a5755;
+  --chart-axis-title: #1b3139;
+  --chart-grid: #ebe8e3;
+  --chart-tooltip-bg: #ffffff;
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.165 0.012 260);
-  --foreground: oklch(0.95 0.005 260);
-  --card: oklch(0.205 0.014 260);
-  --card-foreground: oklch(0.95 0.005 260);
-  --popover: oklch(0.225 0.014 260);
-  --popover-foreground: oklch(0.95 0.005 260);
-  --primary: #3987e5;
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.27 0.016 260);
-  --secondary-foreground: oklch(0.95 0.005 260);
-  --muted: oklch(0.25 0.014 260);
-  --muted-foreground: oklch(0.72 0.015 260);
-  --accent: oklch(0.28 0.02 260);
-  --accent-foreground: oklch(0.95 0.005 260);
-  --destructive: #e66767;
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: #3cc23c;
-  --success-foreground: oklch(0.15 0 0);
-  --warning: #fab219;
-  --warning-foreground: oklch(0.2 0.04 70);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: #3987e5;
+  --background: #0b2026;
+  --foreground: #eeede9;
+  --card: #132a31;
+  --card-foreground: #eeede9;
+  --popover: #17323a;
+  --popover-foreground: #eeede9;
+  --primary: #eeede9;
+  --primary-foreground: #0b2026;
+  --secondary: #1d3a42;
+  --secondary-foreground: #eeede9;
+  --muted: #183139;
+  --muted-foreground: #b3aea8;
+  --accent: #1d3a42;
+  --accent-foreground: #eeede9;
+  --destructive: #f0645a;
+  --destructive-foreground: #0b2026;
+  --success: #42ba91;
+  --success-foreground: #0b2026;
+  --warning: #ffb833;
+  --warning-foreground: #2a1f00;
+  --border: rgba(238, 237, 233, 0.1);
+  --input: rgba(238, 237, 233, 0.16);
+  --ring: #ff5f46;
 
-  --series-forecast: #3987e5;
-  --chart-cat-1: #3987e5;
-  --chart-axis-label: hsla(230, 8%, 66%, 1);
-  --chart-axis-title: hsla(230, 20%, 95%, 1);
-  --chart-grid: hsla(0, 0%, 100%, 0.08);
-  --chart-tooltip-bg: hsla(230, 16%, 15%, 1);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --status-critical: #f0645a;
+  --status-warning: #ffb833;
+  --status-good: #42ba91;
+  --series-actual: #eeede9;
+  --series-forecast: #7d8cff;
+  --series-reference: #9a948e;
+  --chart-cat-1: #7d8cff;
+  --chart-axis-label: #b3aea8;
+  --chart-axis-title: #eeede9;
+  --chart-grid: rgba(238, 237, 233, 0.08);
+  --chart-tooltip-bg: #17323a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     color-scheme: dark;
-    --background: oklch(0.165 0.012 260);
-    --foreground: oklch(0.95 0.005 260);
-    --card: oklch(0.205 0.014 260);
-    --card-foreground: oklch(0.95 0.005 260);
-    --popover: oklch(0.225 0.014 260);
-    --popover-foreground: oklch(0.95 0.005 260);
-    --primary: #3987e5;
-    --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.27 0.016 260);
-    --secondary-foreground: oklch(0.95 0.005 260);
-    --muted: oklch(0.25 0.014 260);
-    --muted-foreground: oklch(0.72 0.015 260);
-    --accent: oklch(0.28 0.02 260);
-    --accent-foreground: oklch(0.95 0.005 260);
-    --destructive: #e66767;
-    --destructive-foreground: oklch(0.99 0 0);
-    --success: #3cc23c;
-    --success-foreground: oklch(0.15 0 0);
-    --border: oklch(1 0 0 / 9%);
-    --input: oklch(1 0 0 / 14%);
-    --ring: #3987e5;
-    --series-forecast: #3987e5;
-    --chart-cat-1: #3987e5;
-    --chart-axis-label: hsla(230, 8%, 66%, 1);
-    --chart-axis-title: hsla(230, 20%, 95%, 1);
-    --chart-grid: hsla(0, 0%, 100%, 0.08);
-    --chart-tooltip-bg: hsla(230, 16%, 15%, 1);
+    --background: #0b2026;
+    --foreground: #eeede9;
+    --card: #132a31;
+    --card-foreground: #eeede9;
+    --popover: #17323a;
+    --popover-foreground: #eeede9;
+    --primary: #eeede9;
+    --primary-foreground: #0b2026;
+    --secondary: #1d3a42;
+    --secondary-foreground: #eeede9;
+    --muted: #183139;
+    --muted-foreground: #b3aea8;
+    --accent: #1d3a42;
+    --accent-foreground: #eeede9;
+    --destructive: #f0645a;
+    --destructive-foreground: #0b2026;
+    --success: #42ba91;
+    --success-foreground: #0b2026;
+    --warning: #ffb833;
+    --warning-foreground: #2a1f00;
+    --border: rgba(238, 237, 233, 0.1);
+    --input: rgba(238, 237, 233, 0.16);
+    --ring: #ff5f46;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --status-critical: #f0645a;
+    --status-warning: #ffb833;
+    --status-good: #42ba91;
+    --series-actual: #eeede9;
+    --series-forecast: #7d8cff;
+    --series-reference: #9a948e;
+    --chart-cat-1: #7d8cff;
+    --chart-axis-label: #b3aea8;
+    --chart-axis-title: #eeede9;
+    --chart-grid: rgba(238, 237, 233, 0.08);
+    --chart-tooltip-bg: #17323a;
   }
 }
 
 body {
   font-family:
-    'Inter',
+    'DM Sans',
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -124,7 +168,6 @@ body {
     'Helvetica Neue',
     Arial,
     sans-serif;
-  font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
 }
 
@@ -134,11 +177,14 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-/* Status + series colors as Tailwind utilities (bg-critical/10, text-forecast, ...). */
+/* Status, series and brand colours as Tailwind utilities (bg-critical/10, text-forecast, shadow-card, ...). */
 @theme inline {
   --color-critical: var(--status-critical);
   --color-caution: var(--status-warning);
   --color-good: var(--status-good);
+  --color-actual: var(--series-actual);
   --color-forecast: var(--series-forecast);
   --color-reference: var(--series-reference);
+  --color-lava: var(--brand-lava);
+  --shadow-card: var(--shadow-card);
 }

@@ -22,15 +22,18 @@ import {
   useAnalyticsQuery,
 } from '@databricks/appkit-ui/react';
 import { sql } from '@databricks/appkit-ui/js';
-import { Check, Gift, History, PencilLine, Store, X } from 'lucide-react';
+import { Check, CircleAlert, Gift, History, Layers, PencilLine, Store, X } from 'lucide-react';
 import {
   ApiError,
   fetchRecommendation,
   saveDecision,
   type DecisionEvent,
   type DecisionStatus,
+  type ExceptionRules,
   type RecommendationDetail,
 } from '../lib/api';
+import { coverWeeks, EXCEPTION_LABEL, exceptionDetail, exceptionRuleText } from '../lib/exceptions';
+import { orderReasons, shortEventName } from '../lib/reasons';
 import { formatDate, formatDateTime, formatInt, formatUsd, titleCase, toNumber } from '../lib/format';
 import { STOCK_STATUS } from '../lib/risk';
 import { useNumeric } from '../lib/useNumeric';
@@ -39,6 +42,7 @@ import { DecisionBadge, ExpiryBadge, StockStatusBadge } from './StatusBadges';
 
 interface Props {
   recommendationId: string | null;
+  rules: ExceptionRules | null;
   onClose: () => void;
   onSaved: () => void;
   /** Drill the whole control panel down to this store. */
@@ -89,7 +93,12 @@ function SkuForecast({ locationId, skuId }: { locationId: string; skuId: string 
           <TableBody>
             {forecast.map((r) => (
               <TableRow key={r.week_start}>
-                <TableCell>{formatDate(r.week_start)}</TableCell>
+                <TableCell>
+                  {formatDate(r.week_start)}
+                  {r.festival && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">{shortEventName(r.festival)}</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{formatInt(r.forecast)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatInt(r.p90)}</TableCell>
                 <TableCell className="text-right tabular-nums text-muted-foreground">
@@ -112,6 +121,7 @@ function AuditTrail({ events }: { events: DecisionEvent[] }) {
           <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-primary" />
           <div className="flex flex-wrap items-center gap-x-2 text-foreground">
             <DecisionBadge status={ev.new_status} />
+            {ev.decision_source === 'bulk' && <span className="text-[11px] text-muted-foreground">bulk accept</span>}
             <span className="tabular-nums">
               {ev.previous_status ? `${formatInt(ev.previous_units)} → ` : ''}
               {formatInt(ev.new_units)} units
@@ -127,7 +137,7 @@ function AuditTrail({ events }: { events: DecisionEvent[] }) {
   );
 }
 
-export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocusStore }: Props) {
+export function RecommendationSheet({ recommendationId, rules, onClose, onSaved, onFocusStore }: Props) {
   const [detail, setDetail] = useState<RecommendationDetail | null>(null);
   const [events, setEvents] = useState<DecisionEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -192,7 +202,8 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocu
     }
   }
 
-  const leadWeeks = detail ? Math.floor(toNumber(detail.lead_time_days) / 7) + 1 : 0;
+  const leadWeeks = detail ? coverWeeks(detail.lead_time_days) : 0;
+  const reasons = orderReasons(detail?.explanation_text);
 
   return (
     <Sheet open={recommendationId !== null} onOpenChange={(open) => !open && onClose()}>
@@ -245,14 +256,46 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocu
                 <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
                   {formatInt(detail.recommended_units)} <span className="text-base font-normal">units</span>
                 </p>
-                <p className="mt-1 text-sm text-foreground">
-                  {detail.explanation_text || 'Stock covers expected demand; no change from the usual pattern.'}
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {STOCK_STATUS[detail.stockout_risk].hint}. Main forecast driver: {detail.top_driver} · model v
-                  {detail.model_version} · refreshed {formatDateTime(detail.refreshed_at)}
+                {reasons.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-sm text-foreground">
+                    {reasons.map((reason, i) => (
+                      <li key={reason} className={i === 0 ? 'font-medium' : undefined}>
+                        {reason}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-sm text-foreground">
+                    Stock covers expected demand; no change from the usual pattern.
+                  </p>
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {STOCK_STATUS[detail.stockout_risk].hint}. Model v{detail.model_version} · refreshed{' '}
+                  {formatDateTime(detail.refreshed_at)}
                 </p>
               </section>
+
+              {toNumber(detail.recommended_units) > 0 &&
+                (detail.exception_reasons.length > 0 ? (
+                  <section className="space-y-2 rounded-xl border p-4">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                      <CircleAlert className="h-4 w-4 text-destructive" aria-hidden /> Why this line needs you
+                    </h3>
+                    <ul className="space-y-1.5 text-sm">
+                      {detail.exception_reasons.map((reason) => (
+                        <li key={reason} title={exceptionRuleText(reason, rules)}>
+                          <span className="font-medium text-foreground">{EXCEPTION_LABEL[reason]}</span>
+                          <span className="text-muted-foreground"> · {exceptionDetail(reason, detail)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : (
+                  <p className="flex items-center gap-1.5 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                    <Layers className="h-4 w-4" aria-hidden /> Routine line: no exception rule fired, so it can be
+                    accepted with the other routine lines.
+                  </p>
+                ))}
 
               <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Stat label="On hand" value={formatInt(detail.on_hand_units)} />
@@ -260,6 +303,11 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocu
                 <Stat label={`Demand over ${leadWeeks} wk`} value={formatInt(detail.demand_cover_units)} />
                 <Stat label="Safety stock" value={formatInt(detail.safety_units)} />
                 <Stat label="Recent weekly sales" value={formatInt(detail.recent_weekly_units)} />
+                <Stat
+                  label="Last year, same weeks"
+                  value={detail.last_year_cover_units == null ? '—' : formatInt(detail.last_year_cover_units)}
+                  hint={`Units sold last year in the same ${leadWeeks} weeks relative to the festival`}
+                />
                 <Stat label="Lead time" value={`${formatInt(detail.lead_time_days)} days`} />
                 <Stat label="Shelf life" value={`${formatInt(detail.shelf_life_days)} days`} />
                 <Stat label="Case pack" value={`${formatInt(detail.case_pack_units)} units`} />
@@ -269,7 +317,6 @@ export function RecommendationSheet({ recommendationId, onClose, onSaved, onFocu
                   hint="Estimated sales lost before the next delivery if no order is placed"
                 />
                 <Stat label="Expected to expire" value={formatUsd(detail.est_expiry_value)} />
-                <Stat label="Cap applied" value={detail.cap_applied === 'SHELF_LIFE' ? 'Shelf life' : 'None'} />
                 <Stat
                   label="Order value at cost"
                   value={formatUsd(toNumber(detail.recommended_units) * toNumber(detail.unit_cost))}

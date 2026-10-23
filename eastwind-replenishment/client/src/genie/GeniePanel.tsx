@@ -37,7 +37,7 @@ function suggestionsFor(filters: ScopeFilters, storeName: string | undefined): s
   return [
     `Which${category} store-SKUs${where} need an order to avoid a stockout before Mid-Autumn, ranked by sales lost if not ordered?`,
     `Where did managers override the recommended order${where}, and what reasons did they give?`,
-    `Compare the model's WMAPE with the same-week-last-year baseline by channel.`,
+    `How does the 6-week forecast${where} compare with the same festival weeks last year?`,
     `What was waste as a percentage of net sales${where} over the last 13 weeks versus last year?`,
   ];
 }
@@ -163,7 +163,7 @@ export function GenieDock(props: { email: string | null; filters: ScopeFilters; 
   return (
     <aside
       aria-label="Ask Genie"
-      className="sticky top-[57px] h-[calc(100vh-57px)] w-[400px] shrink-0 border-l bg-card xl:w-[440px]"
+      className="sticky top-14 h-[calc(100vh-3.5rem)] w-[400px] shrink-0 border-l bg-card xl:w-[440px]"
     >
       <GenieContent {...props} onClose={() => setOpen(false)} />
     </aside>

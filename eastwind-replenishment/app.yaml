@@ -6,7 +6,10 @@ env:
     valueFrom: postgres
   - name: DATABRICKS_GENIE_SPACE_ID
     valueFrom: genie-space
-  # Network-wide planner scope ('*') seeded into replenishment.user_scope at startup (comma-separated emails).
-  # Everyone else is fail-closed until a row is added for them.
+  # Network-wide analysts: comma-separated workspace emails, each seeded at startup as a '*' row in
+  # replenishment.user_scope (idempotent). To add an evaluator, append their email here and redeploy, e.g.
+  #   value: 'darren.wee@databricks.com,evaluator@example.com'
+  # Removing an email does not revoke access; delete their user_scope row (see README). Everyone not listed and
+  # without a user_scope row is fail-closed: no order lines, 403 on decisions.
   - name: REPLENISHMENT_ANALYSTS
     value: 'darren.wee@databricks.com'

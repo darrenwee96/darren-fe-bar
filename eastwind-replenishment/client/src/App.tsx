@@ -1,7 +1,20 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import { useCallback, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle, Badge, Button } from '@databricks/appkit-ui/react';
-import { Clock, Lock, Moon, Sparkles, Sun, TriangleAlert } from 'lucide-react';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Badge,
+  Button,
+  Card,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@databricks/appkit-ui/react';
+import { Moon, Sparkles, Store, Sun, TriangleAlert } from 'lucide-react';
 import { ForecastPanel } from './components/ForecastPanel';
 import { FilterBar } from './components/FilterBar';
 import { KpiStrip } from './components/KpiStrip';
@@ -11,34 +24,38 @@ import { StoreNeedPanel } from './components/StoreNeedPanel';
 import { GenieDock } from './genie/GeniePanel';
 import { useGenie } from './genie/context';
 import { GenieProvider } from './genie/GenieProvider';
-import { fetchFilterOptions, fetchSummary, fetchWhoami } from './lib/api';
+import { fetchFilterOptions, fetchSummary, fetchWhoami, type Summary } from './lib/api';
 import { useGlobalFilters } from './lib/filters';
 import { formatDate, formatDateTime, titleCase } from './lib/format';
 import { useAsync } from './lib/useAsync';
 import { useTheme } from './lib/theme';
 
-function Header({ email, freshness }: { email: string | null; freshness: string | null }) {
+const HEADER_HEIGHT = 'h-14';
+
+/** One line: brand, data freshness, Genie, theme, signed-in identity. */
+function Header({ email, summary }: { email: string | null; summary: Summary | null }) {
   const { open, setOpen } = useGenie();
   const { theme, toggle } = useTheme();
   return (
-    <header className="sticky top-0 z-30 flex h-[57px] items-center gap-4 border-b bg-card/95 px-4 backdrop-blur md:px-6">
-      <div className="flex items-center gap-2.5">
+    <header
+      className={`sticky top-0 z-30 flex ${HEADER_HEIGHT} items-center gap-4 border-b bg-card/95 px-4 backdrop-blur md:px-8`}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
         <div
           aria-hidden
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#104281] text-sm font-bold text-primary-foreground shadow-sm"
+          className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#1b3139] text-[13px] font-bold text-white dark:bg-[#eeede9] dark:text-[#0b2026]"
         >
           E
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-lava ring-2 ring-card" />
         </div>
-        <div className="leading-tight">
-          <h1 className="text-[15px] font-semibold text-foreground">Eastwind Replenishment</h1>
-          <p className="text-[11px] text-muted-foreground">Demand &amp; order control panel</p>
-        </div>
+        <h1 className="truncate text-[15px] font-semibold text-foreground">Eastwind replenishment</h1>
+        {summary?.as_of_date && (
+          <p className="hidden truncate border-l pl-3 text-xs text-muted-foreground tabular-nums lg:block">
+            Order week {formatDate(summary.as_of_date)} · data loaded {formatDateTime(summary.loaded_at)} · model v
+            {summary.model_version}
+          </p>
+        )}
       </div>
-      {freshness && (
-        <Badge variant="outline" className="hidden gap-1 font-normal text-muted-foreground lg:inline-flex">
-          <Clock className="h-3 w-3" aria-hidden /> {freshness}
-        </Badge>
-      )}
       <div className="ml-auto flex items-center gap-2">
         <Button variant={open ? 'secondary' : 'outline'} size="sm" onClick={() => setOpen(!open)} aria-pressed={open}>
           <Sparkles className="mr-1 h-4 w-4" /> Ask Genie
@@ -55,7 +72,7 @@ function Header({ email, freshness }: { email: string | null; freshness: string 
         {email && (
           <Badge
             variant="secondary"
-            className="hidden max-w-[220px] truncate md:inline-flex"
+            className="hidden max-w-[220px] truncate font-normal md:inline-flex"
             title="Decisions you save are recorded under this identity"
           >
             {email}
@@ -63,6 +80,31 @@ function Header({ email, freshness }: { email: string | null; freshness: string 
         )}
       </div>
     </header>
+  );
+}
+
+/** A signed-in user with no rows in replenishment.user_scope: say so plainly instead of showing empty panels. */
+function NoScope({ email }: { email: string | undefined }) {
+  return (
+    <Card className="rounded-xl py-0 shadow-card">
+      <Empty className="py-14">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Store className="h-5 w-5" />
+          </EmptyMedia>
+          <EmptyTitle>You don&apos;t have any stores assigned yet</EmptyTitle>
+          <EmptyDescription>
+            Order lines and decisions are limited to the regions or stores you plan for, and none are assigned to{' '}
+            {email ?? 'you'} yet. Ask your replenishment app admin to add you. The forecast chart below stays available.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <p className="text-xs text-muted-foreground">
+            Access is granted per region or store in replenishment.user_scope.
+          </p>
+        </EmptyContent>
+      </Empty>
+    </Card>
   );
 }
 
@@ -85,19 +127,17 @@ function ControlPanel() {
     ([filters.region, filters.channel && titleCase(filters.channel), filters.category].filter(Boolean).join(' · ') ||
       'All stores');
   const s = summary.data;
-  const freshness = s?.as_of_date
-    ? `Order week ${formatDate(s.as_of_date)} · model v${s.model_version} · loaded ${formatDateTime(s.loaded_at)}`
-    : null;
+  const email = whoami.data?.email ?? null;
 
   return (
     <div className="min-h-screen bg-background">
-      <Header email={whoami.data?.email ?? null} freshness={freshness} />
+      <Header email={email} summary={s} />
       <div className="flex">
         <div className="min-w-0 flex-1">
-          <div className="sticky top-[57px] z-20 border-b bg-background/90 px-4 py-2.5 backdrop-blur md:px-6">
+          <div className="sticky top-14 z-20 border-b bg-background/90 px-4 py-2.5 backdrop-blur md:px-8">
             <FilterBar options={options.data} />
           </div>
-          <main className="space-y-4 p-4 md:px-6">
+          <main className="mx-auto max-w-[1680px] space-y-6 px-4 py-6 md:px-8">
             {whoami.error && (
               <Alert variant="destructive">
                 <TriangleAlert className="h-4 w-4" />
@@ -105,55 +145,58 @@ function ControlPanel() {
                 <AlertDescription>{whoami.error}</AlertDescription>
               </Alert>
             )}
-            {noScope && (
-              <Alert>
-                <Lock className="h-4 w-4" />
-                <AlertTitle>No planning scope assigned</AlertTitle>
-                <AlertDescription>
-                  Order lines and decisions are limited to the regions or stores you plan for, and none are assigned to{' '}
-                  {whoami.data?.email}. Ask an app admin to add you to replenishment.user_scope. Forecast and accuracy
-                  charts stay available.
-                </AlertDescription>
-              </Alert>
-            )}
-            {summary.error && !s && !whoami.error && (
+            {summary.error && !s && !whoami.error && !noScope && (
               <Alert variant="destructive">
                 <TriangleAlert className="h-4 w-4" />
                 <AlertTitle>Order recommendations unavailable</AlertTitle>
-                <AlertDescription>{summary.error}</AlertDescription>
+                <AlertDescription>
+                  {summary.error}. The forecast chart still works; try again in a few minutes.
+                </AlertDescription>
               </Alert>
             )}
-            <KpiStrip filters={filters} summary={s} loading={summary.loading} error={summary.error} />
+            {noScope ? (
+              <NoScope email={whoami.data?.email} />
+            ) : (
+              <KpiStrip filters={filters} summary={s} loading={summary.loading} error={summary.error} />
+            )}
             {/*
-              Charts share a row (forecast 3/5, store ranking 2/5) once the workspace is >= 1400px, else they stack, so they keep a proper aspect ratio at any
-              width, with or without the Genie dock; the queue spans the full width below. Container queries follow
+              Charts share a row (forecast 3/5, store ranking 2/5) once the workspace is >= 1100px, else they stack, so
+              they keep a proper aspect ratio at any width, with or without the Genie dock. Container queries follow
               the space actually left beside the dock.
             */}
             <div className="@container">
-              <div className="grid grid-cols-1 gap-4 @min-[1400px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <div
+                className={
+                  noScope
+                    ? 'grid grid-cols-1 gap-6'
+                    : 'grid grid-cols-1 gap-6 @min-[1100px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'
+                }
+              >
                 <ForecastPanel filters={filters} scopeLabel={scopeLabel} />
-                <StoreNeedPanel
-                  noScope={noScope}
-                  filters={filters}
-                  revision={revision}
-                  onSelect={(id) => setFilter('location', id)}
-                />
+                {!noScope && (
+                  <StoreNeedPanel filters={filters} revision={revision} onSelect={(id) => setFilter('location', id)} />
+                )}
               </div>
             </div>
-            <OrderQueue
-              noScope={noScope}
-              filters={filters}
-              revision={revision}
-              onOpen={setSelected}
-              onChanged={refresh}
-            />
+            {!noScope && (
+              <OrderQueue
+                filters={filters}
+                summary={s}
+                revision={revision}
+                rules={whoami.data?.exceptionRules ?? null}
+                email={email}
+                onOpen={setSelected}
+                onChanged={refresh}
+              />
+            )}
           </main>
         </div>
-        <GenieDock email={whoami.data?.email ?? null} filters={filters} storeName={store?.location_name} />
+        <GenieDock email={email} filters={filters} storeName={store?.location_name} />
       </div>
 
       <RecommendationSheet
         recommendationId={selected}
+        rules={whoami.data?.exceptionRules ?? null}
         onClose={() => setSelected(null)}
         onSaved={refresh}
         onFocusStore={(id) => {

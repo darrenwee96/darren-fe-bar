@@ -5,20 +5,6 @@ import type { SQLTypeMarker, SQLStringMarker, SQLNumberMarker, SQLBooleanMarker,
 
 declare module "@databricks/appkit-ui/react" {
   interface QueryRegistry {
-    accuracy_by_channel: {
-        name: "accuracy_by_channel";
-        parameters: Record<string, never>;
-        result: Array<{
-          /** @sqlType STRING */
-          segment: string;
-          /** @sqlType DOUBLE */
-          model: number;
-          /** @sqlType DOUBLE */
-          same_week_last_year: number;
-          /** @sqlType STRING */
-          model_version: string;
-        }>;
-      };
     forecast_vs_actual: {
         name: "forecast_vs_actual";
         parameters: {
@@ -46,6 +32,8 @@ declare module "@databricks/appkit-ui/react" {
           last_year: number;
           /** @sqlType STRING */
           week_start: string;
+          /** @sqlType STRING */
+          festival: string;
         }>;
       };
     waste_kpis: {

@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
 import { LineChart, useChartUITokens, useThemeColors } from '@databricks/appkit-ui/react';
+import { MarkAreaComponent, MarkLineComponent } from 'echarts/components';
+import { use as registerEcharts } from 'echarts/core';
+import { shortEventName } from '../lib/reasons';
+
+// AppKit registers only the core ECharts components; the forecast shading and festival marker need these two.
+registerEcharts([MarkAreaComponent, MarkLineComponent]);
 
 export interface ScenarioRow {
   week: string;
@@ -7,6 +13,8 @@ export interface ScenarioRow {
   forecast?: number | null;
   p90?: number | null;
   last_year: number | null;
+  /** Festival that falls in this week (e.g. "Mid-Autumn Festival 2026"), drawn as a marker. */
+  festival?: string | null;
   [key: string]: unknown;
 }
 
@@ -30,6 +38,7 @@ const compact = (v: number) =>
  * forecast = dashed accent line with its p90 band (expected → p90) as a light fill of the same hue.
  * AppKit charts draw NULL as 0, so the ECharts series are built here (ECharts leaves a gap for null) and passed
  * through `options`. The tooltip reads the source row, so it shows the true p90 even where the band is clipped.
+ * Festival weeks get a thin dashed vertical marker labelled with the festival, so the peak reads against its cause.
  */
 export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: ScenarioChartProps) {
   const ui = useChartUITokens();
@@ -40,6 +49,7 @@ export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: Sc
     const weeks = rows.map((r) => r.week);
     const forecastWeeks = rows.filter((r) => r.actual === null && r.forecast != null).map((r) => r.week);
     const hasBand = rows.some((r) => r.p90 != null && r.forecast != null);
+    const festivals = rows.filter((r) => r.festival);
     const series: Record<string, unknown>[] = [
       {
         name: 'Last year',
@@ -49,6 +59,23 @@ export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: Sc
         lineStyle: { width: 1.5, color: ui.axisLabel, opacity: 0.75 },
         itemStyle: { color: ui.axisLabel },
         z: 1,
+        markLine:
+          festivals.length > 0
+            ? {
+                silent: true,
+                symbol: 'none',
+                lineStyle: { color: ui.axisLabel, type: [3, 3], width: 1, opacity: 0.9 },
+                label: {
+                  show: true,
+                  position: 'end',
+                  color: ui.axisTitle,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  formatter: (p: { name: string }) => p.name,
+                },
+                data: festivals.map((r) => ({ name: shortEventName(r.festival ?? ''), xAxis: r.week })),
+              }
+            : undefined,
       },
       {
         name: 'Actual',
@@ -102,7 +129,14 @@ export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: Sc
         markArea: {
           silent: true,
           itemStyle: { color: ui.grid, opacity: 0.45 },
-          label: { show: true, position: 'insideTopLeft', color: ui.axisLabel, formatter: 'Forecast', fontSize: 11 },
+          label: {
+            show: true,
+            position: 'insideTopLeft',
+            color: ui.axisLabel,
+            formatter: 'Forecast',
+            fontSize: 11,
+            padding: [6, 6],
+          },
           data: [[{ xAxis: forecastWeeks[0] }, { xAxis: forecastWeeks[forecastWeeks.length - 1] }]],
         },
       });
@@ -143,7 +177,10 @@ export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: Sc
           const r = rows[params[0]?.dataIndex ?? 0];
           if (!r) return '';
           const isForecast = r.actual == null;
-          return `<div style="min-width:170px"><div style="margin-bottom:4px;font-weight:600">Week of ${r.week}</div>
+          const festival = r.festival
+            ? `<div style="margin-bottom:4px;color:${ui.axisLabel}">${shortEventName(r.festival)} week</div>`
+            : '';
+          return `<div style="min-width:170px"><div style="margin-bottom:2px;font-weight:600">Week of ${r.week}</div>${festival}
             ${row('Actual', r.actual, ui.axisTitle)}
             ${isForecast ? row('Forecast', r.forecast, accent, true) : ''}
             ${isForecast ? row('p90', r.p90, accent) : ''}
@@ -151,15 +188,16 @@ export function ScenarioChart({ rows, ariaLabel, height = 300, formatValue }: Sc
         },
       },
       legend: {
-        top: 0,
-        right: 0,
+        bottom: 0,
+        left: 0,
         icon: 'roundRect',
         itemWidth: 14,
         itemHeight: 3,
         textStyle: { color: ui.axisLabel, fontSize: 12 },
         data: ['Actual', 'Forecast', ...(hasBand ? ['p90 band'] : []), 'Last year'],
       },
-      grid: { left: 4, right: 12, top: 32, bottom: 4, containLabel: true },
+      grid: { left: 4, right: 16, top: 26, bottom: 30, containLabel: true },
+      textStyle: { fontFamily: 'DM Sans, system-ui, sans-serif' },
       series,
     };
   }, [rows, ui, accent, formatValue]);

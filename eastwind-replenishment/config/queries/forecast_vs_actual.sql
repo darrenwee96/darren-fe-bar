@@ -7,6 +7,7 @@
 -- week last year. Only the newest forecast_run_id is read, so reruns for the same as-of date never double-count.
 -- p90 is the sum of store-SKU p90s: a plan-for upper bound, not a network quantile.
 -- The forecast columns repeat the last actual week so the lines join.
+-- `festival` names the week a festival falls in (from each week's next-event countdown), for the chart marker.
 WITH run AS (
   SELECT forecast_run_id
   FROM darren_fe_bar_catalog.gold.demand_forecasts
@@ -49,7 +50,15 @@ fc AS (
     AND (:location_id = 'ALL' OR f.location_id = :location_id)
     AND (:sku_id = 'ALL' OR f.sku_id = :sku_id)
   GROUP BY f.forecast_week
-)
+),
+festival AS (
+  SELECT CAST(date_trunc('WEEK', date_add(w.week_start, w.days_from_week_start_to_next_event)) AS DATE) AS week_start,
+         max(w.next_event_name) AS festival
+  FROM darren_fe_bar_catalog.gold.weekly_demand_features w CROSS JOIN b
+  WHERE w.week_start > date_sub(b.last_week, 182) AND w.next_event_name IS NOT NULL
+  GROUP BY 1
+),
+weeks AS (
 SELECT date_format(h.week_start, 'd MMM') AS week, CAST(h.units AS DOUBLE) AS actual,
        CAST(CASE WHEN h.week_start = b.last_week THEN h.units END AS DOUBLE) AS forecast,
        CAST(CASE WHEN h.week_start = b.last_week THEN h.units END AS DOUBLE) AS p90,
@@ -59,4 +68,7 @@ UNION ALL
 SELECT date_format(week_start, 'd MMM'), CAST(NULL AS DOUBLE), CAST(round(units, 1) AS DOUBLE), CAST(round(p90, 1) AS DOUBLE),
        CAST(last_year AS DOUBLE), CAST(week_start AS STRING)
 FROM fc
-ORDER BY week_start
+)
+SELECT weeks.*, festival.festival
+FROM weeks LEFT JOIN festival ON weeks.week_start = CAST(festival.week_start AS STRING)
+ORDER BY weeks.week_start
