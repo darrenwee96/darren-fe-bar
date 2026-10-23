@@ -151,15 +151,15 @@ The forecast units come from the latest weekly run. Mid-Autumn 2026 is Sep 25. T
 
 ## Slide 7 · The app: what managers see
 
-Two crops from the live Databricks App (captured read-only on 2026-10-23), filtered to Region North:
+Two crops from the live Databricks App, captured read-only on 23 Oct 2026 and filtered to Region North:
 1. **Region North, ranked:** the Order need by store panel. North stores are ranked by sales lost if not ordered, and Zhongshan Shop is in the top ten.
-2. **Why this quantity:** the line sheet for Zhongshan Shop × Classic Lotus Mooncake Box, with its holiday-driven reason next to stock, shelf life, and cap.
+2. **Why this quantity:** the line sheet for Zhongshan Shop × Classic Lotus Mooncake Box. Mid-Autumn in 3 weeks · forecast 15.9x recent sales · model v6 · shelf life 30 days · no cap applied.
 3. **Plan for the peak:** on the same sheet, the forecast and p90 band peak before the festival, while last year's line peaks after it.
 
 **Speaker notes**
 - **TELL:** "This is the manager's Monday. I'll switch to the live app now."
 - **SHOW:** Follow the run-of-show below.
-- **TELL:** "One screen to see the risk, understand the line, and approve it. The decision buttons sit at the bottom of this sheet, and I'll use them live."
+- **TELL:** "One screen to see the risk, understand the line, and approve it. The Accept / Adjust / Reject buttons sit below this view; I'll use them live."
 
 ---
 
