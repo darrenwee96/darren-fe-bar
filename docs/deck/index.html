@@ -151,9 +151,9 @@
     </div>
     <div class="kpi">
       <span class="lab">Waste guardrail</span>
-      <span class="num">Flat</span>
-      <span class="what">Waste held within ~1% while shelves stay fuller</span>
-      <span class="proof">+$42k/yr on a $3.87M/yr base in the holiday backtest. No waste saving claimed</span>
+      <span class="num">+$42k<small>/yr</small></span>
+      <span class="what">Waste roughly flat: ~1% of the $3.87M/yr base, in the backtest</span>
+      <span class="proof">Not a saving. Waste-aware ordering is the day-60 item</span>
     </div>
     <div class="kpi">
       <span class="lab">Flagged this order week</span>
@@ -399,14 +399,14 @@
       <tbody>
         <tr><td>Forecast accuracy by channel</td><td>Beats last year’s method in every channel and both holiday seasons</td><td><span class="pill ok">Proven</span></td><td>Track live by channel</td></tr>
         <tr><td>Stockouts on peak gift SKUs</td><td>Modelled lost sales down in 6 of 6 holiday windows<span class="sub">Baseline: 18.7–21.1% of peak-gift days out</span></td><td><span class="pill part">Simulated</span></td><td>Measure in the pilot</td></tr>
-        <tr><td>Expired and marked-down value</td><td>Held flat: +$42k/yr on a $3.87M/yr base</td><td><span class="pill part">Guardrail</span></td><td>Waste-aware ordering</td></tr>
+        <tr><td>Expired and marked-down value</td><td>Roughly flat: +$42k/yr, ~1% of the $3.87M/yr base</td><td><span class="pill part">Guardrail</span></td><td>Waste-aware ordering</td></tr>
         <tr><td>Orders placed from forecast</td><td>Not measured yet: test decisions only</td><td><span class="pill no">Not yet</span></td><td>Measure in the pilot</td></tr>
       </tbody>
     </table>
     <div class="card navy" style="gap:12px;">
       <span class="lab">Holiday backtest</span>
       <span style="font-size:56px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;">6 of 6</span>
-      <span style="font-size:16px;line-height:1.45;color:#fff;">holiday windows with lower lost sales; waste within ~1%</span>
+      <span style="font-size:16px;line-height:1.45;color:#fff;">holiday windows with lower lost sales; waste roughly flat, up ~1%</span>
       <span style="font-size:12px;line-height:1.5;color:#B9C6CB;padding-top:12px;border-top:1px solid #33505A;">Mid-Autumn 2025 and Lunar New Year 2026, each in 3 channels. Simulation on synthetic data</span>
     </div>
   </div>
@@ -414,7 +414,7 @@
     <span class="lab" style="color:var(--db-lava);white-space:nowrap;">For the CIO</span>
     <span class="d" style="color:var(--db-navy);"><b>0</b> mismatched weeks, gold vs source</span>
     <span class="d" style="color:var(--db-navy);"><b>40 of 40</b> planted bad records quarantined</span>
-    <span class="d" style="color:var(--db-navy);">Forged identity and out-of-scope requests <b>refused</b></span>
+    <span class="d" style="color:var(--db-navy);"><b>Spoofed identity ignored;</b> out-of-scope decisions refused</span>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>8 / 9</span></div>
 </div></section>
@@ -427,7 +427,7 @@
   <div class="tl">
     <div class="nd"><div class="dot"></div><span class="when">Day 30</span><span class="h">Governance pack</span><span class="d">UC row filters by region, cost masks, persona groups, column comments.</span></div>
     <div class="nd"><div class="dot"></div><span class="when">Day 60</span><span class="h">Waste-aware ordering</span><span class="d">Shelf-life and waste limits in the order rule; replay a full year.</span></div>
-    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">One-region pilot</span><span class="d">Live just before Lunar New Year 2027. Managers order from the app.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">One-region pilot</span><span class="d">Timed to cover the next Lunar New Year peak. Managers order from the app.</span></div>
   </div>
   <div style="margin-top:auto;margin-bottom:8px;background:var(--db-navy);border-radius:12px;padding:24px 32px;display:grid;grid-template-columns:1fr 1.25fr;gap:32px;align-items:center;">
     <div>
@@ -438,7 +438,7 @@
       <div class="lab" style="color:#B9C6CB;">You measure</div>
       <div style="font-size:16px;line-height:1.4;color:#fff;">Peak-gift out-of-stock rate vs the 18.7–21.1% baseline</div>
       <div style="font-size:16px;line-height:1.4;color:#fff;">Share of orders placed from the forecast</div>
-      <div style="font-size:16px;line-height:1.4;color:#fff;">Waste held flat</div>
+      <div style="font-size:16px;line-height:1.4;color:#fff;">Waste vs today’s $3.87M/yr base</div>
     </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>9 / 9</span></div>

@@ -27,7 +27,7 @@ Unity Catalog governs the data and lineage, and manager decisions flow back to g
 >
 > That's about 80 stores across downtown, highway, and airport, losing $17.8M a year in sales to empty shelves. $10.3M of that is on peak gifts. In Mid-Autumn 2025, about one in five peak-gift store-days was out of stock.
 >
-> In the next 20 minutes I'll show you three things. The outcome we're targeting: $2–3M a year of those peak-gift sales back, with waste held flat. One store, one mooncake box, and one festival, from forecast to an order the manager approves in one click. And how it runs on one Databricks platform, so decisions flow straight back into the data.
+> In the next 20 minutes I'll show you three things. The outcome we're targeting: $2–3M a year of those peak-gift sales back, with waste roughly flat, about +$42k a year, ~1% of the $3.87M base, in the backtest. One store, one mooncake box, and one festival, from forecast to an order the manager approves in one click. And how it runs on one Databricks platform, so decisions flow straight back into the data.
 >
 > [VP name], I'll keep us on outcomes. [CIO name], stop me anywhere and I'll go as deep as you want."
 
@@ -44,7 +44,7 @@ For the VP Merchandising and the CIO · October 2026
 **Speaker notes**
 - **TELL:** "This is about one decision your managers make every Monday: how much to order."
 - **SHOW:** The one-liner. Lunar festivals move every year, and ordering by last year's calendar week misses them.
-- **TELL:** "Fix that one decision on peak gifts and you get sales back without buying more waste."
+- **TELL:** "Fix that one decision on peak gifts and you get sales back, with waste roughly flat, about +$42k a year, ~1% of the $3.87M base, in the backtest."
 
 ---
 
@@ -53,7 +53,7 @@ For the VP Merchandising and the CIO · October 2026
 | Tile | Value | What it means | Note |
 |---|---|---|---|
 | Lost sales recovered (target) | **$2–3M/yr** | 20–30% of the $10.3M/yr you lose on peak gifts | A target for the pilot to prove, not a result yet |
-| Waste guardrail | **Flat** | Waste held within ~1% while shelves stay fuller | +$42k/yr on a $3.87M/yr base in the holiday backtest. No waste saving claimed |
+| Waste guardrail | **+$42k/yr** | Waste roughly flat: ~1% of the $3.87M/yr base, in the backtest | Not a saving. Waste-aware ordering is the day-60 item |
 | Flagged this order week | **$3.6M** | of peak-gift sales at risk without an order | 481 of 908 peak-gift lines need an order, order week of Aug 31, 2026 |
 
 - **VP Merchandising:** full shelves in the festival lead-up, with orders your managers approve on one screen.
@@ -61,8 +61,8 @@ For the VP Merchandising and the CIO · October 2026
 
 **Speaker notes**
 - **TELL:** "Three numbers, in your terms."
-- **SHOW:** The target is $2–3M a year, which means winning back 20–30% of the $10.3M you lose on peak gifts. It's a target, and the pilot is how we prove it. Waste is the guardrail: in the holiday backtest it stayed within about 1% of today. And this week alone, the app flags $3.6M of peak-gift sales at risk, across 481 of 908 peak lines.
-- **TELL:** "So, more peak-gift sales with waste held flat, and you can see the exposure every Monday."
+- **SHOW:** The target is $2–3M a year, which means winning back 20–30% of the $10.3M you lose on peak gifts. It's a target, and the pilot is how we prove it. Waste is the guardrail: roughly flat, about +$42k a year, ~1% of the $3.87M base, in the backtest. Waste-aware ordering is the day-60 item. And this week alone, the app flags $3.6M of peak-gift sales at risk, across 481 of 908 peak lines.
+- **TELL:** "So, more peak-gift sales with waste roughly flat, and you can see the exposure every Monday."
 
 ---
 
@@ -85,7 +85,7 @@ Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. The chart shows the four we
 
 **Speaker notes**
 - **TELL:** "Here's where the money leaks, and why."
-- **SHOW:** $17.8M a year in lost sales, $10.3M of it on peak gifts. Then one real line: in 2025 the shelf was stocked to 2024's peak week. Customers came two weeks later, and the line was out of stock 6 and 7 days in its two peak weeks.
+- **SHOW:** $17.8M a year in lost sales, $10.3M of it on peak gifts. Then one store-SKU line: in 2025 the shelf was stocked to 2024's peak week. Customers came two weeks later, and the line was out of stock 6 and 7 days in its two peak weeks.
 - **TELL:** "That isn't a bad manager. It's the calendar. The festival moved and the order didn't."
 
 ---
@@ -169,16 +169,16 @@ Two crops from the deployed Databricks App, showing an illustrative store and li
 |---|---|---|---|
 | Forecast accuracy by channel | Beats last year's method in every channel and both holiday seasons | Proven | Track live by channel |
 | Stockouts on peak gift SKUs | Modelled lost sales down in 6 of 6 holiday windows (baseline: 18.7–21.1% of peak-gift days out) | Simulated | Measure in the pilot |
-| Expired and marked-down value | Held flat: +$42k/yr on a $3.87M/yr base | Guardrail | Waste-aware ordering |
+| Expired and marked-down value | Roughly flat: +$42k/yr, ~1% of the $3.87M/yr base | Guardrail | Waste-aware ordering |
 | Orders placed from forecast | Not measured yet: test decisions only | Not yet | Measure in the pilot |
 
-**Holiday backtest: 6 of 6** holiday windows had lower lost sales, with waste within ~1%. The windows are Mid-Autumn 2025 and Lunar New Year 2026, each in 3 channels. This is a simulation on synthetic data.
+**Holiday backtest: 6 of 6** holiday windows had lower lost sales, with waste roughly flat (up ~1%). The windows are Mid-Autumn 2025 and Lunar New Year 2026, each in 3 channels. This is a simulation on synthetic data.
 
-**For the CIO:** 0 mismatched weeks, gold vs source · 40 of 40 planted bad records quarantined · forged identity and out-of-scope requests refused.
+**For the CIO:** 0 mismatched weeks, gold vs source · 40 of 40 planted bad records quarantined · spoofed identity ignored; out-of-scope decisions refused.
 
 **Speaker notes**
 - **TELL:** "Here's what's proven and what isn't yet. I'd rather you hear the gaps from me."
-- **SHOW:** Accuracy is proven: the forecast beats last year's method in every channel and both holiday seasons. On stockouts, the simulation lowered lost sales in all six season-and-channel windows. Waste stayed flat, which is the guardrail, not a saving. Adoption isn't measured yet; we only have test decisions. For the CIO: gold matches source exactly, every planted bad record was caught, and forged or out-of-scope requests were refused.
+- **SHOW:** Accuracy is proven: the forecast beats last year's method in every channel and both holiday seasons. On stockouts, the simulation lowered lost sales in all six season-and-channel windows. Waste was roughly flat, about +$42k a year, ~1% of the $3.87M base, in the backtest: a guardrail, not a saving. Adoption isn't measured yet; we only have test decisions. For the CIO: gold matches source exactly, every planted bad record was caught, spoofed identity headers were ignored in favour of the verified sign-in, and out-of-scope decisions were refused.
 - **TELL:** "The direction is clear. The pilot turns it into your numbers."
 
 ---
@@ -187,17 +187,17 @@ Two crops from the deployed Databricks App, showing an illustrative store and li
 
 - **Day 30, governance pack:** UC row filters by region, cost masks, persona groups, column comments.
 - **Day 60, waste-aware ordering:** shelf-life and waste limits in the order rule; replay a full year.
-- **Day 90, one-region pilot:** live just before Lunar New Year 2027, with managers ordering from the app.
+- **Day 90, one-region pilot:** timed to cover the next Lunar New Year peak, with managers ordering from the app.
 
 **The ask: approve a one-region pilot.** You measure:
 - peak-gift out-of-stock rate vs the 18.7–21.1% baseline
 - share of orders placed from the forecast
-- waste held flat
+- waste vs today's $3.87M/yr base (backtest: +$42k/yr, ~1%)
 
 **Speaker notes**
 - **TELL:** "Here's how we get from simulation to proof in your stores."
-- **SHOW:** In 30 days, close the governance gaps in Unity Catalog. In 60 days, make ordering waste-aware and replay a full year. By day 90, one region orders from the app, landing just before Lunar New Year 2027, your next big gifting peak.
-- **TELL:** "The ask is one region, with three measures you can read: peak-gift out-of-stock rate against today's 18.7–21.1%, the share of orders placed from the forecast, and waste held flat."
+- **SHOW:** In 30 days, close the governance gaps in Unity Catalog. In 60 days, make ordering waste-aware and replay a full year. By day 90, one region orders from the app, timed to cover the next Lunar New Year peak, your next big gifting season.
+- **TELL:** "The ask is one region, with three measures you can read: peak-gift out-of-stock rate against today's 18.7–21.1%, the share of orders placed from the forecast, and waste against today's $3.87M base."
 
 ---
 
@@ -214,11 +214,15 @@ Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (wha
 | 5 | "Here's why a manager can trust it." | The reason string, p90 plan-for, and shelf-life cap (example reason: "Mid-Autumn Festival 2026 in 3 weeks; capped by 30-day shelf life", E305–306). | The forecast explains itself in units, which drives adoption. |
 | 6 | "The manager stays in control." | Accept, or adjust with a reason (e.g. 672 → 600, "Display space limited during renovation", E384–386). Point out that a reason is required. | Every decision is versioned, audited, and flows back to gold on the next weekly run. |
 | 7 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" The tested top answer is Taian Service Area N, 6 SKUs, $56,791 (E432–436). Open the SQL. | Self-serve answers on governed data, running as the user, with the SQL visible. No ticket needed. |
-| 8 | "Back to your three measures." | Return to the KPI strip. | Peak-gift out-of-stock rate, share of orders from the forecast, and waste held flat. That's what the pilot measures. |
-| 8b | *(Optional, CIO)* "Where does this number come from?" | Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables (577 lineage rows, E160–168). | Every recommended order traces to its source rows. |
+| 8 | "Back to your three measures." | Return to the KPI strip. | Peak-gift out-of-stock rate, share of orders from the forecast, and waste against today's base. That's what the pilot measures. |
+
+**Optional CIO beat (only if asked):**
+- *TELL:* "Where does this number come from?"
+- *SHOW:* Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables (577 lineage rows, E160–168).
+- *LAND:* every recommended order traces back to its source rows.
 
 **CIO aside (beats 2 and 6):**
-- The app verifies each user's OAuth token, and forged forwarded headers still resolve to the real identity (E474–478).
+- The app verifies each user's OAuth token. Spoofed forwarded identity headers are ignored and the verified identity is used; a request with no verifiable identity gets 401 (E474–478).
 - An out-of-region decision returns 403, and an unmapped user sees nothing (E379–382, E480–484).
 - A stale edit returns 409 "Someone else changed this order" (E370–372).
 
@@ -240,7 +244,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 ### VP Merchandising
 
 **1. What does it cost?**
-- *Exec:* We'll size the pilot with you; this build doesn't include a cost figure. The saving in effort comes from running one platform to govern and operate, instead of wiring six tools together.
+- *Exec:* We'll size the pilot with you; this build doesn't include a cost figure. The intended benefit is less integration effort: one platform to govern and operate instead of six tools wired together. We haven't measured that saving.
 - *Technical:* The pipeline, SQL warehouse, and Lakebase run serverless or autoscaling (E87–88, E354). The weekly scoring job ran in about six minutes (E248).
 
 **2. What's the risk?**
@@ -248,7 +252,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 - *Technical:* The audit trail is append-only (E383–386). Scope blocks access by default, and unmapped users see nothing (E379–382, E480–484). The model only serves after the @champion gate (E201–203).
 
 **3. How fast do we see value?**
-- *Exec:* The full loop already runs weekly. The plan has one region ordering from it by day 90, just before Lunar New Year 2027.
+- *Exec:* The full loop already runs weekly. The plan has one region ordering from it by day 90, timed to cover the next Lunar New Year peak.
 - *Technical:* One weekly job covers refresh, scoring, recommendations, the Lakebase load, and decision ingest, and every task succeeded on the last run (E247–251).
 
 **4. Will managers actually use it?**
@@ -259,8 +263,8 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 - *Exec:* The target is $2–3M a year, 20–30% of the $10.3M lost on peak gifts. It's a target on synthetic data, not a realised return; the pilot measures the real figure.
 - *Technical:* The holiday backtest lowered modelled lost sales in all 6 season × channel windows (E314–321, E337). See the CIO backup below for why we don't headline the backtest dollars.
 
-**6. Will this increase waste?**
-- *Exec:* No, and that's the guardrail. Waste stayed flat in the backtest, within about 1% of today's $3.87M a year. We're not claiming a waste saving. Waste-aware ordering is the day-60 step.
+**6. What happens to waste?**
+- *Exec:* It stays roughly flat, about +$42k a year, ~1% of the $3.87M base, in the backtest. That's the guardrail, not a saving. Waste-aware ordering is the day-60 item.
 - *Technical:* +$42k/yr on the $3.87M/yr base. Mid-Autumn 2025 airport and downtown improved, and Lunar New Year 2026 worsened (E329, E341–344).
 
 ### CIO
@@ -281,7 +285,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 **3. Security and governance?**
 - *Exec:* Unity Catalog governs the data and its lineage today. Per-manager scoping is enforced in the app. UC row filters, masks, and persona groups are the day-30 governance pack.
 - *Technical:*
-  - *Built:* least-privilege grants for the app service principal and 577 lineage rows (E155–168). The app verifies each user's token, so forged headers are refused. Server-side scope blocks access by default (E474–484). Genie runs as the user (E441–442).
+  - *Built:* least-privilege grants for the app service principal and 577 lineage rows (E155–168). The app verifies each user's OAuth token: spoofed forwarded identity headers are ignored and the verified identity is used, and a request with no verifiable identity gets 401. Out-of-scope decisions get 403. Server-side scope blocks access by default (E474–484). Genie runs as the user (E441–442).
   - *Not built yet:* row filters, column masks (unit cost is visible to gold readers), persona groups, and UC column comments (E170–176).
 
 **4. How does it integrate with our POS and ERP?**
