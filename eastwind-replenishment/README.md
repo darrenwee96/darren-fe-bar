@@ -50,10 +50,14 @@ returns counts and a fingerprint of the set, not ids). The server recomputes the
 `EXCEPTION_RULES` inside the caller's verified scope; if its count or snapshot differs from what the user saw (a
 reload, someone else's decision, a different scope), it answers 409 `ROUTINE_CHANGED` with both counts and saves
 nothing. Ids injected into the body are ignored, so exception lines cannot be accepted this way and a caller cannot
-reach outside their scope.
+reach outside their scope. It is all or nothing: the recompute, the comparison and every decision + audit event run in
+one transaction, and if any line cannot be accepted at write time (someone decided it a moment earlier, caught either
+by the in-transaction read or by the unique `recommendation_id` on insert) the whole transaction rolls back with the
+same 409.
 
 **Accept selected** (`POST /api/recommendations/bulk-accept`, the ticked Needs review lines) sends ids with the version
-each row showed. Both paths run in one transaction and apply the single-line rules to each line: verified identity,
+each row showed and keeps per-line results: lines that pass are saved and the rest are reported (207). Both paths
+apply the single-line rules to each line: verified identity,
 the caller's scope (403 per line), the line exists (404), it has something to order (422) and the version the client
 saw is still current (409, also when someone else decided the line a moment earlier). Each accepted line gets its own
 `order_decisions` row and `decision_events` row with `decision_source = 'bulk'`. Lines that fail are returned one by

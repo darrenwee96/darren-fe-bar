@@ -356,7 +356,7 @@ export interface RoutineSet {
 
 /** The pending routine lines in the caller's scope + filters, computed from EXCEPTION_RULES on the server. */
 export async function routineSet(
-  db: Lakebase,
+  db: Pick<Lakebase, 'query'>,
   filters: z.infer<typeof ScopeFilters>,
   scope: Scope
 ): Promise<RoutineSet> {
@@ -560,31 +560,21 @@ export function registerReplenishmentRoutes(
     const user = userOf(res);
     try {
       const scope = await resolveScope(db, user);
-      const current = await routineSet(db, filters, scope);
-      if (current.truncated) {
+      const result = await acceptRoutineSet(db, user, scope, filters, expected);
+      if (result.ok) {
+        res.status(200).json(result.outcome);
+      } else if (result.reason === 'truncated') {
         res.status(400).json({ error: `More than ${BULK_MAX_LINES} routine lines; narrow the filters first` });
-        return;
-      }
-      if (current.snapshot !== expected.snapshot || current.count !== expected.count) {
-        // The data changed since the user confirmed (a reload, someone else's decision, a new rule result):
-        // accept nothing and say so, rather than accepting a set the user never saw.
+      } else {
+        // The data changed since the user confirmed (a reload, someone else's decision, a new rule result), or a line
+        // could not be accepted at write time: everything was rolled back rather than accepting a different set.
         res.status(409).json({
-          error: `The routine lines changed since you looked (you saw ${expected.count}, there are now ${current.count}). Nothing was saved; review and try again.`,
+          error: `The routine lines changed since you looked (you saw ${expected.count}, there are now ${result.currentCount}). Nothing was saved; review and try again.`,
           code: 'ROUTINE_CHANGED',
           expectedCount: expected.count,
-          currentCount: current.count,
+          currentCount: result.currentCount,
         });
-        return;
       }
-      // Pending lines have no decision yet, so each is accepted expecting no prior version; bulkAccept re-checks
-      // scope and version per line inside its transaction.
-      const outcome = await bulkAccept(
-        db,
-        user,
-        scope,
-        current.ids.map((id) => ({ id, expectedVersion: null }))
-      );
-      res.status(outcome.accepted === outcome.requested ? 200 : 207).json(outcome);
     } catch (err) {
       console.error('Failed to accept routine lines:', err);
       res.status(500).json({ error: 'Failed to save decisions; nothing was saved' });
@@ -770,157 +760,219 @@ export async function bulkAccept(
   scope: Scope,
   items: { id: string; expectedVersion: number | null }[]
 ): Promise<BulkOutcome> {
-  const ids = items.map((i) => i.id);
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const recs = await client.query(
-      `SELECT r.recommendation_id, r.recommended_units, r.as_of_date::text AS as_of_date, r.location_id, r.sku_id,
-              ${scopeSql(2)} AS in_scope
-       FROM serving.recommendations r WHERE r.recommendation_id = ANY($1::text[])`,
-      [ids, ...scopeParams(scope)]
-    );
-    const existing = await client.query(
-      `SELECT decision_id, recommendation_id, decision_status, final_order_units, version
-       FROM replenishment.order_decisions WHERE recommendation_id = ANY($1::text[]) FOR UPDATE`,
-      [ids]
-    );
-    const recById = new Map(recs.rows.map((r) => [String(r.recommendation_id), r]));
-    const decisionById = new Map(existing.rows.map((d) => [String(d.recommendation_id), d]));
+    const outcome = await acceptLines(client, user, scope, items);
+    await client.query('COMMIT');
+    return outcome;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
-    const results = new Map<string, BulkLineResult>();
-    const inserts: Record<string, unknown>[] = [];
-    const updates: { id: string; units: number; version: number; previous: Record<string, unknown> }[] = [];
-    for (const item of items) {
-      const rec = recById.get(item.id);
-      if (!rec) {
-        results.set(item.id, { id: item.id, status: 404, error: 'Recommendation not found' });
-        continue;
-      }
-      if (rec.in_scope !== true) {
-        results.set(item.id, { id: item.id, status: 403, error: 'This store is outside your planning scope' });
-        continue;
-      }
-      const units = Number(rec.recommended_units);
-      if (!(units > 0)) {
-        results.set(item.id, { id: item.id, status: 422, error: 'Nothing to order on this line' });
-        continue;
-      }
-      const current = decisionById.get(item.id);
-      const currentVersion = current ? Number(current.version) : null;
-      if (currentVersion !== item.expectedVersion) {
-        results.set(item.id, {
-          id: item.id,
+/** The per-line accept logic, run on a client that already holds an open transaction (the caller commits). */
+async function acceptLines(
+  client: PoolClient,
+  user: string,
+  scope: Scope,
+  items: { id: string; expectedVersion: number | null }[]
+): Promise<BulkOutcome> {
+  const ids = items.map((i) => i.id);
+  const recs = await client.query(
+    `SELECT r.recommendation_id, r.recommended_units, r.as_of_date::text AS as_of_date, r.location_id, r.sku_id,
+            ${scopeSql(2)} AS in_scope
+     FROM serving.recommendations r WHERE r.recommendation_id = ANY($1::text[])`,
+    [ids, ...scopeParams(scope)]
+  );
+  const existing = await client.query(
+    `SELECT decision_id, recommendation_id, decision_status, final_order_units, version
+     FROM replenishment.order_decisions WHERE recommendation_id = ANY($1::text[]) FOR UPDATE`,
+    [ids]
+  );
+  const recById = new Map(recs.rows.map((r) => [String(r.recommendation_id), r]));
+  const decisionById = new Map(existing.rows.map((d) => [String(d.recommendation_id), d]));
+
+  const results = new Map<string, BulkLineResult>();
+  const inserts: Record<string, unknown>[] = [];
+  const updates: { id: string; units: number; version: number; previous: Record<string, unknown> }[] = [];
+  for (const item of items) {
+    const rec = recById.get(item.id);
+    if (!rec) {
+      results.set(item.id, { id: item.id, status: 404, error: 'Recommendation not found' });
+      continue;
+    }
+    if (rec.in_scope !== true) {
+      results.set(item.id, { id: item.id, status: 403, error: 'This store is outside your planning scope' });
+      continue;
+    }
+    const units = Number(rec.recommended_units);
+    if (!(units > 0)) {
+      results.set(item.id, { id: item.id, status: 422, error: 'Nothing to order on this line' });
+      continue;
+    }
+    const current = decisionById.get(item.id);
+    const currentVersion = current ? Number(current.version) : null;
+    if (currentVersion !== item.expectedVersion) {
+      results.set(item.id, {
+        id: item.id,
+        status: 409,
+        error: 'Someone else changed this order. Reload to see the latest decision.',
+        currentVersion,
+      });
+      continue;
+    }
+    if (current) updates.push({ id: item.id, units, version: Number(current.version), previous: current });
+    else inserts.push({ ...rec, units });
+  }
+
+  const events: { decisionId: string; id: string; prevStatus: unknown; prevUnits: number | null; units: number }[] = [];
+  if (inserts.length > 0) {
+    // ON CONFLICT: a line someone else decided after we read it is a conflict for this caller, not an overwrite.
+    const saved = await client.query(
+      `INSERT INTO replenishment.order_decisions
+         (recommendation_id, as_of_date, location_id, sku_id, decision_status, recommended_units, final_order_units,
+          reason, decided_by, decision_source)
+       SELECT u.id, u.as_of_date, u.location_id, u.sku_id, 'ACCEPTED', u.units, u.units, NULL, $6, 'bulk'
+       FROM unnest($1::text[], $2::date[], $3::text[], $4::text[], $5::int[])
+            AS u(id, as_of_date, location_id, sku_id, units)
+       ON CONFLICT (recommendation_id) DO NOTHING
+       RETURNING decision_id, recommendation_id, final_order_units, version`,
+      [
+        inserts.map((r) => r.recommendation_id),
+        inserts.map((r) => r.as_of_date),
+        inserts.map((r) => r.location_id),
+        inserts.map((r) => r.sku_id),
+        inserts.map((r) => r.units),
+        user,
+      ]
+    );
+    for (const row of saved.rows) {
+      const id = String(row.recommendation_id);
+      results.set(id, { id, status: 201, version: Number(row.version) });
+      events.push({
+        decisionId: String(row.decision_id),
+        id,
+        prevStatus: null,
+        prevUnits: null,
+        units: Number(row.final_order_units),
+      });
+    }
+    for (const r of inserts) {
+      const id = String(r.recommendation_id);
+      if (!results.has(id))
+        results.set(id, {
+          id,
           status: 409,
-          error: 'Someone else changed this order. Reload to see the latest decision.',
-          currentVersion,
+          error: 'Someone else decided this order a moment ago. Reload to see it.',
+          currentVersion: null,
         });
-        continue;
-      }
-      if (current) updates.push({ id: item.id, units, version: Number(current.version), previous: current });
-      else inserts.push({ ...rec, units });
     }
+  }
+  if (updates.length > 0) {
+    const saved = await client.query(
+      `UPDATE replenishment.order_decisions d
+       SET decision_status = 'ACCEPTED', final_order_units = u.units, reason = NULL, decided_by = $4,
+           decided_at = now(), updated_at = now(), version = d.version + 1, decision_source = 'bulk'
+       FROM unnest($1::text[], $2::int[], $3::int[]) AS u(id, units, version)
+       WHERE d.recommendation_id = u.id AND d.version = u.version
+       RETURNING d.decision_id, d.recommendation_id, d.final_order_units, d.version`,
+      [updates.map((u) => u.id), updates.map((u) => u.units), updates.map((u) => u.version), user]
+    );
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    for (const row of saved.rows) {
+      const id = String(row.recommendation_id);
+      const before = byId.get(id)?.previous;
+      results.set(id, { id, status: 200, version: Number(row.version) });
+      events.push({
+        decisionId: String(row.decision_id),
+        id,
+        prevStatus: before?.decision_status ?? null,
+        prevUnits: before ? Number(before.final_order_units) : null,
+        units: Number(row.final_order_units),
+      });
+    }
+    for (const u of updates) {
+      if (!results.has(u.id))
+        results.set(u.id, { id: u.id, status: 409, error: 'Someone else changed this order.', currentVersion: null });
+    }
+  }
+  if (events.length > 0) {
+    await client.query(
+      `INSERT INTO replenishment.decision_events
+         (decision_id, recommendation_id, previous_status, new_status, previous_units, new_units, reason, changed_by,
+          decision_source)
+       SELECT e.decision_id, e.id, e.prev_status, 'ACCEPTED', e.prev_units, e.units, NULL, $6, 'bulk'
+       FROM unnest($1::uuid[], $2::text[], $3::text[], $4::int[], $5::int[])
+            AS e(decision_id, id, prev_status, prev_units, units)`,
+      [
+        events.map((e) => e.decisionId),
+        events.map((e) => e.id),
+        events.map((e) => e.prevStatus),
+        events.map((e) => e.prevUnits),
+        events.map((e) => e.units),
+        user,
+      ]
+    );
+  }
+  const ordered = items.map((i) => results.get(i.id) as BulkLineResult);
+  const ok = ordered.filter((r) => r.status === 200 || r.status === 201);
+  return {
+    requested: items.length,
+    accepted: ok.length,
+    acceptedUnits: events.reduce((sum, e) => sum + e.units, 0),
+    results: ordered,
+  };
+}
 
-    const events: { decisionId: string; id: string; prevStatus: unknown; prevUnits: number | null; units: number }[] =
-      [];
-    if (inserts.length > 0) {
-      // ON CONFLICT: a line someone else decided after we read it is a conflict for this caller, not an overwrite.
-      const saved = await client.query(
-        `INSERT INTO replenishment.order_decisions
-           (recommendation_id, as_of_date, location_id, sku_id, decision_status, recommended_units, final_order_units,
-            reason, decided_by, decision_source)
-         SELECT u.id, u.as_of_date, u.location_id, u.sku_id, 'ACCEPTED', u.units, u.units, NULL, $6, 'bulk'
-         FROM unnest($1::text[], $2::date[], $3::text[], $4::text[], $5::int[])
-              AS u(id, as_of_date, location_id, sku_id, units)
-         ON CONFLICT (recommendation_id) DO NOTHING
-         RETURNING decision_id, recommendation_id, final_order_units, version`,
-        [
-          inserts.map((r) => r.recommendation_id),
-          inserts.map((r) => r.as_of_date),
-          inserts.map((r) => r.location_id),
-          inserts.map((r) => r.sku_id),
-          inserts.map((r) => r.units),
-          user,
-        ]
-      );
-      for (const row of saved.rows) {
-        const id = String(row.recommendation_id);
-        results.set(id, { id, status: 201, version: Number(row.version) });
-        events.push({
-          decisionId: String(row.decision_id),
-          id,
-          prevStatus: null,
-          prevUnits: null,
-          units: Number(row.final_order_units),
-        });
-      }
-      for (const r of inserts) {
-        const id = String(r.recommendation_id);
-        if (!results.has(id))
-          results.set(id, {
-            id,
-            status: 409,
-            error: 'Someone else decided this order a moment ago. Reload to see it.',
-            currentVersion: null,
-          });
-      }
+export type RoutineAcceptResult =
+  | { ok: true; outcome: BulkOutcome }
+  | { ok: false; reason: 'changed' | 'truncated'; currentCount: number };
+
+/**
+ * Accept all routine, all or nothing, in ONE transaction on one connection: recompute the pending routine set inside
+ * the caller's scope, compare it with the count + snapshot the user confirmed, then write every decision and audit
+ * event. Any difference, or any line that cannot be accepted (someone decided it after the recompute, it left scope),
+ * rolls the whole transaction back, so the caller gets 409 and nothing is saved, never a partial commit.
+ *
+ * Pending lines have no order_decisions row to lock. A decision that lands concurrently is still caught inside the
+ * transaction: either it is visible to the per-line read of existing decisions, or our INSERT hits the unique
+ * recommendation_id (ON CONFLICT DO NOTHING waits for the other transaction) and that line comes back as a conflict.
+ */
+export async function acceptRoutineSet(
+  db: Lakebase,
+  user: string,
+  scope: Scope,
+  filters: z.infer<typeof ScopeFilters>,
+  expected: { count: number; snapshot: string }
+): Promise<RoutineAcceptResult> {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await routineSet(client, filters, scope);
+    if (current.truncated) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'truncated', currentCount: current.count };
     }
-    if (updates.length > 0) {
-      const saved = await client.query(
-        `UPDATE replenishment.order_decisions d
-         SET decision_status = 'ACCEPTED', final_order_units = u.units, reason = NULL, decided_by = $4,
-             decided_at = now(), updated_at = now(), version = d.version + 1, decision_source = 'bulk'
-         FROM unnest($1::text[], $2::int[], $3::int[]) AS u(id, units, version)
-         WHERE d.recommendation_id = u.id AND d.version = u.version
-         RETURNING d.decision_id, d.recommendation_id, d.final_order_units, d.version`,
-        [updates.map((u) => u.id), updates.map((u) => u.units), updates.map((u) => u.version), user]
-      );
-      const byId = new Map(updates.map((u) => [u.id, u]));
-      for (const row of saved.rows) {
-        const id = String(row.recommendation_id);
-        const before = byId.get(id)?.previous;
-        results.set(id, { id, status: 200, version: Number(row.version) });
-        events.push({
-          decisionId: String(row.decision_id),
-          id,
-          prevStatus: before?.decision_status ?? null,
-          prevUnits: before ? Number(before.final_order_units) : null,
-          units: Number(row.final_order_units),
-        });
-      }
-      for (const u of updates) {
-        if (!results.has(u.id))
-          results.set(u.id, { id: u.id, status: 409, error: 'Someone else changed this order.', currentVersion: null });
-      }
+    if (current.snapshot !== expected.snapshot || current.count !== expected.count) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'changed', currentCount: current.count };
     }
-    if (events.length > 0) {
-      await client.query(
-        `INSERT INTO replenishment.decision_events
-           (decision_id, recommendation_id, previous_status, new_status, previous_units, new_units, reason, changed_by,
-            decision_source)
-         SELECT e.decision_id, e.id, e.prev_status, 'ACCEPTED', e.prev_units, e.units, NULL, $6, 'bulk'
-         FROM unnest($1::uuid[], $2::text[], $3::text[], $4::int[], $5::int[])
-              AS e(decision_id, id, prev_status, prev_units, units)`,
-        [
-          events.map((e) => e.decisionId),
-          events.map((e) => e.id),
-          events.map((e) => e.prevStatus),
-          events.map((e) => e.prevUnits),
-          events.map((e) => e.units),
-          user,
-        ]
-      );
+    const outcome = await acceptLines(
+      client,
+      user,
+      scope,
+      current.ids.map((id) => ({ id, expectedVersion: null }))
+    );
+    if (outcome.accepted !== outcome.requested) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'changed', currentCount: outcome.accepted };
     }
     await client.query('COMMIT');
-
-    const ordered = items.map((i) => results.get(i.id) as BulkLineResult);
-    const ok = ordered.filter((r) => r.status === 200 || r.status === 201);
-    return {
-      requested: items.length,
-      accepted: ok.length,
-      acceptedUnits: events.reduce((sum, e) => sum + e.units, 0),
-      results: ordered,
-    };
+    return { ok: true, outcome };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

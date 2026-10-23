@@ -49,18 +49,28 @@ const EXCEPTION_IDS = ['n-1', 'n-2', 'n-3', 's-1'];
 
 /**
  * Stateful in-memory Lakebase for the bulk path: recommendations, decisions and events live in arrays, and each SQL
- * statement the route issues is answered from them. `raceInsert` simulates another planner inserting a decision for
- * those lines between our read and our insert (ON CONFLICT DO NOTHING then skips them).
+ * statement the route issues is answered from them. BEGIN / COMMIT / ROLLBACK behave like a transaction: a rollback
+ * restores this session's writes but keeps anything another session committed meanwhile.
+ * `raceInsert` simulates another planner inserting a decision for those lines between our read and our insert
+ * (ON CONFLICT DO NOTHING then skips them). `afterRoutineQuery` runs right after the routine set is computed, with an
+ * `inject` that commits a decision from another session at exactly that moment.
  */
 function fakeLakebase(
   opts: {
     decisions?: Decision[];
     scope?: Record<string, { region: string | null; location_id: string | null }[]>;
     raceInsert?: string[];
+    afterRoutineQuery?: (inject: (d: Decision) => void) => void;
   } = {}
 ) {
   const decisions = [...(opts.decisions ?? [])];
   const events: unknown[][] = [];
+  let snap: { decisions: Decision[]; events: number } | null = null;
+  const committedElsewhere: Decision[] = [];
+  const inject = (d: Decision) => {
+    decisions.push(d);
+    committedElsewhere.push({ ...d });
+  };
   const calls: Call[] = [];
   const scope = opts.scope ?? {
     [PLANNER]: [{ region: '*', location_id: null }],
@@ -70,6 +80,13 @@ function fakeLakebase(
 
   const respond = (text: string, params: unknown[] = []) => {
     calls.push({ text, params });
+    if (text === 'BEGIN') snap = { decisions: decisions.map((d) => ({ ...d })), events: events.length };
+    if (text === 'COMMIT') snap = null;
+    if (text === 'ROLLBACK' && snap) {
+      decisions.splice(0, decisions.length, ...snap.decisions, ...committedElsewhere.map((d) => ({ ...d })));
+      events.length = snap.events;
+      snap = null;
+    }
     if (text.includes('FROM replenishment.user_scope')) return { rows: scope[String(params[0]).toLowerCase()] ?? [] };
     if (text.includes('cardinality(x.exception_reasons) = 0') && text.includes('ORDER BY r.recommendation_id')) {
       // ROUTINE_PENDING_SQL: filters ($1-$4) and scope ($5-$7) applied as the SQL does.
@@ -82,7 +99,7 @@ function fakeLakebase(
         string[],
         string[],
       ];
-      return {
+      const answer = {
         rows: RECS.filter(
           (r) =>
             r.routine &&
@@ -93,6 +110,8 @@ function fakeLakebase(
             (!restricted || regions.includes(r.region) || locations.includes(r.location_id))
         ).map((r) => ({ ...r, as_of_date: '2026-08-31', value_at_cost: r.recommended_units * 10 })),
       };
+      opts.afterRoutineQuery?.(inject);
+      return answer;
     }
     if (text.includes('AS in_scope') && text.includes('ANY($1::text[])')) {
       const [ids, restricted, regions, locations] = params as [string[], boolean, string[], string[]];
@@ -450,6 +469,67 @@ describe('POST /api/recommendations/accept-routine (server-side routine set)', (
     // Same count but a different set (a swap) is caught by the snapshot, not only by the count.
     const swapped = await acceptRoutine(base, { filters: {}, expected: { count: 2, snapshot: seen.snapshot } });
     expect(swapped.status).toBe(409);
+  });
+
+  it('is all-or-nothing: a decision landing after the in-transaction recompute rolls everything back (409)', async () => {
+    let armed = false;
+    const { db, calls, decisions, events } = fakeLakebase({
+      afterRoutineQuery: (inject) => {
+        // Fires on the confirm request only: another planner commits a decision on r-2 between our recompute and
+        // our writes.
+        if (!armed) return;
+        armed = false;
+        inject({
+          decision_id: 'd-other',
+          recommendation_id: 'r-2',
+          decision_status: 'REJECTED',
+          final_order_units: 0,
+          version: 1,
+        });
+      },
+    });
+    const base = await start(db);
+    const seen = (await routineSummary(base, PLANNER)).body;
+    expect(seen.count).toBe(3);
+    armed = true;
+    const before = calls.length;
+    const res = await acceptRoutine(base, { filters: {}, expected: { count: seen.count, snapshot: seen.snapshot } });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ code: 'ROUTINE_CHANGED', expectedCount: 3 });
+    // Zero new decisions (only the other planner's) and zero audit events from this request.
+    expect(decisions.map((d) => d.recommendation_id)).toEqual(['r-2']);
+    expect(events).toHaveLength(0);
+    // Recompute and writes ran in ONE transaction that was rolled back, never committed.
+    const tx = calls.slice(before);
+    expect(tx.filter((c) => c.text === 'BEGIN')).toHaveLength(1);
+    expect(tx.map((c) => c.text)).toContain('ROLLBACK');
+    expect(tx.map((c) => c.text)).not.toContain('COMMIT');
+    const order = tx.map((c) => c.text);
+    expect(order.findIndex((t) => t.includes('cardinality(x.exception_reasons) = 0'))).toBeLessThan(
+      order.findIndex((t) => t.includes('FOR UPDATE'))
+    );
+  });
+
+  it('rolls back every line when a concurrent insert wins one line at write time (409, nothing saved)', async () => {
+    const { db, decisions, events } = fakeLakebase({ raceInsert: ['r-3'] });
+    const base = await start(db);
+    const seen = (await routineSummary(base, PLANNER)).body;
+    const res = await acceptRoutine(base, { filters: {}, expected: { count: seen.count, snapshot: seen.snapshot } });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('ROUTINE_CHANGED');
+    expect(decisions).toHaveLength(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('keeps per-line partial results (207) for Accept selected', async () => {
+    const decisions: Decision[] = [
+      { decision_id: 'd-x', recommendation_id: 'n-2', decision_status: 'REJECTED', final_order_units: 0, version: 1 },
+    ];
+    const { db } = fakeLakebase({ decisions });
+    const base = await start(db);
+    const res = await bulk(base, { items: pending('n-1', 'n-2') });
+    expect(res.status).toBe(207);
+    expect(res.body.results.map((r) => r.status)).toEqual([201, 409]);
   });
 
   it('rejects a missing or malformed snapshot / count (400) and an unauthenticated caller (401)', async () => {
