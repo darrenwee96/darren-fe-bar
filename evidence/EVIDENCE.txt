@@ -391,8 +391,9 @@ Live in gold.order_decisions_history (3 rows) / gold.order_decision_events (4):
   L0008 SKU-MC01 ADJUSTED 672 -> 600 v2 | "Display space limited during renovation"
   L0022 SKU-MC02 REJECTED 624 -> 0   v1 | "Store closing for refit 14-28 Sep"
   L0026 SKU-MC02 ACCEPTED 488 -> 488 v1
-These 3 are test decisions written during app verification; they should be
-cleared before a customer demo (known limitation, section 11).
+These 3 were test decisions written during app verification. CLEARED 2026-10-23
+(section 9, "Test decisions cleared"): backed up, then deleted by primary key from
+Lakebase and Gold; both stores now hold 0 decisions / 0 events.
 
 
 ================================================================================
@@ -437,7 +438,8 @@ Natural-language probes (conversation API, wording a planner would use):
   Q: "Where did managers override the forecast?"
      decision_status IN (ADJUSTED, REJECTED) joined to recommendations:
      Daan Shop 3 rejected 624 -> 0; Taichung Park Shop adjusted 672 -> 600
-     (the app write-back test decisions).
+     (the app write-back test decisions; cleared 2026-10-23, so this question
+     now correctly returns no overrides until real decisions exist).
   In the app, the docked Genie panel answered "Which stores have the largest
   recommended order value at cost?" on behalf of the signed-in user in 23s with
   an expandable SQL attachment.
@@ -448,64 +450,138 @@ Natural-language probes (conversation API, wording a planner would use):
 ================================================================================
 
 App eastwind-replenishment (AppKit), deployed from the eastwind-replenishment/
-bundle, profile fe-bar. Live status 2026-10-12: app_status RUNNING,
-compute_status ACTIVE; resources sql-warehouse, postgres (Lakebase),
-genie-space; effective user scopes include dashboards.genie.
-URL: https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+bundle, profile fe-bar. URL:
+https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
 
-One control-panel view (six legacy tab pages consolidated): KPI strip, order
-queue with one-click accept and adjust/reject side sheet, forecast vs actual
-chart with p90 band, order-need-by-store drill-down, docked Ask Genie panel.
-Global region/channel/category/store filters in the URL; legacy routes redirect.
+v2 (2026-10-23, branch polly/app-exceptions-ui, commits 552e546 + 014a363): management by
+exception, bulk accept, demo fixes, Databricks brand refresh. Live status after
+deploy: app_status RUNNING, compute_status ACTIVE, deployment 01f1cef31c601b29b37e61b9ff5ac65f.
+App log at startup:
+  "[replenishment] Schema replenishment is ready"
+  "[replenishment] Planner scope seed applied"
+  "[appkit:server] Server running on http://0.0.0.0:8000"
+  "[replenishment] line_context refreshed: 2247 lines (recommendations loaded
+   2026-10-12 06:20:23.548793+00)"
 
-Gates (all on 2026-10-12, branch polly/app-control-panel):
-  npm run typecheck OK (tsc server + client, 0 errors)
-  npm run lint OK (eslint, 0 problems) | ast-grep lint: no violations
-  npm run build OK (tsdown server + vite client)
-  npx vitest run: 1 file, 20 tests passed (9 decision API + scope/identity cases:
-  400/409/404/401/403 paths, spoofed-header rejection, token cache, scope seeds)
-  databricks apps validate --profile fe-bar: all checks passed
-  bundle deploy + run: "App started successfully", RUNNING/ACTIVE,
-  deployment 01f1c5ef1f35140288305ea8d53d527d; app log:
-    "[replenishment] Schema replenishment is ready"
-    "[replenishment] Planner scope seed applied"
-    "[appkit:server] Server running on http://0.0.0.0:8000"
+One view: one-line header (order week, data loaded, model version); four KPI
+tiles (peak lines needing an order, peak sales at risk, lines that need you
+today, waste guardrail); forecast vs actual (p90 band, festival-week markers)
+next to order need by store; then the Needs review queue; docked Ask Genie.
+No forecast-error (WMAPE/MAPE) figure anywhere: the accuracy tile, its query
+(config/queries/accuracy_by_channel.sql) and the WMAPE Genie starter question
+were removed.
 
-Identity and scoping (the parts a technical evaluator should probe):
+Management by exception (server/routes/exceptions.ts, EXCEPTION_RULES):
+  A line to order needs review when any rule fires; the rest are routine.
+  rule            threshold                                         lines
+  PEAK_STOCKOUT   peak gift, order needed, >= $10,000 sales lost       119
+  SHELF_CAP       shelf-life cap applied                                29
+  VS_LAST_YEAR    forecast > 2x or < 1/2 of last year's festival-
+                  aligned cover weeks, order >= 2 cases                 39
+  VS_RECENT       non-peak, forecast > 3x or < 1/3 of recent sales,
+                  order >= 2 cases                                      46
+  HIGH_VALUE      order >= $10,000 at cost                              57
+  Live GET /api/recommendations/summary (all stores): 231 of 1,561 lines to
+  order need review (77 stores, $2.60M at risk); 1,330 routine lines,
+  180,518 units, $1.72M at cost; decided 0. North region: 82 need review,
+  462 routine. Same counts from the SQL replayed read-only on Lakebase before
+  deploy (rolled back), and from a warehouse profile of the same rules.
+  Last-year context: the app copies sum(gold.demand_forecasts.
+  baseline_event_naive) over each line's cover weeks into
+  replenishment.line_context (2,247 rows); the app SP already had SELECT.
+
+Bulk accept: POST /api/recommendations/bulk-accept + GET .../routine. One
+transaction; per line: verified identity, scope (403), exists (404), something
+to order (422), expected version (409, incl. a concurrent insert via
+ON CONFLICT DO NOTHING); one order_decisions row + one decision_events row per
+accepted line, decision_source = 'bulk'. 200 all accepted / 207 partial (each
+refused line listed) / 403 none in scope / 400 empty or duplicate / 401.
+Adjust and reject stay single-line with a required reason.
+Idempotent migration verified live: decision_source column on order_decisions
+and decision_events (default 'single'), constraint order_decisions_source_check,
+table replenishment.line_context.
+
+Demo fixes:
+- Adoption ("Orders from forecast") shows "not enough decisions yet (0 of 20
+  needed)" until 20 real decisions exist in scope.
+- Order reasons in plain words, strongest first, zero-unit drivers dropped.
+  Hero line live (North -> Zhongshan Shop L0001 -> SKU-MC01, 804 units):
+  "Mid-Autumn in 3 weeks - forecast 15.9x recent sales | Stock covers 0.2 of
+  the 3 weeks needed | Holiday timing adds 5 units"; needs review because
+  "Peak gift at risk - $22.5K of peak sales lost if not ordered" and
+  "High value - $12.1K at cost". Sheet forecast table marks 21 Sep as
+  Mid-Autumn (expected 241, p90 468, last year 353).
+- Evaluator access stays fail-closed. REPLENISHMENT_ANALYSTS in app.yaml is the
+  one-line, comma-separated list of network-wide analysts (README "Planner
+  scope"). No evaluator emails were provided, so only the app owner is seeded,
+  as before.
+
+Test decisions cleared (2026-10-23):
+  Backup first: /Users/darren.wee/Downloads/FEBAR/_generated/backup/
+    test-decisions-20261023T223955.json (3 decisions + 4 audit events from
+    Lakebase, the same 3 + 4 rows from gold.order_decisions_history and
+    gold.order_decision_events, table counts before).
+  Deleted by primary key only (decision_id / event_id), counts guarded:
+    Lakebase replenishment.order_decisions  3 -> 0  (deleted 3)
+    Lakebase replenishment.decision_events  4 -> 0  (deleted 4)
+    gold.order_decisions_history            3 -> 0  (num_affected_rows 3)
+    gold.order_decision_events              4 -> 0  (num_affected_rows 4)
+  Rows: L0008 SKU-MC01 ADJUSTED 672 -> 600, L0022 SKU-MC02 REJECTED,
+  L0026 SKU-MC02 ACCEPTED. Recounted 0 / 0 after the read-only browser checks.
+
+Gates (2026-10-23, eastwind-replenishment/):
+  npm run typecheck     OK (tsc server + client, 0 errors)
+  npm run lint          OK (eslint, 0 problems) | npx appkit lint: no violations
+  npx vitest run        3 files, 35 tests passed (35 it() cases, no
+                        parameterised tests):
+    server/routes/replenishment-routes.test.ts  20 (decision API, identity, scope)
+    server/routes/bulk-accept.test.ts           11 (bulk: happy path 200,
+      out-of-scope lines 403 per line + 207, none in scope 403, version
+      conflicts on some lines 409 + 207, re-accept 200, 404/422, empty /
+      duplicate / malformed 400, unauthenticated 401; routine listing scope;
+      exception SQL from the constant; line_context parsing)
+    client/src/lib/reasons.test.ts               4 (plain-word reasons, no
+      zero-unit drivers)
+  npm run build         OK | databricks apps validate --profile fe-bar: all
+                        checks passed
+
+Browser checks (deployed app, headless Chrome via playwright-core, bearer
+token; every POST/PUT/PATCH/DELETE except warehouse queries aborted at the
+network layer, so nothing could be saved; no Accept/Adjust/Reject clicked):
+  widths 1024, 1280, 1440, 1920 x Genie dock open/closed x light/dark (16):
+  forecast chart aspect 1.85-2.09:1 (narrowest: 1024 with dock open, 518x280),
+  no horizontal overflow, 0 console errors, no "WMAPE"/"MAPE"/"forecast
+  error" text, no "+0 units" text, "231 of 1,561 lines need you" and
+  "1,330 routine lines - $1.72M at cost" rendered at every width.
+  Bulk dialog opened and cancelled: "Accept 1,330 routine lines? Orders
+  180,518 units ($1.72M at cost) at the recommended quantities. Each line is
+  saved as its own decision under <user> ...".
+  No-scope state ("You don't have any stores assigned yet") rendered with an
+  unmapped user's /api/whoami answer substituted in the browser; the
+  server-side fail-closed path is covered by the tests above.
+Screenshots (outside the repo, illustrative only): /Users/darren.wee/Downloads/
+FEBAR/_generated/screens/
+  app-v2-1440-light-dock-closed.png   app-v2-1440-light-dock-open.png
+  app-v2-1920-light-dock-closed.png   app-v2-1920-light-dock-open.png
+  app-v2-1440-dark-dock-closed.png    app-v2-mc01-line-sheet.png
+  app-v2-bulk-accept-dialog.png       app-v2-no-scope.png
+
+Identity and scoping (unchanged in v2; the parts a technical evaluator should
+probe):
 - x-forwarded-email/user headers are NOT trusted on their own. Every /api route
   verifies the forwarded user OAuth token against SCIM /api/2.0/preview/scim/v2/Me;
   the verified userName drives decided_by and scope. No verifiable identity -> 401.
-  Live proof: GET /api/whoami with spoofed forwarded headers still returns the
-  token's real identity.
 - Server-side scope table replenishment.user_scope applied to every Lakebase
-  read and write; fail-closed for unmapped users; region='*' is the explicit
-  network-wide grant. Verified with seeded identities: north.manager sees 782
-  store-SKUs / 559 lines and gets 403 outside North; daan3.manager sees only
-  L0022 (31 store-SKUs / 26 lines); a stranger sees nothing.
-- Run-id hygiene: analytics queries read only the latest forecast_run_id /
-  backtest_run_id, so duplicate scoring runs never double-count.
+  read and write, now including each line of a bulk accept; fail-closed for
+  unmapped users; region='*' is the explicit network-wide grant. Seeded
+  identities as before: north.manager (North region), daan3.manager (L0022).
+- Run-id hygiene: analytics queries read only the latest forecast_run_id, so
+  duplicate scoring runs never double-count.
 
-Live read-only summary (GET /api/recommendations/summary, 2026-10-12):
-  2,247 store-SKUs | 1,561 lines to order | 278,410 units | $3,204,091 at cost
-  1,087 lines need an order to avoid a stockout; $4.75M sales at risk without them
-  peak gifts: 481 of 908 peak lines need an order, $3.60M of peak sales at risk
-  70 shelf-life capped | 92 high overstock | decisions: 3 decided (1/1/1), 1,558 pending
-  refreshed_at 2026-10-12T06:19:48Z, loaded_at 06:20:23Z (matches section 7)
-
-Browser verification (deployed app, headless Chrome, light + dark, widths
-1280-2560 with the Genie dock open and closed): no console errors; charts keep a
-2.0-3.3:1 aspect ratio at every width; KPI tiles equal height; no horizontal
-overflow; reject-without-reason is blocked in the UI; an unmapped user sees the
-"No planning scope assigned" notice and an empty queue.
-Screenshots (outside the repo): /Users/darren.wee/Downloads/FEBAR/_generated/screens/
-  control-panel-overview-light.png      control-panel-full-light.png
-  control-panel-genie.png               control-panel-store-drilldown.png
-  control-panel-order-sheet.png         control-panel-dark-filtered.png
-  control-panel-no-scope.png            control-panel-1920-light.png
-  control-panel-1920-genie.png          control-panel-1440-dark.png
-  overview.png                          detail.png
-(Screenshots are illustrative only; the text in this file is the execution
-evidence, per the FE Bar rule that images do not count as evidence.)
+Not done in v2: ml/src/sync_lakebase.py ingest_decisions does not copy the new
+decision_source column to Gold yet (it selects named columns, so it keeps
+working). The Genie space content was not changed; Genie can still answer an
+accuracy question if asked, but the app no longer shows or suggests one.
 
 
 ================================================================================
@@ -533,12 +609,11 @@ Expired + marked-down inventory value   gold.channel_weekly_  Baseline $3.87M/yr
                                                                under the current p90 policy
                                                                (+$42k/yr) - NOT yet the ~20%
                                                                cut the problem hopes for.
-Share of orders from the forecast       Lakebase decisions    3 test decisions so far: 2 of 3
-                                                               placed from the forecast (1
-                                                               accepted as-is, 1 adjusted), 1
-                                                               rejected. Sample too small to be
-                                                               a KPI; the app reports it as
-                                                               decided lines accumulate.
+Share of orders from the forecast       Lakebase decisions    0 real decisions (the 3 test
+                                                               decisions were cleared on
+                                                               2026-10-23). The app shows "not
+                                                               enough decisions yet" until 20
+                                                               decisions exist, then the share.
 
 Estimated business impact (industry-problem.md: $2-3M lost sales recovered,
 ~$1M waste saved): the policy backtest shows modelled lost-sales reduction in
@@ -570,9 +645,10 @@ $3.9M/yr of waste at stake, so the problem sizes are realistic.
    fixed the alignment bug; amplitude tuning remains.
 5. Genie: 16 benchmarks validated by --check; a native eval run has only scored
    the older 11-question set (11/11). Eval-driven tuning guidance is ~30
-   phrasings. Override questions see only the 3 test decisions.
-6. Test data: 3 decisions written during app verification remain in Lakebase and
-   Gold (L0008, L0022, L0026). Clear them before a customer demo.
+   phrasings. Override questions return nothing until real decisions exist
+   (test decisions cleared 2026-10-23).
+6. Test data: the 3 decisions written during app verification (L0008, L0022,
+   L0026) were backed up and cleared on 2026-10-23 (section 9).
 7. Lakebase load is a full idempotent upsert over psycopg because this workspace
    cannot create a Lakebase UC catalog for synced tables; if CREATE CATALOG is
    granted, swap in a triggered synced table (app unchanged).
