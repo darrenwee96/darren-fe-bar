@@ -151,15 +151,15 @@ The forecast units come from the latest weekly run. Mid-Autumn 2026 is Sep 25. T
 
 ## Slide 7 · The app: what managers see
 
-Two crops from the deployed Databricks App, showing an illustrative store and line:
-1. **Where to start:** stores ranked by sales lost if not ordered.
-2. **Why this quantity:** stock, shelf life, forecast, p90 plan-for, and last year, for one line.
-3. **One-click decision:** accept, or adjust or reject with a required reason. Every change is audited.
+Two crops from the live Databricks App (captured read-only on 2026-10-23), filtered to Region North:
+1. **Region North, ranked:** the Order need by store panel. North stores are ranked by sales lost if not ordered, and Zhongshan Shop is in the top ten.
+2. **Why this quantity:** the line sheet for Zhongshan Shop × Classic Lotus Mooncake Box, with its holiday-driven reason next to stock, shelf life, and cap.
+3. **Plan for the peak:** on the same sheet, the forecast and p90 band peak before the festival, while last year's line peaks after it.
 
 **Speaker notes**
 - **TELL:** "This is the manager's Monday. I'll switch to the live app now."
 - **SHOW:** Follow the run-of-show below.
-- **TELL:** "One screen to see the risk, understand the line, and approve it."
+- **TELL:** "One screen to see the risk, understand the line, and approve it. The decision buttons sit at the bottom of this sheet, and I'll use them live."
 
 ---
 
@@ -211,7 +211,7 @@ Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (wha
 | 2 | "Let's go to one region." | Set Region = North. The KPI strip and queue rescope (in the evidence, a North manager sees 782 store-SKUs, E483). | Each manager sees their own stores, and the scope is enforced server-side. |
 | 3 | "Now one store." | Click Zhongshan Shop in Order need by store. | Start with the lines that lose the most sales. |
 | 4 | "Here's the mooncake box from the slide." | Open the Classic Lotus Mooncake Box line. Point to the forecast peaking in the lead-up weeks (188, 416) where last year's calendar orders 353 and 504 for the festival week and after (E261–264). | The order lands before customers arrive, not after. |
-| 5 | "Here's why a manager can trust it." | The reason string, p90 plan-for, and shelf-life cap (example reason: "Mid-Autumn Festival 2026 in 3 weeks; capped by 30-day shelf life", E305–306). | The forecast explains itself in units, which drives adoption. |
+| 5 | "Here's why a manager can trust it." | The reason string (live, 2026-10-23: "+5 units from holiday timing · Mid-Autumn Festival 2026 in 3 weeks · Forecast 15.9x recent weekly sales · Stock covers 0.2 of 3 weeks needed"), the p90 plan-for column, shelf life (30 days), and "Cap applied: None" for this line. | The forecast explains itself in units, which drives adoption. |
 | 6 | "The manager stays in control." | Accept, or adjust with a reason (e.g. 672 → 600, "Display space limited during renovation", E384–386). Point out that a reason is required. | Every decision is versioned, audited, and flows back to gold on the next weekly run. |
 | 7 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" The tested top answer is Taian Service Area N, 6 SKUs, $56,791 (E432–436). Open the SQL. | Self-serve answers on governed data, running as the user, with the SQL visible. No ticket needed. |
 | 8 | "Back to your three measures." | Return to the KPI strip. | Peak-gift out-of-stock rate, share of orders from the forecast, and waste against today's base. That's what the pilot measures. |
@@ -228,7 +228,7 @@ Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (wha
 
 ## Demo-prep checklist
 
-- [ ] **The MC01 reason must show real drivers.** The October screenshots show "+0 units from holiday timing" on queue lines. Before the demo, open Zhongshan Shop × Classic Lotus Mooncake Box and confirm its reason names the festival lead-up. If it doesn't, pick a line whose reason does, or fix the reason builder first.
+- [x] **The MC01 reason shows real drivers** (checked read-only against the live app and gold on 2026-10-23): "+5 units from holiday timing · Mid-Autumn Festival 2026 in 3 weeks · Forecast 15.9x recent weekly sales · Stock covers 0.2 of 3 weeks needed". Lead with "Mid-Autumn Festival 2026 in 3 weeks" and "Forecast 15.9x recent weekly sales". "+5 units from holiday timing" reads small next to them, so have an answer ready if it's asked about. No shelf-life cap applies to this line.
 - [ ] **Clear the 3 test decisions** (L0008, L0022, L0026) from Lakebase and gold, so the adoption tile and the Genie override answers start empty (E394–395, E574–575).
 - [ ] **Pre-warm Genie.** Ask the highway question once beforehand; a cold answer took about 23s in testing (E441–443).
 - [ ] **Add scope entries for the evaluators.** Anyone not in `replenishment.user_scope` sees "No planning scope assigned" and an empty queue (E480–484, E499).
