@@ -28,33 +28,37 @@
   .dark .eyebrow { color: #FFC9BF; }
   .title { font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; color: var(--db-navy); margin-top: 8px; }
   .dark .title { color: #fff; }
-  .rule { height: 3px; width: 100%; background: var(--db-oat-medium); margin: 16px 0 32px; position: relative; }
+  .rule { height: 3px; width: 100%; background: var(--db-oat-medium); margin: 16px 0 32px; position: relative; flex: none; }
   .rule::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 88px; background: var(--db-lava); }
-  .white .rule { background: var(--db-oat-medium); }
+  .rule.tight { margin-bottom: 24px; }
 
   .footer { position: absolute; left: 80px; right: 80px; bottom: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--db-ink-muted); }
   .dark .footer { color: #7E9098; }
-  .source { position: absolute; left: 80px; bottom: 44px; font-size: 12px; font-style: italic; color: var(--db-ink-muted); }
+  .source { position: absolute; left: 80px; right: 80px; bottom: 44px; font-size: 12px; font-style: italic; color: var(--db-ink-muted); }
 
-  .card { background: #fff; border-radius: 12px; box-shadow: var(--shadow-md); padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+  .card { background: #fff; border-radius: 12px; box-shadow: var(--shadow-md); padding: 24px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
   .white .card { background: var(--db-oat-light); box-shadow: none; border: 1px solid var(--db-line); }
+  .card.navy { background: var(--db-navy); }
   .lab { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-ink-muted); }
+  .navy .lab, .hl .lab { color: #FFC9BF; }
   .h { font-size: 20px; font-weight: 700; color: var(--db-navy); line-height: 1.25; }
   .d { font-size: 16px; line-height: 1.45; color: var(--db-ink-soft); }
   .small { font-size: 12px; line-height: 1.45; color: var(--db-ink-muted); }
-  .chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 4px; background: var(--db-oat-medium); color: var(--db-navy); font-size: 12px; font-weight: 700; }
+  .chip { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 4px; background: var(--db-oat-medium); color: var(--db-navy); font-size: 12px; font-weight: 700; }
   .mono { font-family: var(--font-mono); }
+  .big { font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--db-navy); }
+  .fix { min-height: 72px; box-sizing: border-box; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--db-line); font-size: 16px; line-height: 1.45; color: var(--db-navy); }
+  .fix b { color: var(--db-lava); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 4px; }
 
   /* KPI tiles */
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-  .kpi { min-height: 344px; box-sizing: border-box; background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 32px 32px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .kpi { min-height: 328px; box-sizing: border-box; background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 32px 32px 24px; display: flex; flex-direction: column; gap: 8px; }
   .kpi .num { font-size: 64px; font-weight: 700; letter-spacing: -.03em; color: var(--db-navy); line-height: 1; margin-top: 8px; }
+  .kpi .num small { font-size: 24px; font-weight: 500; letter-spacing: 0; }
   .kpi .what { font-size: 20px; font-weight: 500; color: var(--db-navy); line-height: 1.3; }
-  .kpi .proof { min-height: 56px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--db-line); font-size: 12px; line-height: 1.5; color: var(--db-ink-muted); }
+  .kpi .proof { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--db-line); font-size: 12px; line-height: 1.5; color: var(--db-ink-muted); }
   .kpi.hl { background: var(--db-navy); border-color: var(--db-navy); }
-  .kpi.hl .lab { color: #FFC9BF; }
-  .kpi.hl .num { color: #fff; }
-  .kpi.hl .what { color: #fff; }
+  .kpi.hl .num, .kpi.hl .what { color: #fff; }
   .kpi.hl .proof { color: #B9C6CB; border-top-color: #33505A; }
 
   /* tables */
@@ -62,7 +66,7 @@
   .tbl th { background: var(--db-coral); color: #fff; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
   .tbl th:first-child { border-top-left-radius: 8px; }
   .tbl th:last-child { border-top-right-radius: 8px; }
-  .tbl td { padding: 16px; font-size: 16px; line-height: 1.35; color: var(--db-ink); vertical-align: top; }
+  .tbl td { padding: 12px 16px; font-size: 16px; line-height: 1.35; color: var(--db-ink); vertical-align: top; }
   .tbl tbody tr:nth-child(odd) { background: #fff; }
   .tbl tbody tr:nth-child(even) { background: #F3F3F3; }
   .tbl td:first-child { font-weight: 700; color: var(--db-navy); }
@@ -73,49 +77,46 @@
   .pill.no { background: #FBE3E0; color: var(--db-maroon); }
 
   /* architecture */
-  .arch { display: grid; grid-template-columns: repeat(6, 1fr); gap: 32px; position: relative; }
-  .node { background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 16px; display: flex; flex-direction: column; gap: 8px; position: relative; min-height: 264px; }
-  .node .ic { width: 48px; height: 48px; }
-  .node .step { font-family: var(--font-mono); font-size: 12px; color: var(--db-lava); }
-  .node .nt { font-size: 16px; font-weight: 700; color: var(--db-navy); line-height: 1.25; }
-  .node ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
-  .node li { font-size: 12px; line-height: 1.4; color: var(--db-ink-soft); padding-left: 12px; position: relative; }
-  .node li::before { content: ""; position: absolute; left: 0; top: 6px; width: 4px; height: 4px; border-radius: 1px; background: var(--db-coral); }
-  .node:not(:last-child)::after { content: ""; position: absolute; right: -27px; top: 40px; width: 22px; height: 2px; background: var(--db-coral); }
-  .node:not(:last-child)::before { content: ""; position: absolute; right: -28px; top: 36px; border-left: 8px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
-  .node.dk { background: var(--db-navy); border-color: var(--db-navy); }
-  .node.dk .nt { color: #fff; }
-  .node.dk li { color: #C9D3D7; }
   .src { display: flex; flex-direction: column; gap: 8px; }
-  .src span { font-size: 12px; font-weight: 700; color: var(--db-navy); background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 4px; padding: 4px 8px; }
+  .src span { font-size: 12px; font-weight: 700; color: var(--db-navy); background: #fff; border: 1px solid var(--db-line); border-radius: 4px; padding: 4px 8px; }
+  .band { background: #fff; border: 2px solid var(--db-navy); border-radius: 12px; padding: 16px 24px 16px; display: flex; flex-direction: column; box-shadow: var(--shadow-md); }
+  .band-h { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--db-line); margin-bottom: 12px; }
+  .outc { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 32px; margin-bottom: 8px; }
+  .outc span { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-lava); border-top: 2px solid var(--db-lava); padding-top: 8px; }
+  .pnodes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+  .pn { background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 4px; position: relative; min-height: 168px; box-sizing: border-box; }
+  .pn .row { display: flex; align-items: center; gap: 8px; }
+  .pn .ic { width: 32px; height: 32px; }
+  .pn .biz { font-size: 24px; font-weight: 700; color: var(--db-navy); line-height: 1.2; margin-top: 8px; }
+  .pn .prod { font-size: 12px; font-weight: 700; color: var(--db-ink-muted); letter-spacing: .02em; }
+  .pn .proofl { margin-top: auto; align-self: flex-start; font-size: 12px; font-weight: 700; color: var(--db-green-700); background: #DDF3EA; border-radius: 4px; padding: 4px 8px; }
+  .pn:not(:last-child)::after { content: ""; position: absolute; right: -27px; top: 72px; width: 18px; height: 2px; background: var(--db-coral); }
+  .pn:not(:last-child)::before { content: ""; position: absolute; right: -28px; top: 68px; border-left: 8px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  .uc { background: var(--db-navy); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
 
   /* timeline */
-  .tl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; margin-top: 8px; }
+  .tl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; }
   .tl::before { content: ""; position: absolute; left: 0; right: 0; top: 13px; height: 2px; background: var(--db-line); }
-  .tl .nd { position: relative; display: flex; flex-direction: column; gap: 12px; }
-  .tl .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--db-coral); border: 6px solid #fff; box-shadow: 0 0 0 1px var(--db-line); box-sizing: border-box; z-index: 1; }
+  .tl .nd { position: relative; display: flex; flex-direction: column; gap: 8px; }
+  .tl .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--db-coral); border: 6px solid #fff; box-shadow: 0 0 0 1px var(--db-line); box-sizing: border-box; z-index: 1; margin-bottom: 4px; }
   .tl .nd:nth-child(2) .dot { background: var(--db-lava); }
   .tl .nd:nth-child(3) .dot { background: var(--db-navy-700); }
   .tl .when { font-family: var(--font-mono); font-size: 16px; color: var(--db-lava); font-weight: 500; }
 
-  /* screenshot */
-  .shot { position: relative; border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid var(--db-line); }
+  /* screenshots */
+  .shot { position: relative; border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid var(--db-line); background: #fff; }
   .shot img { display: block; width: 100%; }
-  .box { position: absolute; border: 2px solid var(--db-lava); border-radius: 6px; }
   .mk { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: var(--db-lava); color: #fff; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(255,54,33,.24); }
+  .box { position: absolute; border: 2px solid var(--db-lava); border-radius: 6px; }
   .co { display: grid; grid-template-columns: 32px 1fr; gap: 16px; align-items: start; }
   .co .mk { position: static; box-shadow: none; }
-  /* one-platform band */
-  .band { background: #fff; border: 2px solid var(--db-navy); border-radius: 12px; padding: 16px 24px 24px; display: flex; flex-direction: column; box-shadow: var(--shadow-md); }
-  .band-h { display: flex; align-items: center; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--db-line); margin-bottom: 16px; }
-  .pnodes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; }
-  .pn { background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px; position: relative; min-height: 184px; box-sizing: border-box; }
-  .pn .ic { width: 40px; height: 40px; }
-  .pn .nt { font-size: 16px; font-weight: 700; color: var(--db-navy); line-height: 1.25; }
-  .pn .nd2 { font-size: 12px; line-height: 1.4; color: var(--db-ink-soft); }
-  .pn:not(:last-child)::after { content: ""; position: absolute; right: -21px; top: 35px; width: 14px; height: 2px; background: var(--db-coral); }
-  .pn:not(:last-child)::before { content: ""; position: absolute; right: -22px; top: 31px; border-left: 7px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
-  .uc { margin-top: 16px; background: var(--db-navy); border-radius: 8px; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+
+  /* numbered beats */
+  .beats { display: flex; flex-direction: column; }
+  .beat { display: grid; grid-template-columns: 48px 1fr; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--db-line); }
+  .beat:first-child { padding-top: 0; }
+  .beat:last-child { border-bottom: 0; }
+  .beat .n { font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--db-lava); line-height: 1.2; }
 </style>
 </head>
 <body>
@@ -126,13 +127,13 @@
   <img src="assets/databricks-logo-white.svg" alt="Databricks" style="height:32px;width:auto;align-self:flex-start;">
   <div style="display:flex;align-items:center;gap:16px;margin-top:48px;">
     <div style="width:64px;height:6px;background:var(--db-lava);border-radius:3px;"></div>
-    <span class="eyebrow">Eastwind Gourmet · Specialty food retail</span>
+    <span class="eyebrow">Eastwind Gourmet · From a Monday guess to a Monday order</span>
   </div>
-  <div style="margin-top:auto;margin-bottom:56px;max-width:760px;">
+  <div style="margin-top:auto;margin-bottom:56px;max-width:800px;">
     <div class="title" style="font-size:64px;line-height:1.05;">Forecast-driven replenishment</div>
-    <div style="margin-top:24px;font-size:24px;line-height:1.4;color:#B9C6CB;">You can’t forecast a gift box for a highway kiosk the way you do downtown.</div>
+    <div style="margin-top:24px;font-size:24px;line-height:1.4;color:#B9C6CB;">Eastwind orders festival gifts for the week the festival fell last year, so shelves run empty before Mid-Autumn and fill up after it.</div>
   </div>
-  <img src="assets/illustration-nodal-02.svg" alt="" style="position:absolute;right:72px;top:96px;height:320px;opacity:.95;">
+  <img src="assets/illustration-nodal-02.svg" alt="" style="position:absolute;right:72px;top:96px;height:288px;opacity:.95;">
   <div class="footer"><span>For the VP Merchandising and the CIO</span><span>October 2026</span></div>
 </div></section>
 
@@ -144,26 +145,26 @@
   <div class="kpis">
     <div class="kpi hl">
       <span class="lab">Lost sales recovered · target</span>
-      <span class="num">$2–3M<span style="font-size:24px;font-weight:500;letter-spacing:0;">/yr</span></span>
-      <span class="what">10–15% of today’s $17.8M/yr lost sales</span>
-      <span class="proof">Conservative: the peak-season backtest cut modelled lost sales in every channel and every holiday window</span>
+      <span class="num">$2–3M<small>/yr</small></span>
+      <span class="what">20–30% of the $10.3M/yr you lose on peak gifts</span>
+      <span class="proof">A target for the pilot to prove, not a result yet</span>
     </div>
     <div class="kpi">
-      <span class="lab">Plan-for coverage</span>
-      <span class="num">91–92%</span>
-      <span class="what">of store-SKU-weeks land within the p90 plan-for quantity</span>
-      <span class="proof">Calibrated p90 band drives safety stock, so you know how much buffer you are buying</span>
+      <span class="lab">Waste guardrail</span>
+      <span class="num">Flat</span>
+      <span class="what">Waste held within ~1% while shelves stay fuller</span>
+      <span class="proof">+$42k/yr on a $3.87M/yr base in the holiday backtest. No waste saving claimed</span>
     </div>
     <div class="kpi">
-      <span class="lab">One platform</span>
-      <span class="num">1</span>
-      <span class="what">platform from ingestion to ML, apps, and Gen AI</span>
-      <span class="proof">6 capabilities on Databricks, one security and lineage model, fewer vendor handoffs</span>
+      <span class="lab">Flagged this order week</span>
+      <span class="num">$3.6M</span>
+      <span class="what">of peak-gift sales at risk without an order</span>
+      <span class="proof">481 of 908 peak-gift lines need an order, order week of Aug 31, 2026</span>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px;">
-    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> fuller shelves on peak gifts, and orders your managers trust.</div>
-    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one governed platform from POS to order, traceable end to end.</div>
+    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> full shelves in the festival lead-up, with orders your managers approve on one screen.</div>
+    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one platform from POS files to approved order, so manager decisions flow back into the data.</div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>2 / 9</span></div>
 </div></section>
@@ -171,31 +172,58 @@
 <!-- 3 · The problem -->
 <section class="page" id="s3"><div class="slide">
   <span class="eyebrow">The problem</span>
-  <div class="title">Ordering by gut feel</div>
-  <div class="rule"></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;flex:1;">
+  <div class="title">Last year’s calendar</div>
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:400px 1fr;gap:32px;">
     <div style="display:flex;flex-direction:column;gap:16px;">
-      <div class="h">80 stores, 3 channels, one gift box that sells three ways</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;">
-        <div class="card"><span class="lab">Downtown</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">32</span><span class="small">stores</span></div>
-        <div class="card"><span class="lab">Highway</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">26</span><span class="small">kiosks</span></div>
-        <div class="card"><span class="lab">Airport</span><span style="font-size:40px;font-weight:700;color:var(--db-navy);line-height:1;">22</span><span class="small">stores</span></div>
-      </div>
-      <div class="d" style="margin-top:8px;">Managers order from experience. Holiday peaks make the swings larger.</div>
-      <img src="assets/illustration-nodal-07.svg" alt="" style="height:120px;width:auto;align-self:flex-start;margin-top:auto;opacity:.9;">
+      <div class="card" style="border-top:4px solid var(--db-lava);padding:16px 24px;"><span class="big" style="color:var(--db-lava);">$17.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">lost sales from empty shelves across 80 stores</span></div>
+      <div class="card" style="padding:16px 24px;"><span class="big">$10.3M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">of that on peak gifts, 57.5% of all lost sales</span></div>
+      <div class="card navy" style="padding:16px 24px;"><span class="big" style="color:#fff;">18.7–21.1%</span><span class="d" style="color:#C9D3D7;">of peak-gift store-days out of stock in Mid-Autumn 2025, vs 8.6% overall</span></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:24px;">
-      <div class="h">You lose both ways</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="card" style="border-top:4px solid var(--db-lava);"><span style="font-size:48px;font-weight:700;color:var(--db-lava);line-height:1;letter-spacing:-.02em;">$17.8M</span><span class="d">lost sales a year from stockouts</span></div>
-        <div class="card" style="border-top:4px solid var(--db-navy);"><span style="font-size:48px;font-weight:700;color:var(--db-navy);line-height:1;letter-spacing:-.02em;">$3.87M</span><span class="d">expired and marked down a year</span></div>
-      </div>
-      <div class="card" style="background:var(--db-navy);gap:8px;">
-        <span class="lab" style="color:#FFC9BF;">Peaks amplify it</span>
-        <span style="font-size:20px;line-height:1.4;color:#fff;">18.7–21.1% of peak-gift store-days stocked out in Mid-Autumn 2025, vs 8.6% overall. Peak gifts carry 57.5% of lost sales.</span>
-      </div>
+    <div class="card" style="padding:24px;gap:12px;">
+      <span class="lab">Zhongshan Shop · Classic Lotus Mooncake Box · Mid-Autumn 2025</span>
+      <span class="h">Stocked for 2024’s peak, out of stock for 2025’s</span>
+      <div style="display:flex;gap:24px;font-size:12px;font-weight:500;color:var(--db-ink-soft);"><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#1B5162;display:inline-block;"></span>Same week last year (what gets ordered)</span><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#FF3621;display:inline-block;"></span>Sold in 2025</span></div>
+      <div style="margin-top:8px;"><svg viewBox="0 0 632 304" width="632" height="304" role="img" font-family="DM Sans" style="display:block;overflow:visible;">
+<line x1="40" x2="624" y1="248.0" y2="248.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="252.0" text-anchor="end" font-size="12" fill="#8A8580">0</text>
+<line x1="40" x2="624" y1="192.0" y2="192.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="196.0" text-anchor="end" font-size="12" fill="#8A8580">100</text>
+<line x1="40" x2="624" y1="136.0" y2="136.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="140.0" text-anchor="end" font-size="12" fill="#8A8580">200</text>
+<line x1="40" x2="624" y1="80.0" y2="80.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="84.0" text-anchor="end" font-size="12" fill="#8A8580">300</text>
+<line x1="40" x2="624" y1="24.0" y2="24.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="28.0" text-anchor="end" font-size="12" fill="#8A8580">400</text>
+<path d="M72.0,248.0 L72.0,77.3 Q72.0,73.3 76.0,73.3 L108.0,73.3 Q112.0,73.3 112.0,77.3 L112.0,248.0 Z" fill="#1B5162"><title>Same week last year (what gets ordered), week of Sep 8: 312 units</title></path>
+<text x="92.0" y="67.3" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">312</text>
+<path d="M114.0,248.0 L114.0,244.2 Q114.0,240.2 118.0,240.2 L150.0,240.2 Q154.0,240.2 154.0,244.2 L154.0,248.0 Z" fill="#FF3621"><title>Sold in 2025, week of Sep 8: 14 units</title></path>
+<text x="134.0" y="234.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">14</text>
+<text x="113.0" y="268" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 8</text>
+<path d="M218.0,248.0 L218.0,248.0 Q218.0,244.6 221.4,244.6 L254.6,244.6 Q258.0,244.6 258.0,248.0 L258.0,248.0 Z" fill="#1B5162"><title>Same week last year (what gets ordered), week of Sep 22: 6 units</title></path>
+<text x="238.0" y="238.6" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">6</text>
+<path d="M260.0,248.0 L260.0,54.3 Q260.0,50.3 264.0,50.3 L296.0,50.3 Q300.0,50.3 300.0,54.3 L300.0,248.0 Z" fill="#FF3621"><title>Sold in 2025, week of Sep 22: 353 units</title></path>
+<text x="280.0" y="44.3" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">353</text>
+<text x="259.0" y="268" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 22</text>
+<path d="M364.0,248.0 L364.0,242.5 Q364.0,238.5 368.0,238.5 L400.0,238.5 Q404.0,238.5 404.0,242.5 L404.0,248.0 Z" fill="#1B5162"><title>Same week last year (what gets ordered), week of Sep 29: 17 units</title></path>
+<text x="384.0" y="232.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">17</text>
+<path d="M406.0,248.0 L406.0,211.7 Q406.0,207.7 410.0,207.7 L442.0,207.7 Q446.0,207.7 446.0,211.7 L446.0,248.0 Z" fill="#FF3621"><title>Sold in 2025, week of Sep 29: 72 units</title></path>
+<text x="426.0" y="201.7" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">72</text>
+<text x="405.0" y="268" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 29</text>
+<text x="405.0" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="#98102A">6 days out</text>
+<rect x="482.0" y="8" width="138.0" height="240" rx="4" fill="#FF3621" fill-opacity="0.06"/>
+<text x="551.0" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#FF3621">Festival week</text>
+<path d="M510.0,248.0 L510.0,245.8 Q510.0,241.8 514.0,241.8 L546.0,241.8 Q550.0,241.8 550.0,245.8 L550.0,248.0 Z" fill="#1B5162"><title>Same week last year (what gets ordered), week of Oct 6: 11 units</title></path>
+<text x="530.0" y="235.8" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">11</text>
+<path d="" fill="#FF3621"><title>Sold in 2025, week of Oct 6: 0 units</title></path>
+<text x="572.0" y="242.0" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">0</text>
+<text x="551.0" y="268" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Oct 6</text>
+<text x="551.0" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="#98102A">7 days out</text>
+<line x1="40" x2="624" y1="248" y2="248" stroke="#8A8580" stroke-width="1"/>
+</svg></div>
     </div>
   </div>
+  <div class="source">Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. Chart shows the four weeks in the evidence spot check. Waste is a further $3.87M/yr.</div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>3 / 9</span></div>
 </div></section>
 
@@ -204,34 +232,30 @@
   <span class="eyebrow">For the CIO</span>
   <div class="title">Why it’s hard</div>
   <div class="rule"></div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;">
-    <div class="card" style="min-height:344px;">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;">
+    <div class="card" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:var(--db-lava);">01</span>
-      <span class="h">Five siloed sources</span>
+      <span class="h">Fragmented feeds</span>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;">
         <span class="chip">POS</span><span class="chip">ERP inventory</span><span class="chip">Product catalog</span><span class="chip">Store master</span><span class="chip">Holiday calendar</span>
       </div>
       <span class="d">Different owners, formats, and refresh cycles. Even store IDs differ: <span class="mono">DT001</span> vs <span class="mono">L0001</span>.</span>
+      <div class="fix"><b>How we handle it</b>Lakeflow reconciles all five into one governed gold table.</div>
     </div>
-    <div class="card" style="min-height:344px;">
+    <div class="card" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:var(--db-lava);">02</span>
       <span class="h">Stockouts hide demand</span>
-      <span class="d">When the shelf is empty, sales stop, so history understates what customers wanted.</span>
-      <span class="d" style="margin-top:auto;padding-top:16px;border-top:1px solid var(--db-line);">One mooncake line was out of stock 6 and 7 days in its two peak weeks.</span>
+      <span class="d">When the shelf is empty, sales stop. History records what sold, not what customers wanted.</span>
+      <div class="fix"><b>How we handle it</b>Training skips weeks with two or more days out of stock.</div>
     </div>
-    <div class="card" style="min-height:344px;">
-      <span class="mono" style="font-size:16px;color:var(--db-lava);">03</span>
-      <span class="h">Festivals move</span>
-      <span class="d">Lunar holidays land in a different week each year, so “same week last year” points at the wrong week.</span>
-      <span class="d" style="margin-top:auto;padding-top:16px;border-top:1px solid var(--db-line);">Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025.</span>
-    </div>
-    <div class="card" style="min-height:344px;background:var(--db-navy);">
-      <span class="mono" style="font-size:16px;color:#FFC9BF;">04</span>
-      <span class="h" style="color:#fff;">Stitched-together stack</span>
+    <div class="card navy" style="min-height:376px;">
+      <span class="mono" style="font-size:16px;color:#FFC9BF;">03</span>
+      <span class="h" style="color:#fff;">The usual fix: six tools</span>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;">
         <span class="chip" style="background:#2A4650;color:#fff;">ETL tool</span><span class="chip" style="background:#2A4650;color:#fff;">Warehouse</span><span class="chip" style="background:#2A4650;color:#fff;">ML platform</span><span class="chip" style="background:#2A4650;color:#fff;">OLTP database</span><span class="chip" style="background:#2A4650;color:#fff;">BI / chat</span><span class="chip" style="background:#2A4650;color:#fff;">App hosting</span>
       </div>
-      <span class="d" style="color:#C9D3D7;">Every hop adds a data copy, a handoff, and another set of permissions to keep in sync.</span>
+      <span class="d" style="color:#C9D3D7;">Each hop adds a copy, a handoff, and another set of permissions to keep in sync.</span>
+      <div class="fix" style="color:#fff;border-top-color:#33505A;"><b style="color:#FFC9BF;">How we handle it</b>One platform, one governed data flow.</div>
     </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>4 / 9</span></div>
@@ -241,10 +265,10 @@
 <section class="page" id="s5"><div class="slide">
   <span class="eyebrow">Architecture</span>
   <div class="title">One platform, end to end</div>
-  <div class="rule" style="margin-bottom:24px;"></div>
-  <div style="display:grid;grid-template-columns:136px 1fr;gap:40px;flex:1;margin-bottom:16px;align-items:center;">
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:144px 1fr;gap:40px;">
     <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;position:relative;">
-      <span class="lab" style="margin-bottom:4px;">Raw files</span>
+      <span style="font-size:12px;font-weight:700;color:var(--db-navy);line-height:1.4;margin-bottom:4px;">Your POS and ERP keep running. They just drop files.</span>
       <div class="src"><span>POS sales</span><span>ERP inventory</span><span>Product catalog</span><span>Store master</span><span>Holiday calendar</span></div>
       <svg width="40" height="12" style="position:absolute;right:-40px;top:50%;margin-top:-6px;"><line x1="4" y1="6" x2="30" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M30,1 L38,6 L30,11 z" fill="#FF5F46"/></svg>
     </div>
@@ -254,47 +278,85 @@
         <span style="font-size:16px;font-weight:700;color:var(--db-navy);">Data Intelligence Platform</span>
         <span style="margin-left:auto;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--db-ink-muted);">One governed data flow</span>
       </div>
-      <div class="pnodes">
-        <div class="pn"><img class="ic" src="assets/lakeflow-icon-full-color.svg" alt=""><span class="nt">Lakeflow</span><span class="nd2">Bronze, silver, gold. Expectations and quarantine</span></div>
-        <div class="pn"><img class="ic" src="assets/mosaic-ai-icon-full-color.svg" alt=""><span class="nt">ML + MLflow</span><span class="nd2">LightGBM forecast, @champion gate, p90 band</span></div>
-        <div class="pn"><img class="ic" src="assets/lakebase-icon-full-color.svg" alt=""><span class="nt">Lakebase</span><span class="nd2">Orders and manager decisions, audit trail</span></div>
-        <div class="pn"><img class="ic" src="assets/genie-icon-full-color.svg" alt=""><span class="nt">Genie Agent</span><span class="nd2">Plain-language questions, runs as the user</span></div>
-        <div class="pn"><img class="ic" src="assets/apps-icon-full-color.svg" alt=""><span class="nt">Databricks App</span><span class="nd2">Managers review and approve orders</span></div>
+      <div class="outc">
+        <span style="grid-column:1 / span 2;">Right quantity, right week</span>
+        <span>An order you trust</span>
+        <span>Answers without a ticket</span>
       </div>
-      <svg width="100%" height="40" viewBox="0 0 872 40" preserveAspectRatio="none" style="display:block;overflow:visible;">
-        <defs><marker id="ah" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#FF3621"/></marker></defs>
-        <path d="M 436 0 L 436 24 L 80 24 L 80 6" fill="none" stroke="#FF3621" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ah)"/>
+      <div class="pnodes">
+        <div class="pn"><div class="row"><img class="ic" src="assets/lakeflow-icon-full-color.svg" alt=""></div><span class="biz">Unify</span><span class="prod">Lakeflow · bronze, silver, gold</span><span class="proofl">0 mismatched weeks</span></div>
+        <div class="pn"><div class="row"><img class="ic" src="assets/mosaic-ai-icon-full-color.svg" alt=""></div><span class="biz">Predict</span><span class="prod">ML · MLflow · festival-aligned</span><span class="proofl">@champion gate</span></div>
+        <div class="pn"><div class="row"><img class="ic" src="assets/lakebase-icon-full-color.svg" alt=""><img class="ic" src="assets/apps-icon-full-color.svg" alt=""></div><span class="biz">Decide</span><span class="prod">Lakebase + Databricks App</span><span class="proofl">Audited; conflicting edits rejected</span></div>
+        <div class="pn"><div class="row"><img class="ic" src="assets/genie-icon-full-color.svg" alt=""></div><span class="biz">Ask</span><span class="prod">Genie Agent</span><span class="proofl">Runs on governed data</span></div>
+      </div>
+      <svg id="loop" width="100%" height="48" style="display:block;overflow:visible;margin-top:4px;">
+        <defs><marker id="ah" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#FF3621"/></marker></defs>
+        <path id="loopPath" d="" fill="none" stroke="#FF3621" stroke-width="4" stroke-linejoin="round" marker-end="url(#ah)"/>
+        <rect id="loopBg" x="0" y="18" width="0" height="28" rx="4" fill="#FF3621"/>
+        <text id="loopTxt" x="0" y="37" text-anchor="middle" font-family="DM Sans" font-size="16" font-weight="700" fill="#fff">Manager decisions flow back to gold</text>
       </svg>
-      <div style="position:relative;margin-top:-30px;margin-left:120px;font-size:12px;font-weight:700;color:var(--db-navy);background:#fff;align-self:flex-start;padding:0 8px;">Decisions flow back to gold</div>
-      <div class="uc">
+      <div class="uc" style="margin-top:8px;">
         <img src="assets/unity-catalog-icon-full-color.svg" alt="" style="width:32px;height:32px;">
-        <div><div style="font-size:16px;font-weight:700;color:#fff;">Unity Catalog · one governance layer</div><div style="font-size:12px;color:#C9D3D7;margin-top:4px;">Permissions, lineage, and audit across every step</div></div>
+        <div><div style="font-size:16px;font-weight:700;color:#fff;">Unity Catalog governs data and lineage at every step</div><div style="font-size:12px;color:#C9D3D7;margin-top:4px;">Store-manager scoping is enforced in the app today. UC row filters and masks are the day-30 governance pack.</div></div>
       </div>
     </div>
   </div>
-  <div class="small">One weekly job refreshes data, scores the @champion model, builds orders, loads Lakebase, and ingests decisions.</div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>5 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · one platform is why the loop closes</span><span>5 / 9</span></div>
 </div></section>
 
-<!-- 6 · How it tackles the problem -->
+<!-- 6 · Demo setup -->
 <section class="page" id="s6"><div class="slide">
-  <span class="eyebrow">How it works</span>
-  <div class="title">Pain point to result</div>
-  <div class="rule"></div>
-  <table class="tbl">
-    <thead><tr><th style="width:22%;">Pain point</th><th style="width:38%;">Databricks capability</th><th>Result</th></tr></thead>
-    <tbody>
-      <tr><td>Fragmented data</td><td>Lakeflow + Unity Catalog: one governed view</td><td>0 mismatched weeks; 40 bad rows quarantined</td></tr>
-      <tr><td>Hidden demand</td><td>Stockout-aware training</td><td>Weeks distorted by empty shelves kept out of training</td></tr>
-      <tr><td>Holiday swings</td><td>Festival-aligned features</td><td>Forecast peaks in the lead-up weeks to the festival</td></tr>
-      <tr><td>Distrust</td><td>Reasons in units, plus a p90 band on every line</td><td>Peak-gift demand within p90 in 90–95% of weeks</td></tr>
-      <tr><td>Slow decisions</td><td>One-click approve in the App, on Lakebase</td><td>Accept, adjust, or reject with a reason, all audited</td></tr>
-      <tr><td>Ad-hoc questions</td><td>Genie Agent on governed gold tables</td><td>11 of 11 benchmark questions correct, SQL shown</td></tr>
-    </tbody>
-  </table>
-  <div style="margin-top:24px;background:var(--db-navy);border-radius:8px;padding:16px 24px;display:flex;align-items:center;gap:16px;">
-    <img src="assets/unity-catalog-icon-full-color.svg" alt="" style="width:32px;height:32px;">
-    <span style="font-size:16px;font-weight:700;color:#fff;">Every row runs on one platform: same data, same permissions, no vendor-to-vendor copies.</span>
+  <span class="eyebrow">The demo</span>
+  <div class="title">What you’ll see</div>
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:1fr 528px;gap:32px;">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="h" style="font-size:24px;">One store, one mooncake box, one festival</div>
+      <div class="beats">
+        <div class="beat"><span class="n">01</span><div><div class="h">The order week</div><div class="d">481 of 908 peak-gift lines need an order. $3.6M of peak sales flagged.</div></div></div>
+        <div class="beat"><span class="n">02</span><div><div class="h">One line you can trust</div><div class="d">Zhongshan Shop’s Classic Lotus Mooncake Box, with its reason and plan-for range.</div></div></div>
+        <div class="beat"><span class="n">03</span><div><div class="h">Approve, then ask</div><div class="d">Accept or adjust with a reason. Then ask Genie which highway stores are most at risk.</div></div></div>
+      </div>
+    </div>
+    <div class="card" style="gap:12px;">
+      <span class="lab">Zhongshan Shop · Classic Lotus Mooncake Box · 2026</span>
+      <span class="h">The forecast fixes the calendar mistake</span>
+      <div style="display:flex;gap:24px;font-size:12px;font-weight:500;color:var(--db-ink-soft);"><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#1B5162;display:inline-block;"></span>Same week last year</span><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#FF3621;display:inline-block;"></span>New forecast</span></div>
+      <div style="margin-top:8px;"><svg viewBox="0 0 480 248" width="480" height="248" role="img" font-family="DM Sans" style="display:block;overflow:visible;">
+<line x1="40" x2="472" y1="192.0" y2="192.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="196.0" text-anchor="end" font-size="12" fill="#8A8580">0</text>
+<line x1="40" x2="472" y1="136.0" y2="136.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="140.0" text-anchor="end" font-size="12" fill="#8A8580">200</text>
+<line x1="40" x2="472" y1="80.0" y2="80.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="84.0" text-anchor="end" font-size="12" fill="#8A8580">400</text>
+<line x1="40" x2="472" y1="24.0" y2="24.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="28.0" text-anchor="end" font-size="12" fill="#8A8580">600</text>
+<path d="M60.6,192.0 L60.6,192.0 Q60.6,188.1 64.5,188.1 L89.1,188.1 Q93.0,188.1 93.0,192.0 L93.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 7: 14 units</title></path>
+<text x="76.8" y="182.1" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">14</text>
+<path d="M95.0,192.0 L95.0,143.4 Q95.0,139.4 99.0,139.4 L123.4,139.4 Q127.4,139.4 127.4,143.4 L127.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 7: 188 units</title></path>
+<text x="111.2" y="133.4" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">188</text>
+<text x="94.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 7</text>
+<path d="M168.6,192.0 L168.6,172.2 Q168.6,168.2 172.6,168.2 L197.0,168.2 Q201.0,168.2 201.0,172.2 L201.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 14: 85 units</title></path>
+<text x="184.8" y="162.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">85</text>
+<path d="M203.0,192.0 L203.0,79.5 Q203.0,75.5 207.0,75.5 L231.4,75.5 Q235.4,75.5 235.4,79.5 L235.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 14: 416 units</title></path>
+<text x="219.2" y="69.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">416</text>
+<text x="202.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 14</text>
+<rect x="260.0" y="8" width="100.0" height="184" rx="4" fill="#FF3621" fill-opacity="0.06"/>
+<text x="310.0" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#FF3621">Festival week</text>
+<path d="M276.6,192.0 L276.6,97.2 Q276.6,93.2 280.6,93.2 L305.0,93.2 Q309.0,93.2 309.0,97.2 L309.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 21: 353 units</title></path>
+<text x="292.8" y="87.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">353</text>
+<path d="M311.0,192.0 L311.0,128.5 Q311.0,124.5 315.0,124.5 L339.4,124.5 Q343.4,124.5 343.4,128.5 L343.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 21: 241 units</title></path>
+<text x="327.2" y="118.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">241</text>
+<text x="310.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 21</text>
+<path d="M384.6,192.0 L384.6,54.9 Q384.6,50.9 388.6,50.9 L413.0,50.9 Q417.0,50.9 417.0,54.9 L417.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 28: 504 units</title></path>
+<text x="400.8" y="44.9" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">504</text>
+<path d="M419.0,192.0 L419.0,192.0 Q419.0,189.2 421.8,189.2 L448.6,189.2 Q451.4,189.2 451.4,192.0 L451.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 28: 10 units</title></path>
+<text x="435.2" y="183.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">10</text>
+<text x="418.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 28</text>
+<line x1="40" x2="472" y1="192" y2="192" stroke="#8A8580" stroke-width="1"/>
+</svg></div>
+      <span class="small">Forecast units from the latest weekly run. Mid-Autumn 2026 is Sep 25. A forecast, not an outcome.</span>
+    </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>6 / 9</span></div>
 </div></section>
@@ -303,50 +365,57 @@
 <section class="page" id="s7"><div class="slide">
   <span class="eyebrow">The app</span>
   <div class="title">What managers see</div>
-  <div class="rule" style="margin-bottom:24px;"></div>
-  <div style="display:grid;grid-template-columns:768px 1fr;gap:32px;align-items:start;">
-    <div class="shot">
-      <img src="assets/app-control-panel.png" alt="Eastwind Replenishment control panel with KPI strip, forecast chart, order need by store, and Ask Genie panel">
-      <div class="box" style="left:6px;top:47px;width:580px;height:102px;"></div>
-      <div class="box" style="left:353px;top:150px;width:233px;height:243px;"></div>
-      <div class="box" style="left:592px;top:24px;width:168px;height:412px;"></div>
-      <div class="mk" style="left:544px;top:31px;">1</div>
-      <div class="mk" style="left:337px;top:134px;">2</div>
-      <div class="mk" style="left:726px;top:8px;">3</div>
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:352px 304px 1fr;gap:40px;align-items:start;padding-left:16px;margin-top:8px;">
+    <div style="position:relative;">
+      <div class="shot"><img src="assets/app-order-need.png" alt="Order need by store: top 10 stores ranked by sales lost if not ordered"></div>
+      <div class="mk" style="left:-16px;top:-16px;">1</div>
+    </div>
+    <div style="position:relative;">
+      <div class="shot" style="height:458px;">
+        <img src="assets/app-line-detail.png" alt="Line detail: stock, shelf life, forecast with p90 band, weekly plan-for table, and decision panel">
+        <div class="box" style="left:4px;right:4px;top:372px;height:80px;"></div>
+      </div>
+      <div class="mk" style="left:-16px;top:-16px;">2</div>
+      <div class="mk" style="left:-16px;top:356px;">3</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:24px;">
-      <div class="co"><div class="mk">1</div><div><div class="h">KPI strip</div><div class="d">Peak gifts at risk, waste, and adoption at a glance.</div></div></div>
-      <div class="co"><div class="mk">2</div><div><div class="h">Order queue</div><div class="d">Ranked by sales at risk. Accept in one click, or adjust with a reason.</div>
-        <img src="assets/app-order-decision.png" alt="Order decision panel with Accept, Save adjusted quantity, and Reject" style="width:100%;margin-top:8px;border-radius:4px;border:1px solid var(--db-line);"></div></div>
-      <div class="co"><div class="mk">3</div><div><div class="h">Ask Genie</div><div class="d">Plain-language questions, answered with your access and the SQL shown.</div></div></div>
+      <div class="co"><div class="mk">1</div><div><div class="h">Where to start</div><div class="d">Stores ranked by sales lost if not ordered.</div></div></div>
+      <div class="co"><div class="mk">2</div><div><div class="h">Why this quantity</div><div class="d">Stock, shelf life, forecast, p90 plan-for, and last year, for one line.</div></div></div>
+      <div class="co"><div class="mk">3</div><div><div class="h">One-click decision</div><div class="d">Accept, or adjust or reject with a required reason. Every change is audited.</div></div></div>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · deployed Databricks App</span><span>7 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · deployed Databricks App, illustrative store and line</span><span>7 / 9</span></div>
 </div></section>
 
 <!-- 8 · Impact and proof -->
 <section class="page" id="s8"><div class="slide">
   <span class="eyebrow">Impact and proof</span>
   <div class="title">Proven vs next</div>
-  <div class="rule" style="margin-bottom:24px;"></div>
-  <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;">
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:1fr 288px;gap:24px;align-items:start;">
     <table class="tbl">
-      <thead><tr><th style="width:24%;">Success measure</th><th>Evidence</th><th style="width:16%;">Status</th><th style="width:22%;">Next</th></tr></thead>
+      <thead><tr><th style="width:24%;">Success measure</th><th>Evidence</th><th style="width:15%;">Status</th><th style="width:21%;">Next</th></tr></thead>
       <tbody>
-        <tr><td>Forecast accuracy by channel</td><td>Beats today’s method in every channel and both holiday seasons<span class="sub">See build evidence, section 5</span></td><td><span class="pill ok">Proven</span></td><td>Track live by channel</td></tr>
-        <tr><td>Stockouts on peak gift SKUs</td><td>Modelled lost sales down in every window and channel<span class="sub">Baseline: 18.7–21.1% of peak-gift days out</span></td><td><span class="pill part">Simulated</span></td><td>Measure in the pilot</td></tr>
-        <tr><td>Expired and marked-down value</td><td>Flat: +$42k/yr in the backtest<span class="sub">Baseline: $3.87M/yr</span></td><td><span class="pill no">Not yet</span></td><td>Waste-aware policy, phase 2</td></tr>
-        <tr><td>Orders placed from forecast</td><td>Test decisions only so far</td><td><span class="pill no">Not yet</span></td><td>Track in the pilot</td></tr>
+        <tr><td>Forecast accuracy by channel</td><td>Beats last year’s method in every channel and both holiday seasons</td><td><span class="pill ok">Proven</span></td><td>Track live by channel</td></tr>
+        <tr><td>Stockouts on peak gift SKUs</td><td>Modelled lost sales down in 6 of 6 holiday windows<span class="sub">Baseline: 18.7–21.1% of peak-gift days out</span></td><td><span class="pill part">Simulated</span></td><td>Measure in the pilot</td></tr>
+        <tr><td>Expired and marked-down value</td><td>Held flat: +$42k/yr on a $3.87M/yr base</td><td><span class="pill part">Guardrail</span></td><td>Waste-aware ordering</td></tr>
+        <tr><td>Orders placed from forecast</td><td>Not measured yet: test decisions only</td><td><span class="pill no">Not yet</span></td><td>Measure in the pilot</td></tr>
       </tbody>
     </table>
-    <div class="card" style="background:var(--db-navy);padding:24px;gap:12px;">
-      <span class="lab" style="color:#FFC9BF;">Peak-season backtest</span>
-      <span style="font-size:48px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;">$26.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span>
-      <span style="font-size:16px;line-height:1.45;color:#fff;">lost sales avoided vs manual ordering, pooled across 25 holiday weeks</span>
-      <span style="font-size:12px;line-height:1.5;color:#B9C6CB;padding-top:12px;border-top:1px solid #33505A;">Peak-window annualised, not a whole-year estimate. It shows the $2–3M/yr target is conservative.</span>
+    <div class="card navy" style="gap:12px;">
+      <span class="lab">Holiday backtest</span>
+      <span style="font-size:56px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;">6 of 6</span>
+      <span style="font-size:16px;line-height:1.45;color:#fff;">holiday windows with lower lost sales; waste within ~1%</span>
+      <span style="font-size:12px;line-height:1.5;color:#B9C6CB;padding-top:12px;border-top:1px solid #33505A;">Mid-Autumn 2025 and Lunar New Year 2026, each in 3 channels. Simulation on synthetic data</span>
     </div>
   </div>
-  <div class="source">Policy backtest is a simulation on synthetic data; a full-year replay comes before any finance claim.</div>
+  <div style="margin-top:24px;display:flex;align-items:center;gap:24px;background:#fff;border:1px solid var(--db-line);border-radius:8px;padding:16px 24px;">
+    <span class="lab" style="color:var(--db-lava);white-space:nowrap;">For the CIO</span>
+    <span class="d" style="color:var(--db-navy);"><b>0</b> mismatched weeks, gold vs source</span>
+    <span class="d" style="color:var(--db-navy);"><b>40 of 40</b> planted bad records quarantined</span>
+    <span class="d" style="color:var(--db-navy);">Forged identity and out-of-scope requests <b>refused</b></span>
+  </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>8 / 9</span></div>
 </div></section>
 
@@ -356,16 +425,21 @@
   <div class="title">30 / 60 / 90 days</div>
   <div class="rule"></div>
   <div class="tl">
-    <div class="nd"><div class="dot"></div><span class="when">Day 30</span><span class="h">Governance pack</span><span class="d">Row filters by region, column masks on cost, persona groups, lineage in UC.</span></div>
-    <div class="nd"><div class="dot"></div><span class="when">Day 60</span><span class="h">Waste-aware ordering</span><span class="d">Add shelf-life and waste limits to the order rule; replay a full year.</span></div>
-    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">One-region pilot</span><span class="d">Managers order from the app; you measure all four success measures live.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 30</span><span class="h">Governance pack</span><span class="d">UC row filters by region, cost masks, persona groups, column comments.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 60</span><span class="h">Waste-aware ordering</span><span class="d">Shelf-life and waste limits in the order rule; replay a full year.</span></div>
+    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">One-region pilot</span><span class="d">Live just before Lunar New Year 2027. Managers order from the app.</span></div>
   </div>
-  <div style="margin-top:auto;margin-bottom:24px;background:var(--db-navy);border-radius:12px;padding:32px 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;">
+  <div style="margin-top:auto;margin-bottom:8px;background:var(--db-navy);border-radius:12px;padding:24px 32px;display:grid;grid-template-columns:1fr 1.25fr;gap:32px;align-items:center;">
     <div>
       <div class="lab" style="color:#FFC9BF;">The ask</div>
       <div style="font-size:32px;font-weight:700;color:#fff;margin-top:8px;letter-spacing:-.01em;">Approve a one-region pilot</div>
     </div>
-    <div style="font-size:16px;line-height:1.45;color:#C9D3D7;max-width:400px;">You get live proof on stockouts, waste, and adoption before a network-wide rollout.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="lab" style="color:#B9C6CB;">You measure</div>
+      <div style="font-size:16px;line-height:1.4;color:#fff;">Peak-gift out-of-stock rate vs the 18.7–21.1% baseline</div>
+      <div style="font-size:16px;line-height:1.4;color:#fff;">Share of orders placed from the forecast</div>
+      <div style="font-size:16px;line-height:1.4;color:#fff;">Waste held flat</div>
+    </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>9 / 9</span></div>
 </div></section>
@@ -378,6 +452,25 @@
     if (!m) return;
     var el = document.getElementById('s' + m[1]);
     if (el) { document.body.classList.add('single'); el.classList.add('on'); }
+  })();
+  // slide 5: draw the decision loop from Decide back to Unify, measured from the live layout
+  (function () {
+    var svg = document.getElementById('loop');
+    var nodes = document.querySelectorAll('#s5 .pn');
+    if (!svg || nodes.length < 3) return;
+    function draw() {
+      var s = svg.getBoundingClientRect();
+      if (!s.width) return;
+      var a = nodes[2].getBoundingClientRect(), b = nodes[0].getBoundingClientRect();
+      var x1 = a.left + a.width / 2 - s.left, x2 = b.left + b.width / 2 - s.left;
+      document.getElementById('loopPath').setAttribute('d', 'M ' + x1 + ' 0 L ' + x1 + ' 32 L ' + x2 + ' 32 L ' + x2 + ' 10');
+      var t = document.getElementById('loopTxt'), bg = document.getElementById('loopBg');
+      var mid = (x1 + x2) / 2; t.setAttribute('x', mid);
+      var w = t.getComputedTextLength() + 24; bg.setAttribute('x', mid - w / 2); bg.setAttribute('width', w);
+    }
+    draw(); window.addEventListener('resize', draw);
+    if (document.fonts) document.fonts.ready.then(draw);
+    window.addEventListener('beforeprint', draw);
   })();
 </script>
 </body>
