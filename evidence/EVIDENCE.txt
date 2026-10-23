@@ -454,9 +454,9 @@ bundle, profile fe-bar. URL:
 https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
 
 v2 (2026-10-23, branch polly/app-exceptions-ui, commits 552e546 + 014a363, review
-fixes e2cb3e6): management by exception, bulk accept, demo fixes, Databricks brand
-refresh. Live status after the review-fix deploy: app_status RUNNING,
-compute_status ACTIVE, deployment 01f1cef5d10714c0a3fee86d6b21630e.
+fixes e2cb3e6 + 23c0f8f): management by exception, bulk accept, demo fixes,
+Databricks brand refresh. Live status after the latest deploy: app_status
+RUNNING, compute_status ACTIVE, deployment 01f1cef775a1196e8129640a5f2a1003.
 App log at startup:
   "[replenishment] Schema replenishment is ready"
   "[replenishment] Planner scope seed applied"
@@ -503,11 +503,20 @@ accept-routine takes only {filters, expected: {count, snapshot}}. GET
 order week + sorted ids), never ids. On confirm the server recomputes the
 pending routine set from EXCEPTION_RULES inside the caller's verified scope and
 ignores any ids in the body; if count or snapshot differ from what the user saw
-it answers 409 ROUTINE_CHANGED with both counts and saves nothing. Live GET
+it answers 409 ROUTINE_CHANGED with both counts and saves nothing.
+All or nothing, one transaction: the recompute, the comparison and every
+decision + audit event run on one connection between one BEGIN and one COMMIT
+(acceptRoutineSet). If any line cannot be accepted at write time (a decision
+committed after the recompute, seen by the in-transaction read of existing
+decisions, or an in-flight insert caught by the unique recommendation_id via
+ON CONFLICT DO NOTHING), the whole transaction rolls back and the answer is the
+same 409; routine mode never commits a partial set. Pending lines have no
+order_decisions row to lock and the app has no UPDATE on serving.recommendations,
+so the unique key is the concurrency guard. Live GET
 (read-only): all stores count 1,330, 180,518 units, snapshot d33858c90a7c4dec,
 no ids in the body; North count 462.
 Accept selected (POST /api/recommendations/bulk-accept) keeps ids + the version
-each row showed. Both paths: one transaction; per line: verified identity,
+each row showed and keeps per-line partial results (207). Both paths: per line: verified identity,
 scope (403), exists (404), something to order (422), expected version (409,
 incl. a concurrent insert via ON CONFLICT DO NOTHING); one order_decisions row +
 one decision_events row per accepted line, decision_source = 'bulk'. 200 all
@@ -549,10 +558,10 @@ Test decisions cleared (2026-10-23):
 Gates (2026-10-23, eastwind-replenishment/):
   npm run typecheck     OK (tsc server + client, 0 errors)
   npm run lint          OK (eslint, 0 problems) | npx appkit lint: no violations
-  npx vitest run        3 files, 44 tests passed (44 it() cases, no
+  npx vitest run        3 files, 47 tests passed (47 it() cases, no
                         parameterised tests):
     server/routes/replenishment-routes.test.ts  20 (decision API, identity, scope)
-    server/routes/bulk-accept.test.ts           20:
+    server/routes/bulk-accept.test.ts           23:
       accept selected (8): happy path 200, out-of-scope lines 403 per line +
         207, none in scope 403, version conflicts on some lines 409 + 207,
         re-accept 200, 404/422, empty / duplicate / malformed 400,
@@ -564,6 +573,12 @@ Gates (2026-10-23, eastwind-replenishment/):
         written; own snapshot accepts only North lines); changed set -> 409
         ROUTINE_CHANGED with both counts, nothing written, a same-count swap
         also caught; bad snapshot / count 400, unauthenticated 401
+      routine concurrency (3): a decision injected after the in-transaction
+        recompute and before the writes -> 409, zero new decisions, zero
+        audit events, one BEGIN rolled back with no COMMIT; a concurrent
+        insert winning one line at write time -> 409, nothing saved (both
+        fail against the previous commit, which returned a partial 207);
+        Accept selected still returns per-line 207
       exception rules + line_context (6): rule SQL from the constant; strict
         parsing; empty / undefined / {} / malformed / failed warehouse keeps
         the existing rows and issues no DELETE; a valid set replaces them in
@@ -589,9 +604,11 @@ network layer, so nothing could be saved; no Accept/Adjust/Reject clicked):
   browser, with no identity shown (no email-like text on screen; store filter
   "All stores (0)", "Your scope: none"); the server-side fail-closed path is
   covered by the tests above.
-  Re-run after the review fixes (deployment 01f1cef5d107...): same 16/16
-  results, aspect 1.85-2.09:1, hero line and bulk dialog unchanged; Lakebase
-  still 0 decisions / 0 events afterwards.
+  Re-run after the review fixes (deployments 01f1cef5d107... and
+  01f1cef775a1...): same 16/16 results, aspect 1.85-2.09:1, hero line and bulk
+  dialog unchanged, live GET /routine 1,330 lines snapshot d33858c90a7c4dec;
+  accept-routine was not called on live data; Lakebase still 0 decisions /
+  0 events afterwards.
 Screenshots (outside the repo, illustrative only): /Users/darren.wee/Downloads/
 FEBAR/_generated/screens/
   app-v2-1440-light-dock-closed.png   app-v2-1440-light-dock-open.png
