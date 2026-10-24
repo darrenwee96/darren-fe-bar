@@ -17,7 +17,7 @@ The visual version is `index.html` and `eastwind-deck.pdf`. The architecture dia
 **Storyline: from a Monday guess to a Monday order.** You get three outcomes on one platform:
 1. **Right quantity, right week.** Lakeflow unifies your five feeds, and Mosaic AI forecasts against the festival, not the calendar week.
 2. **Managers review only the exceptions.** The Databricks App on Lakebase routes the ~15% of lines that need judgement and lets the routine rest go through in one step, with every decision audited.
-3. **Ask anything, see only your stores.** Genie answers in plain language on governed data, and Unity Catalog decides what each person sees.
+3. **Ask anything, see only your stores.** Genie answers in plain language on governed data. Unity Catalog policies define what each person can see, and the app applies the same mapping to its Lakebase reads.
 
 Manager decisions flow back to gold, so next week's forecast learns from them. One platform is the reason that loop closes.
 
@@ -112,7 +112,7 @@ Your systems keep running; they just drop files. The five feeds (POS sales, ERP 
 | Step | Product | What it does | Proof label |
 |---|---|---|---|
 | **Unify** | Lakeflow | Bronze, silver, gold; quality expectations | 0 mismatched weeks |
-| **Predict** | Mosaic AI · MLflow | Forecast + p90 band; champion gate before it serves | Festival-aligned |
+| **Predict** | Mosaic AI · MLflow | Forecast + p90 band; registered, versioned, and compared with the live model before promotion | Festival-aligned |
 | **Decide** | Lakebase + App | Exception-based queue; every decision audited | ~15% need you |
 | **Ask** | Genie | Natural language; runs as the user, SQL shown | No ticket needed |
 
@@ -122,7 +122,7 @@ Your systems keep running; they just drop files. The five feeds (POS sales, ERP 
 
 **Speaker notes**
 - **TELL:** "One platform, four steps, and a loop."
-- **SHOW:** Your systems just drop files. Lakeflow unifies them, and gold matches source with zero mismatched weeks. Mosaic AI forecasts each store and SKU against the festival, tracked in MLflow, and a model only serves once it passes the champion gate. Lakebase and the app put each line in front of the right manager, but only the ~15% that need judgement. Genie answers on the same governed tables. Then the red arrow: decisions flow back to gold for the next run. Unity Catalog sits underneath all of it.
+- **SHOW:** Your systems just drop files. Lakeflow unifies them, and gold matches source with zero mismatched weeks. Mosaic AI forecasts each store and SKU against the festival, tracked in MLflow, and each new model is registered, versioned, and compared with the live model before it is promoted. Lakebase and the app put each line in front of the right manager, but only the ~15% that need judgement. Genie answers on the same governed tables. Then the red arrow: decisions flow back to gold for the next run. Unity Catalog sits underneath all of it.
 - **TELL:** "No export to a second vendor and back. [CIO], the store and region scope is a real Unity Catalog row filter and the cost mask is a real column mask; I'll show you both live."
 
 ---
@@ -192,16 +192,16 @@ The inset shows the live "Viewing as Store Manager · Zhongshan Shop L0001" stri
 
 | Today | With Databricks |
 |---|---|
-| Order by last year's calendar week | Order for the festival week, with a p90 buffer sized to the risk |
-| Review every line by hand | Review the ~15% of lines that need you; accept the routine rest in one step |
-| Questions wait for a report | Ask Genie and get the answer, with the SQL, in your own scope |
-| Six tools, six copies, six permission sets | One platform, governed in Unity Catalog, decisions flowing back to gold |
+| Order by gut feel and last year's calendar week | Order for the festival week, with a p90 buffer sized to the risk |
+| Peak gifts run out before the festival | Volume lands in the lead-up weeks, when customers buy |
+| Every line approved by hand | Review the ~15% of lines that need you; accept the routine rest in one step |
+| POS, ERP, catalog, store, and holiday data apart, with no single view | One governed view in Unity Catalog; ask Genie, and decisions flow back to gold |
 
 **Suggested next step: plan your next order week together.** Your POS and ERP teams drop the five feeds, your planners review the first queue with us, and you see your own peak-gift exposure before the next Lunar New Year.
 
 **Speaker notes**
 - **TELL:** "Here's what your Monday looks like with this in place."
-- **SHOW:** Four rows: order for the festival, review only exceptions, ask instead of waiting, and one governed platform instead of six tools.
+- **SHOW:** Four rows: order for the festival week instead of last year's calendar, stock the lead-up instead of running out, review only the exceptions instead of every line, and one governed view of your five sources instead of separate systems.
 - **TELL:** "The next step is simple. Your teams drop the feeds and we sit with your planners on the first order week, so you see your own exposure before the next Lunar New Year."
 
 ---
@@ -256,7 +256,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 
 **2. What's the risk?**
 - *Exec:* Your managers stay in control. Exceptions get a human decision with a reason, routine lines can still be reviewed, and every change is audited.
-- *Technical:* The audit trail is append-only (E383–386). "Accept all routine" is all-or-nothing: if the routine set changed since the user saw it, nothing is saved (E500–513). Scope fails closed for unmapped users (E624–627). The model only serves after the @champion gate (E201–203).
+- *Technical:* The audit trail is append-only (E383–386). "Accept all routine" is all-or-nothing: if the routine set changed since the user saw it, nothing is saved (E500–513). Scope fails closed for unmapped users (E624–627). A new model is compared with the live @champion before promotion (E201–209).
 
 **3. How fast do you see value?**
 - *Exec:* The full loop already runs weekly on this data. Your next step is to drop your own feeds and review a first order week together.
@@ -308,10 +308,10 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 - *Technical:* 2,247 store-SKU series, 1,860,102 training rows, and 13,482 forecast rows per weekly run (E53, E196, E254). Training took about 25 minutes and scoring about 6 (E191, E248).
 
 **6. How do you handle model drift and MLOps?**
-- *Exec:* Every model is versioned, gated before it serves, and checked against its features on every run.
+- *Exec:* Every model is registered and versioned, compared with the live model before promotion, and checked against its features on every run.
 - *Technical:*
   - The scoring job asserts a feature-schema hash before it writes forecasts (E197–199).
-  - Version 6 is @champion. It was promoted because the corrected festival features changed the schema, not because of an accuracy win: on point accuracy it is level with v5, and we say so (E201–213).
+  - By default the gate blocks a worse model: a candidate is promoted only if it scores no worse than the live @champion. Version 6 was promoted through an explicit override, because the corrected festival features changed the feature schema. On its own inputs the previous model (v5) scored about the same, so v6 is not an accuracy win over v5 (E201–213).
   - Known gaps:
     - stockout weeks are excluded rather than demand-corrected (E845–848)
     - some festival-week peaks are still dampened (E278–279, E849–851)
