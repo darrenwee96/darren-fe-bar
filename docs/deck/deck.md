@@ -208,37 +208,37 @@ The inset shows the live "Viewing as Store Manager · Zhongshan Shop L0001" stri
 
 ## Live demo run-of-show (about 8 minutes)
 
-Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (what it means for the business). Read live values off the screen; the figures here are from the latest evidence run (E-rbac lines).
+Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (what it means for the business). Read live values off the screen; the figures here are from the latest evidence run (`evidence/EVIDENCE.txt`, refreshed 24 Oct 2026; see its §1b live snapshot).
 
 | # | TELL | SHOW | LAND (business meaning) |
 |---|---|---|---|
-| 1 | "This is the one screen your managers open on Monday." | Header (order week, data loaded, model v6) and the KPI tiles: 481 of 908 peak lines need an order, $3.60M of peak sales at risk (E491). | You see the exposure in dollars before anyone orders. |
-| 2 | "Only some lines need a person." | Needs review: "231 of 1,561 lines need you"; routine bar "1,330 routine lines · $1.72M at cost" (E485–487). Point to Accept all routine and **don't press it**. | Your managers' time goes to the ~15% that need judgement. |
-| 3 | "Let's go to one region and one store." | Region = North (82 need review, 462 routine, E487–488), then Zhongshan Shop. | Each manager works their own queue. |
-| 4 | "Here's the mooncake box from the slides." | Open Classic Lotus Mooncake Box. Point to the forecast peaking in the lead-up weeks (188, 416), where last year's calendar orders 353 and 504 for the festival week and after (E261–264). | The order lands before customers arrive, not after. |
-| 5 | "Here's why a manager can trust it." | The reason ("Mid-Autumn in 3 weeks – forecast 15.9x recent sales · Stock covers 0.2 of the 3 weeks needed · Holiday timing adds 5 units") and "Why this line needs you" ($22.5K peak sales at risk; $12.1K at cost) (E533–538). Then Accept, or adjust with a required reason. | The forecast explains itself in plain words, which drives adoption. Every decision is audited and flows back to gold. |
-| 6 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" The top answer in testing was Taian Service Area N, 6 SKUs, $56,791 (E433–437). Open the SQL. | Self-serve answers on governed data, running as the user, with no ticket. |
-| 7 | "Now, who sees what." | Viewing as → Store Manager · Zhongshan Shop L0001: "2 of 20 lines need you", unit cost masked. Open "How UC enforces this": app 31 / 2,247 rows, UC row filter 31 / 2,247 rows, and the live row filter and mask definitions (E680–689, E751, E764–769). Switch to Regional Planner · North (782 store-SKUs). | One governance model: each person sees only their stores, cost stays private, and the app and Unity Catalog agree. |
+| 1 | "This is the one screen your managers open on Monday." | Header (order week, data loaded, model v6) and the KPI tiles: 481 of 908 peak lines need an order, $3.60M of peak sales at risk. | You see the exposure in dollars before anyone orders. |
+| 2 | "Only some lines need a person." | Needs review: "231 of 1,561 lines need you"; routine bar "1,330 routine lines · $1.72M at cost". Point to Accept all routine and **don't press it**. | Your managers' time goes to the ~15% that need judgement. |
+| 3 | "Let's go to one region and one store." | Region = North (82 need review, 462 routine), then Zhongshan Shop. | Each manager works their own queue. |
+| 4 | "Here's the mooncake box from the slides." | Open Classic Lotus Mooncake Box. Point to the forecast peaking in the lead-up weeks (188, 416), where last year's calendar orders 353 and 504 for the festival week and after. | The order lands before customers arrive, not after. |
+| 5 | "Here's why a manager can trust it." | The reason ("Mid-Autumn in 3 weeks – forecast 15.9x recent sales · Stock covers 0.2 of the 3 weeks needed · Holiday timing adds 5 units") and "Why this line needs you" ($22.5K peak sales at risk; $12.1K at cost). Then Accept, or adjust with a required reason. | The forecast explains itself in plain words, which drives adoption. Every decision is audited and flows back to gold. |
+| 6 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" The top answer in testing was Taian Service Area N, 6 SKUs, $56,791. Open the SQL. | Self-serve answers on governed data, running as the user, with no ticket. |
+| 7 | "Now, who sees what." | Viewing as → Store Manager · Zhongshan Shop L0001: "2 of 20 lines need you", unit cost masked. Open "How UC enforces this": app 31 / 2,247 rows, UC row filter 31 / 2,247 rows, and the live row filter and mask definitions. Switch to Regional Planner · North (782 store-SKUs). | One governance model: each person sees only their stores, cost stays private, and the app and Unity Catalog agree. |
 | 8 | "Back to your outcomes." | Return to Viewing as → Me and the KPI tiles. | More peak-gift sales, managers on exceptions only, and one platform your CIO can govern. |
 
 **Optional CIO beat (only if asked):**
 - *TELL:* "Where does this number come from?"
-- *SHOW:* Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables (577 lineage rows, E160–168). Then the row filter `governance.rf_store_scope` and mask `governance.mask_unit_cost` on the table (E650–653).
+- *SHOW:* Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables (577 lineage rows). Then the row filter `governance.rf_store_scope` and mask `governance.mask_unit_cost` on the table.
 - *LAND:* every recommended order traces back to its source rows, under one set of controls.
 
 **CIO aside (beats 5 and 7):**
-- The app verifies each user's OAuth token. Spoofed forwarded identity headers are ignored and the verified identity is used; a request with no verifiable identity gets 401 (E621–623).
-- Out-of-scope decisions get 403. A persona can only narrow your own access, never widen it, and the auditor persona is read-only (E699–707).
-- A stale edit returns 409 "Someone else changed this order" (E370–372).
+- The app verifies each user's OAuth token. Spoofed forwarded identity headers are ignored and the verified identity is used; a request with no verifiable identity gets 401.
+- Out-of-scope decisions get 403. A persona can only narrow your own access, never widen it, and the auditor persona is read-only.
+- A stale edit returns 409 "Someone else changed this order".
 
 ## Demo-prep checklist
 
-- [x] **Test decisions cleared** (2026-10-23, backed up first): Lakebase and gold hold 0 decisions and 0 events (E545–556). The adoption tile shows "not enough decisions yet (0 of 20 needed)" until real decisions exist (E530–531).
-- [x] **Hero line reason checked:** "Mid-Autumn in 3 weeks – forecast 15.9× recent sales | Stock covers 0.2 of the 3 weeks needed | Holiday timing adds 5 units" (E533–535; live on 24 Oct 2026).
+- [x] **Test decisions cleared** (2026-10-23, backed up first): Lakebase and gold hold 0 decisions and 0 events. The adoption tile shows "not enough decisions yet (0 of 20 needed)" until real decisions exist.
+- [x] **Hero line reason checked:** "Mid-Autumn in 3 weeks – forecast 15.9× recent sales | Stock covers 0.2 of the 3 weeks needed | Holiday timing adds 5 units" (live on 24 Oct 2026).
 - [ ] **Don't press "Accept all routine" in the demo.** It would write 1,330 decisions. Point to it and use single-line Accept or Adjust instead.
-- [ ] **Pre-warm Genie.** Ask the highway question once beforehand; an answer took about 23s in testing (E443–445).
-- [ ] **Add the evaluators as analysts** in `REPLENISHMENT_ANALYSTS` (app.yaml) before the session. Anyone unmapped sees "You don't have any stores assigned yet" (E539–543, E602–606).
-- [ ] **Know what "Viewing as" is:** a narrowing demo. It picks a persona from the UC mapping and intersects it with your own scope. It doesn't sign you in as that person (E784–785).
+- [ ] **Pre-warm Genie.** Ask the highway question once beforehand; an answer took about 23s in testing.
+- [ ] **Add the evaluators as analysts** in `REPLENISHMENT_ANALYSTS` (app.yaml) before the session. Anyone unmapped sees "You don't have any stores assigned yet".
+- [ ] **Know what "Viewing as" is:** a narrowing demo. It picks a persona from the UC mapping and intersects it with your own scope. It doesn't sign you in as that person.
 - [ ] **Use a demo identity for accept/adjust in beat 5,** and clear those decisions afterwards.
 - [ ] **If someone asks about forecast accuracy:** "It beats last year's method in every channel and both holiday seasons. I'm happy to walk your team through the backtest in a technical session."
 
@@ -252,79 +252,79 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
 
 **1. What does it cost?**
 - *Exec:* We'll size it with you; this build doesn't include a cost figure. The intended benefit is less integration effort: one platform to govern and operate instead of six tools wired together. We haven't measured that saving.
-- *Technical:* The pipeline, SQL warehouse, and Lakebase run serverless or autoscaling (E87–88, E354). The weekly scoring job ran in about six minutes (E248).
+- *Technical:* The pipeline, SQL warehouse, and Lakebase run serverless or autoscaling. The weekly scoring job ran in about six minutes.
 
 **2. What's the risk?**
 - *Exec:* Your managers stay in control. Exceptions get a human decision with a reason, routine lines can still be reviewed, and every change is audited.
-- *Technical:* The audit trail is append-only (E383–386). "Accept all routine" is all-or-nothing: if the routine set changed since the user saw it, nothing is saved (E500–513). Scope fails closed for unmapped users (E624–627). A new model is compared with the live @champion before promotion (E201–209).
+- *Technical:* The audit trail is append-only. "Accept all routine" is all-or-nothing: if the routine set changed since the user saw it, nothing is saved. Scope fails closed for unmapped users. A new model is compared with the live @champion before promotion.
 
 **3. How fast do you see value?**
 - *Exec:* The full loop already runs weekly on this data. Your next step is to drop your own feeds and review a first order week together.
-- *Technical:* One weekly job covers refresh, scoring, recommendations, the Lakebase load, and decision ingest, and every task succeeded on the last run (E247–251).
+- *Technical:* One weekly job covers refresh, scoring, recommendations, the Lakebase load, and decision ingest, and every task succeeded on the last run.
 
 **4. Will managers actually use it?**
 - *Exec:* That's the point of the exception queue: only ~15% of lines ask for a decision, each with its reason in plain words, and approval is one click. We'll measure the share of orders placed from the forecast once your managers use it.
-- *Technical:* There are 0 real decisions so far; the app shows "not enough decisions yet" until 20 exist, then the share (E818–822).
+- *Technical:* There are 0 real decisions so far; the app shows "not enough decisions yet" until 20 exist, then the share.
 
 **5. What's the return?**
 - *Exec:* The opportunity is $2–3M a year: 20–30% of the $10.3M lost on peak gifts. That's an expected outcome on synthetic data, not a realised return, and it's what you'd track on your own data.
-- *Technical:* The holiday backtest lowered modelled lost sales in all 6 season × channel windows (E314–321, E337). See the backup section for why we don't headline the backtest dollars.
+- *Technical:* The holiday backtest lowered modelled lost sales in all 6 season × channel windows. See the backup section for why we don't headline the backtest dollars.
 
 **6. What happens to waste?**
-- *Exec:* It stays roughly flat: about +$42k a year, ~1% of today's $3.87M, in the backtest. We're not claiming a waste saving. Making the order rule waste-aware is the natural next improvement.
-- *Technical:* Mid-Autumn 2025 airport and downtown improved, and Lunar New Year 2026 worsened (E329, E341–344).
+- *Exec:* It stays roughly flat. In the backtest, forecast-driven ordering had slightly less waste than manual ordering, about $42k a year (~1% of today's $3.87M), but the result is mixed by season, so we're not claiming a waste saving. Making the order rule waste-aware is the natural next improvement.
+- *Technical:* Mid-Autumn 2025 airport and downtown improved, and Lunar New Year 2026 worsened.
 
 ### CIO
 
 **1. What's the architecture?**
 - *Exec:* One Databricks platform: Unify, Predict, Decide, Ask, with Unity Catalog governing the data and lineage, and decisions looping back to gold.
 - *Technical:*
-  - **Unify:** serverless Lakeflow pipeline with 5 bronze Auto Loader streaming tables, plus 6 silver and 2 gold materialized views (E87–89).
-  - **Predict:** LightGBM mean plus quantile(0.9) models on 29 features, registered in UC with @champion (E184–186).
-  - **Decide:** Lakebase Postgres 17 for recommendations and decisions (E354). The app routes lines by five exception rules (E475–489).
-  - **Ask:** an AppKit app and a Genie space on 8 governed tables (E405–408, E452).
+  - **Unify:** serverless Lakeflow pipeline with 5 bronze Auto Loader streaming tables, plus 6 silver and 2 gold materialized views.
+  - **Predict:** LightGBM mean plus quantile(0.9) models on 29 features, registered in UC with @champion.
+  - **Decide:** Lakebase Postgres 17 for recommendations and decisions. The app routes lines by five exception rules.
+  - **Ask:** an AppKit app and a Genie space on 8 governed tables.
   - Genie is the only GenAI component. We don't use or claim ai_query or other AI functions here.
 
 **2. How do you handle data quality?**
 - *Exec:* Bad rows are caught and quarantined automatically, and gold reconciles to source exactly.
-- *Technical:* Expectations quarantined exactly the 40 planted defects: 20 unknown-store rows and 20 negative-unit rows. Duplicates collapse to one row. Gold reconciles to source with 0 mismatched weeks in all three channels (E112–122).
+- *Technical:* Expectations quarantined exactly the 40 planted defects: 20 unknown-store rows and 20 negative-unit rows. Duplicates collapse to one row. Gold reconciles to source with 0 mismatched weeks in all three channels.
 
 **3. Security and governance?**
 - *Exec:* Unity Catalog governs the data, lineage, and access. A row filter limits each persona to its stores or region, a column mask hides unit cost, and the app applies the same mapping to what it reads from Lakebase.
 - *Technical:*
   - *Built:*
-    - `governance.rf_store_scope` row filter on `(region, location_id)` and `governance.mask_unit_cost` column mask, both on `gold.replenishment_recommendations_current`, driven by `governance.persona_access` (E646–657).
-    - Verified per persona: 2,247 / 782 / 31 rows; unit cost masked for the store manager (E679–689).
-    - Least-privilege grants for the app service principal and 577 lineage rows (E155–168).
-  - *What enforces what:* UC enforces warehouse and Genie reads of the gold table at query time. The app enforces its Lakebase copy using the same UC mapping, server-side (E711–713).
-  - *Not yet:* account groups for the four personas aren't created; today's bindings are by principal, and an admin creates the groups and reruns the script (E691–697). The gold decision-history tables have no row filter (E787–790).
+    - `governance.rf_store_scope` row filter on `(region, location_id)` and `governance.mask_unit_cost` column mask, both on `gold.replenishment_recommendations_current`, driven by `governance.persona_access`.
+    - Verified per persona: 2,247 / 782 / 31 rows; unit cost masked for the store manager.
+    - Least-privilege grants for the app service principal and 577 lineage rows.
+  - *What enforces what:* UC enforces warehouse and Genie reads of the gold table at query time. The app enforces its Lakebase copy using the same UC mapping, server-side.
+  - *Not yet:* account groups for the four personas aren't created; today's bindings are by principal, and an admin creates the groups and reruns the script. The gold decision-history tables have no row filter.
 
 **4. How does it integrate with our POS and ERP?**
 - *Exec:* Your systems keep running. They drop files, and Lakeflow picks up only what's new.
-- *Technical:* Two drops added exactly +12,079 POS and +15,729 inventory rows (E98–101). The store master bridges POS `store_code` to ERP `location_id` (E79–80). Direct connectors are an option to scope with you; this build doesn't show them.
+- *Technical:* Two drops added exactly +12,079 POS and +15,729 inventory rows. The store master bridges POS `store_code` to ERP `location_id`. Direct connectors are an option to scope with you; this build doesn't show them.
 
 **5. Will it scale?**
 - *Exec:* It already forecasts every store and SKU, every week.
-- *Technical:* 2,247 store-SKU series, 1,860,102 training rows, and 13,482 forecast rows per weekly run (E53, E196, E254). Training took about 25 minutes and scoring about 6 (E191, E248).
+- *Technical:* 2,247 store-SKU series, 1,860,102 training rows, and 13,482 forecast rows per weekly run. Training took about 25 minutes and scoring about 6.
 
 **6. How do you handle model drift and MLOps?**
 - *Exec:* Every model is registered and versioned, compared with the live model before promotion, and checked against its features on every run.
 - *Technical:*
-  - The scoring job asserts a feature-schema hash before it writes forecasts (E197–199).
-  - By default the gate blocks a worse model: a candidate is promoted only if it scores no worse than the live @champion. Version 6 was promoted through an explicit override, because the corrected festival features changed the feature schema. On its own inputs the previous model (v5) scored about the same, so v6 is not an accuracy win over v5 (E201–213).
+  - The scoring job asserts a feature-schema hash before it writes forecasts.
+  - By default the gate blocks a worse model: a candidate is promoted only if it scores no worse than the live @champion. Version 6 was promoted through an explicit override, because the corrected festival features changed the feature schema. On its own inputs the previous model (v5) scored about the same, so v6 is not an accuracy win over v5.
   - Known gaps:
-    - stockout weeks are excluded rather than demand-corrected (E845–848)
-    - some festival-week peaks are still dampened (E278–279, E849–851)
+    - stockout weeks are excluded rather than demand-corrected
+    - some festival-week peaks are still dampened
     - live drift monitoring is next
 
 ### Backup (quote only if asked)
 
-- **p90 plan-for coverage:** 91–92% of observed store-SKU-weeks landed within the calibrated p90 across both holiday backtests, and 90–95% on peak gifts (E236–241).
-- **Backtest dollars (caveat first):** across 25 holiday weeks, the forecast policy had $12.9M less modelled lost sales than the manual policy. Scaled up from peak weeks only, that is $26.8M/yr. It is peak weeks scaled up, not a whole-year estimate, and we don't quote it as a forecast of savings or as support for the $2–3M opportunity. A full-year replay comes first (E314–329, E338–340, E824–830).
+- **p90 plan-for coverage:** 91–92% of observed store-SKU-weeks landed within the calibrated p90 across both holiday backtests, and 90–95% on peak gifts.
+- **Backtest dollars (caveat first):** across 25 holiday weeks, the forecast policy had $12.9M less modelled lost sales than the manual policy. Scaled up from peak weeks only, that is $26.8M/yr. It is peak weeks scaled up, not a whole-year estimate, and we don't quote it as a forecast of savings or as support for the $2–3M opportunity. A full-year replay comes first.
 
 ### Objection handling
 
 - **"We already have a BI tool and a data warehouse."** Keep them. This isn't a BI replacement; it's the forecast-to-order loop BI can't close. Gold tables are open to your BI through a SQL warehouse, and you avoid adding vendor-to-vendor copies for ML, an OLTP database, and an app host.
 - **"Why not buy a point forecasting SaaS?"** A SaaS forecast is another copy of your data, another permission model, and a black box your managers won't trust. Here the festival logic is yours, every order traces back to its source rows, access is governed in Unity Catalog, and manager decisions flow back to improve the next forecast.
-- **"These numbers are synthetic."** Yes. The synthetic business is calibrated to realistic magnitudes: $160.8M net sales, $17.8M lost sales, and $3.87M waste a year (E58–62, E126–131). That's why the next step is your own feeds: so every figure becomes yours.
+- **"These numbers are synthetic."** Yes. The synthetic business is calibrated to realistic magnitudes: $160.8M net sales, $17.8M lost sales, and $3.87M waste a year. That's why the next step is your own feeds: so every figure becomes yours.
 - **"Your backtest shows much bigger numbers. Why only $2–3M?"** The backtest figure comes from the two most stressed holiday windows, scaled up. We don't treat it as a whole-year number. $2–3M is the opportunity we'd track with you, against the $10.3M lost on peak gifts today.
