@@ -103,14 +103,17 @@ Gold tables.
 
 The app creates the `replenishment` schema at startup. Deploy once before running locally, so the service principal
 owns it. The startup migration is idempotent: v2 adds `decision_source` (`'single'` or `'bulk'`, default `'single'`)
-to `order_decisions` and `decision_events`, and creates `line_context`. The Gold copy
+to `order_decisions` and `decision_events`, and creates `line_context`; v3 adds `acting_persona` (the "Viewing as"
+persona a decision was made under, `NULL` = the decider's own scope) to both. The Gold copy
 (`ml/src/sync_lakebase.py ingest_decisions`) selects named columns, so it does not carry `decision_source` yet.
 
 ### API
 
 | Route                                      | What it does                                                                                                                                           |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/whoami`                          | Verified user, resolved planning scope and the exception thresholds                                                                                    |
+| `GET /api/whoami`                          | Verified user, effective scope (own scope narrowed by the persona), own scope, `canDecide`, `costMasked`, persona, exception thresholds                |
+| `GET /api/personas`                        | Selectable personas from the UC mapping (`{enabled: false}` unless `DEMO_PERSONAS=true`)                                                               |
+| `GET /api/governance`                      | Governance drawer: rows visible vs total, live row filter / mask definitions, grants, UC-evaluated row count per persona                               |
 | `GET /api/filters`                         | Regions, categories and stores inside the caller's scope                                                                                               |
 | `GET /api/recommendations/summary`         | KPI counts and values for the filters                                                                                                                  |
 | `GET /api/recommendations/by-store`        | Top 10 stores by order need                                                                                                                            |
@@ -168,8 +171,77 @@ INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('<email>'
 DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('<email>');
 ```
 
-The warehouse charts show aggregated history and forecasts and run as the app service principal. To restrict those
-per user too, add a Unity Catalog row filter on the Gold tables.
+The warehouse charts show aggregated history and forecasts and run as the app service principal. While viewing as a
+single-region or single-store persona they are pinned to that region / store.
+
+## "Viewing as" personas: Unity Catalog governance demo
+
+A **Viewing as** picker in the header (with a **Governance** drawer) shows how Unity Catalog governs this data: a store
+manager sees and decides only their store, an auditor sees everything and decides nothing. It is on when `app.yaml`
+sets `DEMO_PERSONAS: 'true'`; with any other value the picker is hidden and the persona header is ignored.
+
+**UC objects** (`../etl/governance/persona_rbac.sql`, idempotent; apply with
+`python3 ../etl/governance/apply_governance.py --profile fe-bar`, which also prints a verification report):
+
+| Object                                                                | What it does                                                                                                                                                                 |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `darren_fe_bar_catalog.governance.persona_access`                     | The governed mapping: persona → account group (or one explicit principal) → region `'*'` / region / store, `can_decide`, `sees_unit_cost`                                    |
+| `governance.rf_store_scope(region, location_id)`                      | **Row filter** on `gold.replenishment_recommendations_current`: a row is visible when one of the caller's bindings (`is_account_group_member` or `current_user()`) covers it |
+| `governance.mask_unit_cost(unit_cost)`                                | **Column mask** on `unit_cost`: `NULL` unless a binding has `sees_unit_cost` (store managers do not)                                                                         |
+| `governance.persona_row_visible`, `governance.persona_sees_unit_cost` | The same rules for a named persona, so the app can show what UC returns for it                                                                                               |
+| `GRANT`s                                                              | `USE CATALOG` / `USE SCHEMA` / `SELECT` to the four persona groups; the app service principal reads the mapping and the functions                                            |
+
+| Persona (`persona_id`)                                       | Account group             | Scope       | Can                                      | Rows (of 2,247) |
+| ------------------------------------------------------------ | ------------------------- | ----------- | ---------------------------------------- | --------------- |
+| Head-office Analyst (`head_office_analyst`)                  | `eastwind_head_office`    | all regions | see + decide                             | 2,247           |
+| Regional Planner · North (`regional_planner_north`)          | `eastwind_planners_north` | North       | see + decide                             | 782             |
+| Store Manager · Zhongshan Shop L0001 (`store_manager_l0001`) | `eastwind_store_l0001`    | store L0001 | see + decide its lines; unit cost masked | 31              |
+| Auditor · Read-only (`auditor`)                              | `eastwind_auditors`       | all regions | see only                                 | 2,247           |
+
+The pipeline owner and the app's service principal have explicit network-wide `SERVICE` bindings (by principal, not
+group), so the weekly MERGE and Lakebase load, the Genie space and the app's own warehouse reads keep every row.
+
+**How the app enforces it.** The persona travels as the `x-eastwind-persona` header. The server checks it against
+`persona_access` (read from UC as the service principal, cached 60 s), then:
+
+- **never widens**: the persona's scope is intersected with the signed-in user's own `replenishment.user_scope`
+  (a North planner viewing as Head-office still sees North only);
+- **reads**: every list, KPI, store ranking, routine count and line detail uses that narrowed scope; cost columns UC
+  masks for the persona come back `null` (shown as "Masked");
+- **writes**: Accept / Adjust / Reject, Accept selected and Accept all routine use the same narrowed scope (a store
+  manager deciding another store's line gets `403`, per line in a bulk accept) and a persona without `can_decide`
+  gets `403 READ_ONLY_PERSONA` before any transaction;
+- unknown persona `400 UNKNOWN_PERSONA`; mapping unreadable `503` (fail-closed; your own view keeps working);
+- every decision and audit event records `acting_persona`. Identity (verified token), 401/404/409/422, per-line 207
+  and the all-or-nothing routine accept are unchanged.
+
+**What is UC-enforced at query time vs app-enforced.** The row filter and column mask run inside Unity Catalog for any
+warehouse or Genie query on the Gold table, for whoever runs it (Genie runs as the signed-in user). The app's order
+lines and decisions come from a **Lakebase copy** (`serving.recommendations`), where UC policies do not run; the app
+applies the same UC mapping on the server instead. The Governance drawer puts both side by side: rows the app returns
+(Lakebase) and rows UC returns for the persona (`persona_row_visible` over the Gold table). They match: 782 for North,
+31 for L0001. Personas are a demo of the policy, not an impersonation: the persona's account group is not checked
+against your own membership; it can only narrow what you already have.
+
+**Admin steps (manual).** UC cannot grant to workspace-local groups, and creating account groups needs an account
+admin. Create these **account** groups, add members, assign them to the workspace, then rerun the apply script (it
+reports each missing group as `SKIPPED` until then): `eastwind_head_office`, `eastwind_planners_north`,
+`eastwind_store_l0001`, `eastwind_auditors`. A member then sees exactly their persona's rows when they query
+`gold.replenishment_recommendations_current` in SQL or Genie. Add more personas by adding rows to `persona_access`.
+
+### 60-second demo script (UC RBAC)
+
+1. **(0-10 s)** "Same app, same data. Viewing as **Me**: 2,247 store-SKUs, 231 lines need review." Point at the
+   **Viewing as** picker.
+2. **(10-25 s)** Pick **Store Manager · Zhongshan Shop L0001**. Everything re-scopes: 31 store-SKUs, 2 lines need
+   review, the forecast is Zhongshan Shop's, the store filter offers one store, and unit cost shows **Masked**.
+3. **(25-40 s)** Click **Governance**: role, scope Store L0001, _Can decide_, unit cost masked; rows **31 / 2,247** in
+   the app and **31 / 2,247** from UC's row filter; the actual `rf_store_scope` predicate and `mask_unit_cost`, read live
+   from `information_schema`; the grants on the table.
+4. **(40-50 s)** Pick **Auditor · Read-only**: all 2,247 rows again, every Accept button disabled; "even if the UI were
+   bypassed, the server answers 403".
+5. **(50-60 s)** Pick **Regional Planner · North**: 782 rows, 82 to review. "One mapping table in Unity Catalog drives
+   the row filter for SQL and Genie and the scope in this app; a persona can only narrow what you already have."
 
 ## Local development
 
@@ -189,7 +261,7 @@ Checks:
 ```bash
 npm run typecheck   # server + client tsc
 npm run lint        # eslint
-npm run test        # vitest: decision API, bulk accept, exception rules, order reasons, scope, identity
+npm run test        # vitest: decision API, bulk accept, exception rules, order reasons, scope, identity, personas
 npm run build       # typegen + server (tsdown) + client (vite)
 ```
 

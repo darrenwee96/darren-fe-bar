@@ -635,6 +635,162 @@ accuracy question if asked, but the app no longer shows or suggests one.
 
 
 ================================================================================
+9b. GOVERNANCE: UNITY CATALOG RBAC + "VIEWING AS" PERSONAS
+================================================================================
+
+Branch polly/app-viewer-rbac (on 7651f84). UC objects from
+etl/governance/persona_rbac.sql (idempotent), applied 2026-10-24 with
+`python3 etl/governance/apply_governance.py --profile fe-bar` as the catalog
+owner (statement execution API, warehouse 221da0ceb437f8a8).
+
+Created in darren_fe_bar_catalog:
+  governance                          schema
+  governance.persona_access           mapping table (6 rows: 4 personas + 2
+                                      SERVICE bindings by principal)
+  governance.rf_store_scope           row filter, SET on
+                                      gold.replenishment_recommendations_current
+                                      ON (region, location_id)
+  governance.mask_unit_cost           column mask on unit_cost
+  governance.persona_row_visible      same predicate for a named persona
+  governance.persona_sees_unit_cost   same mask rule for a named persona
+  GRANTs to the app SP f4a2a131-...: USE CATALOG, USE SCHEMA governance,
+  SELECT persona_access, EXECUTE on the 4 functions.
+
+Safety probe before touching Gold: a CTAS copy with the same filter + mask,
+then the weekly job's exact MERGE (WHEN MATCHED UPDATE / NOT MATCHED INSERT /
+NOT MATCHED BY SOURCE DELETE) as the pipeline owner: OK, 2,247 rows,
+sum(unit_cost) 25498.4 (unmasked); probe table dropped.
+
+Row counts before / after (pipeline owner, the job + Genie identity):
+  BEFORE 2026-10-24T09:30:15Z  rows 2247, stores 80, sum(unit_cost) 25498.4
+  AFTER  (row filter applied)  rows 2247
+  App SP after redeploy (warehouse read through the filter), app log:
+    "[replenishment] line_context refreshed: 2247 lines (recommendations
+     loaded 2026-10-12 06:20:23.548793+00)"
+  The weekly jobs (eastwind-forecast-weekly-scoring / -training) and the ETL
+  pipeline run as the pipeline owner (no run_as), which holds the
+  svc_pipeline_owner binding. The Genie space runs on behalf of the user; its
+  only users are the owner (bound) and admins. The other catalog-level
+  principal, vending-machine-sp (FEVM provisioning), has no binding and
+  would see 0 rows of this one table; it does not read it.
+
+Verification report (apply_governance.py, second run = idempotency check,
+every statement OK or SKIPPED, same results):
+  Rows per persona (governance.persona_row_visible)
+    head_office_analyst     ANALYST        visible 2247 / 2247  sees_unit_cost true
+    regional_planner_north  PLANNER        visible  782 / 2247  sees_unit_cost true
+    store_manager_l0001     STORE_MANAGER  visible   31 / 2247  sees_unit_cost false
+    auditor                 AUDITOR        visible 2247 / 2247  sees_unit_cost true
+    svc_pipeline_owner      SERVICE        visible 2247 / 2247
+    svc_app                 SERVICE        visible 2247 / 2247
+  Row filters:  gold.replenishment_recommendations_current
+                darren_fe_bar_catalog.governance.rf_store_scope (region, location_id)
+  Column masks: gold.replenishment_recommendations_current.unit_cost
+                darren_fe_bar_catalog.governance.mask_unit_cost
+
+Account groups: NOT created. `databricks groups create` from this workspace
+makes a workspace-local group (meta.resourceType WorkspaceGroup; one was
+created as a test and deleted), which UC cannot grant to, and the account API
+is not available to this identity. The 15 GRANTs to eastwind_head_office,
+eastwind_planners_north, eastwind_store_l0001 and eastwind_auditors report
+SKIPPED ("principal does not exist yet"). Admin to do: create those four
+ACCOUNT groups, add members, assign to the workspace, rerun the apply script.
+
+App (server/routes/personas.ts + replenishment-routes.ts), DEMO_PERSONAS=true
+in app.yaml:
+  x-eastwind-persona header, validated against persona_access (UC, as the
+  SP, cached 60 s). Persona scope is intersected with the verified user's own
+  user_scope (never wider). Reads and writes use the narrowed scope; a persona
+  without can_decide gets 403 READ_ONLY_PERSONA on decision / bulk-accept /
+  accept-routine before any transaction; unknown persona 400
+  UNKNOWN_PERSONA; mapping unreadable 503; flag off = header ignored.
+  Cost fields are nulled for a persona without sees_unit_cost.
+  New: GET /api/personas, GET /api/governance. Idempotent migration:
+  acting_persona TEXT on replenishment.order_decisions and decision_events
+  (recorded on single, bulk and routine writes; NULL = own scope).
+  What UC enforces at query time: warehouse / Genie reads of the Gold table
+  (row filter + mask for the caller). What the app enforces: its Lakebase
+  copy (serving.recommendations), using the same UC mapping server-side.
+
+Gates (2026-10-24, eastwind-replenishment/):
+  npm run typecheck   OK (tsc server + client, 0 errors)
+  npx eslint .        OK (0 problems)
+  npx vitest run      4 files, 64 tests passed (64 it() cases, no
+                      parameterised tests): replenishment-routes.test.ts 20,
+                      bulk-accept.test.ts 23, reasons.test.ts 4,
+                      personas.test.ts 17 (new):
+    read scope: store manager L0001 = only L0001 on list / summary / whoami /
+      governance, unit_cost + order_value_at_cost null; North planner viewing
+      as head office still North only (can't widen) and 403 on a South line;
+      two restricted scopes intersect (North x L0001 = L0001; L0022 x North =
+      nothing, 403); no header = own scope
+    write scope: store manager on another store -> 403, nothing written; own
+      store -> 201 with acting_persona on the decision and the event; bulk
+      as store manager -> 207 with per-line 403, persona on insert + events;
+      auditor -> 403 on single, bulk, routine (and on an invalid body) with
+      no BEGIN; acting_persona NULL in own scope
+    validation: unknown / SERVICE / malformed / 80-char persona -> 400, no
+      reads or writes; mapping unreadable -> 503 (own view still 200); flag
+      off -> header ignored (own scope, 201, acting_persona NULL, no
+      personas listed); personasEnabled only for 'true'; /api/personas
+      excludes SERVICE; /api/governance returns the UC objects
+    helpers: mapping parsing, narrowScope never wider, source cache + retry
+  databricks apps validate --profile fe-bar: all validation checks passed
+
+Deploy: databricks bundle deploy + bundle run app (profile fe-bar), final
+deployment 01f1cf932913116d94ef10a455a5c21c, app_status RUNNING,
+compute_status ACTIVE (earlier today: 01f1cf900f05..., 01f1cf90e74e...,
+01f1cf9201d9...). Startup log: "Schema replenishment is ready", "Planner scope
+seed applied", "\"Viewing as\" personas enabled (DEMO_PERSONAS=true)".
+
+Read-only smoke test per persona (live, owner token, GET only):
+  persona               scope        store_skus lines exc rout cost      UC rows
+  self                  all          2247  1561  231 1330 $3.20M      n/a
+  head_office_analyst   all          2247  1561  231 1330 $3.20M   2247/2247
+  regional_planner_north North        782   544   82  462 $1.19M    782/2247
+  store_manager_l0001   [L0001]        31    20    2   18 null(masked) 31/2247
+  auditor (canDecide=false) all      2247  1561  231 1330 $3.20M   2247/2247
+  (lines = lines to order, exc = needs review pending, rout = routine pending,
+  cost = order value at cost; app rows = Lakebase visible/total, same numbers)
+  GET with x-eastwind-persona: ceo -> 400 {"error":"Unknown persona",
+  "code":"UNKNOWN_PERSONA"}. Store manager asking ?region=South -> total 0.
+  No write was attempted live (no Accept/Adjust/Reject/bulk/routine); the
+  403 paths are covered by the tests. Decisions after all checks: decided 0,
+  accepted 0, adjusted 0, rejected 0.
+
+Browser checks (headless Chrome via playwright-core, owner token, every
+non-warehouse POST/PUT/PATCH/DELETE aborted; 0 were attempted):
+  1440, each persona: no overflow, 0 console errors, no WMAPE/MAPE/forecast
+  error text; strip "Viewing as <persona>"; store manager "2 of 20 lines need
+  you", "18 routine lines - Masked at cost"; North "82 of 544"; auditor
+  26/26 Accept buttons disabled and the line sheet's Accept / Save adjusted /
+  Reject disabled with the read-only note. Governance drawer per persona:
+  app rows = UC rows, rf_store_scope + mask_unit_cost definitions from
+  information_schema.routines, grants.
+  Sweep 390, 768, 1024, 1280, 1440, 1920 x Genie dock open/closed x {self,
+  store manager, auditor} (36): no horizontal or header overflow, no KPI tile
+  overflow, 0 console errors; forecast chart 1.85-2.09:1 from 768 up (390:
+  316x280, the existing phone minimum). Two layout fixes made during the
+  sweep: below 1024 px Genie opens as a sheet (a 400 px dock squeezed the
+  chart to 262x280 at 768), and the KPI row uses a container query (4 tiles
+  only when there is room beside the dock).
+Screenshots (outside the repo): /Users/darren.wee/Downloads/FEBAR/_generated/
+screens/app-rbac-*.png (24): app-rbac-<persona>-1440.png and
+app-rbac-<persona>-governance.png for self, head_office_analyst,
+regional_planner_north, store_manager_l0001, auditor;
+app-rbac-viewing-as-dropdown.png; app-rbac-auditor-line-sheet.png;
+app-rbac-{store_manager_l0001,auditor}-{390,1280,1920}-dock-{open,closed}.png.
+
+Known limitations: the persona's account group is not checked against the
+signed-in user's membership (it is a narrowing demo, not impersonation); the
+forecast / waste charts are aggregate warehouse reads by the SP pinned to a
+single-region / single-store persona on the client; order_decisions_history /
+order_decision_events in Gold have no row filter (sync_lakebase overwrites
+them with overwriteSchema), and ingest_decisions does not copy
+acting_persona to Gold yet.
+
+
+================================================================================
 10. KPIs VS industry-problem.md SUCCESS MEASURES
 ================================================================================
 
