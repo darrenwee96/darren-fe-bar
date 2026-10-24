@@ -27,10 +27,15 @@ no customer-identifying information is present.
 Requirement (Project.md / industry-problem.md)            Section  Status
 --------------------------------------------------------- -------  -------------------------
 Lakeflow ingests the raw data (5 sources, incremental)      3      EVIDENCED
-Unity Catalog governs it (grants, comments, lineage)        4      PARTIAL - grants, table
-                                                                  comments, lineage live;
-                                                                  row filter / column mask /
-                                                                  persona groups NOT built
+Unity Catalog governs it (grants, comments, lineage)        4, 9b  PARTIAL - grants, table
+                                                                  comments, lineage live; row
+                                                                  filter + column mask + persona
+                                                                  mapping DEPLOYED on gold.
+                                                                  replenishment_recommendations_
+                                                                  current (9b); account groups
+                                                                  NOT created (grants skipped);
+                                                                  decision-history Gold tables
+                                                                  unfiltered
 Lakebase operational serving + decision write-back          7      EVIDENCED
 ML makes it intelligent (forecast, registered @champion)    5      EVIDENCED
 Genie Agent answers in natural language                     8      EVIDENCED
@@ -167,11 +172,18 @@ What exists (verified live 2026-10-12):
     gold.demand_forecasts(_current) -> gold.replenishment_recommendations_current
   so every recommendation traces back through gold to the raw POS/ERP feeds.
 
-What is NOT built (honest gaps, deferred from the plan):
-- No row filters (the planned gold.manager_scope region filter does not exist;
-  manager scoping is enforced in the app layer instead - see section 9).
-- No column masks (unit_cost is visible to any reader of gold).
-- No persona workspace groups (workspace has only the 2 default groups).
+Row-level governance (added 2026-10-24, details in section 9b):
+- DEPLOYED: row filter governance.rf_store_scope and column mask
+  governance.mask_unit_cost on gold.replenishment_recommendations_current,
+  driven by the mapping table governance.persona_access.
+- NOT created: the four persona ACCOUNT groups (eastwind_head_office,
+  eastwind_planners_north, eastwind_store_l0001, eastwind_auditors); their
+  GRANTs are skipped until an account admin creates them. Until then only the
+  explicit principal bindings (pipeline owner, app SP) match the filter.
+- Unfiltered: gold.order_decisions_history and gold.order_decision_events (no
+  row filter; ingest_decisions overwrites them with overwriteSchema).
+- The app's Lakebase reads are scoped by the app from the same mapping, not by
+  UC at query time (section 9 / 9b).
 - No UC column-level comments; business definitions currently live only in the
   Genie space column configs (section 8), so other consumers do not see them.
 
@@ -715,10 +727,10 @@ in app.yaml:
 Gates (2026-10-24, eastwind-replenishment/):
   npm run typecheck   OK (tsc server + client, 0 errors)
   npx eslint .        OK (0 problems)
-  npx vitest run      4 files, 64 tests passed (64 it() cases, no
+  npx vitest run      4 files, 73 tests passed (73 it() cases, no
                       parameterised tests): replenishment-routes.test.ts 20,
                       bulk-accept.test.ts 23, reasons.test.ts 4,
-                      personas.test.ts 17 (new):
+                      personas.test.ts 26 (new):
     read scope: store manager L0001 = only L0001 on list / summary / whoami /
       governance, unit_cost + order_value_at_cost null; North planner viewing
       as head office still North only (can't widen) and 403 on a South line;
@@ -734,13 +746,31 @@ Gates (2026-10-24, eastwind-replenishment/):
       off -> header ignored (own scope, 201, acting_persona NULL, no
       personas listed); personasEnabled only for 'true'; /api/personas
       excludes SERVICE; /api/governance returns the UC objects
+    every read route narrowed: /api/filters (L0001 only / North only),
+      /by-store (scope applied even with ?region=South), /recommendations/:id
+      (own line 200 with unit_cost null; other store 404, audit trail not read)
+    routine accept as store manager: server-computed set = L0001 lines only,
+      one BEGIN ... COMMIT around recompute + writes, no ROLLBACK,
+      acting_persona on decisions + events; a network-wide snapshot -> 409,
+      nothing written
+    fail-closed mapping reads (review fix): malformed UC answers ({}, data not
+      an array, no data) -> 503 PERSONAS_UNAVAILABLE, never cached, the next
+      good read succeeds and is then cached; /api/personas 503 on a malformed
+      answer; rowsOf rejects anything but { data: [rows] }
+    conflicting mapping rows (review fix): can_decide / sees_unit_cost must
+      hold on every row of a persona, otherwise false
     helpers: mapping parsing, narrowScope never wider, source cache + retry
   databricks apps validate --profile fe-bar: all validation checks passed
 
 Deploy: databricks bundle deploy + bundle run app (profile fe-bar), final
-deployment 01f1cf932913116d94ef10a455a5c21c, app_status RUNNING,
-compute_status ACTIVE (earlier today: 01f1cf900f05..., 01f1cf90e74e...,
-01f1cf9201d9...). Startup log: "Schema replenishment is ready", "Planner scope
+deployment 01f1cf95915f12488bcba8154112a993 (after the review fixes),
+app_status RUNNING, compute_status ACTIVE (earlier today: 01f1cf900f05...,
+01f1cf90e74e..., 01f1cf9201d9..., 01f1cf932913...). Read-only re-check on the
+final deployment, GET /api/governance per persona: app rows = UC rows
+(2247, 782, 31, 2247), canDecide false only for auditor, costMasked only for
+the store manager, ucError null; x-eastwind-persona: ceo -> 400; store
+manager /by-store?region=South -> 0 rows; decided 0 / accepted 0 / adjusted 0
+/ rejected 0. Startup log: "Schema replenishment is ready", "Planner scope
 seed applied", "\"Viewing as\" personas enabled (DEMO_PERSONAS=true)".
 
 Read-only smoke test per persona (live, owner token, GET only):
@@ -783,8 +813,12 @@ app-rbac-{store_manager_l0001,auditor}-{390,1280,1920}-dock-{open,closed}.png.
 
 Known limitations: the persona's account group is not checked against the
 signed-in user's membership (it is a narrowing demo, not impersonation); the
-forecast / waste charts are aggregate warehouse reads by the SP pinned to a
-single-region / single-store persona on the client; order_decisions_history /
+summary charts (forecast vs actual, waste KPI, line-sheet SKU forecast) are
+illustrative and NOT a security boundary: aggregate warehouse reads that run as
+the app SP with client-supplied filters, pinned to a single-region /
+single-store persona only by the client. Access is enforced only by the
+server-scoped Lakebase routes and by UC's row filter / mask for queries run as
+the caller (SQL, Genie); order_decisions_history /
 order_decision_events in Gold have no row filter (sync_lakebase overwrites
 them with overwriteSchema), and ingest_decisions does not copy
 acting_persona to Gold yet.
@@ -834,10 +868,13 @@ $3.9M/yr of waste at stake, so the problem sizes are realistic.
 11. KNOWN LIMITATIONS & NEXT STEPS
 ================================================================================
 
-1. Governance gaps (section 4): no row filters, no column masks, no persona
-   groups, no UC column comments. Next: workspace groups per persona, row filter
-   on recommendations via a gold.manager_scope mapping, unit_cost mask, and
-   moving the Genie space definitions into UC comments.
+1. Governance (sections 4, 9b): row filter + column mask + persona mapping are
+   DEPLOYED on gold.replenishment_recommendations_current. Still open: the four
+   persona account groups are NOT created (an account admin must create them and
+   rerun etl/governance/apply_governance.py; grants are skipped until then); the
+   decision-history Gold tables are unfiltered; no UC column comments. Next:
+   create the groups, filter the decision-history tables, move the Genie space
+   definitions into UC comments.
 2. Policy backtest is a simulation on synthetic data (section 6): stressed-window
    annualisation is not a whole-year estimate; waste needs a waste-aware order
    policy before any saving is claimed. Next: full-year replay; add waste-aware

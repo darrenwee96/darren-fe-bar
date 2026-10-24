@@ -7,6 +7,7 @@ import {
   narrowScope,
   personasEnabled,
   personasFromRows,
+  rowsOf,
   ucPersonaSource,
   type PersonaSource,
   type UcGovernance,
@@ -98,6 +99,49 @@ function fakeLakebase() {
       return {
         rows: [{ visible: RECS.filter((r) => inScope(restricted, regions, locations, r)).length, total: RECS.length }],
       };
+    }
+    // OPTIONS_SQL (/api/filters): scope is $1-$3.
+    if (text.includes('SELECT DISTINCT r.location_id, r.location_name')) {
+      const [restricted, regions, locations] = params as [boolean, string[], string[]];
+      return {
+        rows: RECS.filter((r) => inScope(restricted, regions, locations, r)).map((r) => ({
+          ...r,
+          location_name: `Store ${r.location_id}`,
+          channel_type: 'DOWNTOWN',
+          category: 'Mooncake',
+        })),
+      };
+    }
+    // BY_STORE_SQL and ROUTINE_PENDING_SQL: filters $1-$4, scope $5-$7. Every line to order counts as routine here.
+    if (
+      text.includes('GROUP BY r.location_id') ||
+      (text.includes('cardinality(x.exception_reasons) = 0') && text.includes('ORDER BY r.recommendation_id'))
+    ) {
+      const [region, , , location, restricted, regions, locations] = params as [
+        string | null,
+        null,
+        null,
+        string | null,
+        boolean,
+        string[],
+        string[],
+      ];
+      const rows = RECS.filter(
+        (r) =>
+          inScope(restricted, regions, locations, r) &&
+          (region === null || r.region === region) &&
+          (location === null || r.location_id === location)
+      );
+      return {
+        rows: text.includes('GROUP BY')
+          ? [...new Set(rows.map((r) => r.location_id))].map((location_id) => ({ location_id }))
+          : rows.map((r) => ({ ...r, as_of_date: '2026-08-31', value_at_cost: r.recommended_units * r.unit_cost })),
+      };
+    }
+    // DETAIL_SQL: id $1, scope $2-$4.
+    if (text.includes('WHERE r.recommendation_id = $1 AND')) {
+      const [id, restricted, regions, locations] = params as [string, boolean, string[], string[]];
+      return { rows: RECS.filter((r) => r.recommendation_id === id && inScope(restricted, regions, locations, r)) };
     }
     if (text.includes('count(*) OVER ()')) {
       const [restricted, regions, locations] = params.slice(4, 7) as [boolean, string[], string[]];
@@ -252,6 +296,45 @@ describe('"Viewing as" personas: read scope', () => {
   });
 });
 
+describe('"Viewing as" personas: every read route is narrowed', () => {
+  it('/api/filters offers only L0001 to the store manager and only North to the North planner', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    const sm = await call(base, '/api/filters', ANALYST, 'store_manager_l0001');
+    expect(sm.status).toBe(200);
+    expect((sm.body.stores as { location_id: string }[]).map((s) => s.location_id)).toEqual(['L0001']);
+    expect(sm.body.scope).toEqual({ restricted: true, regions: [], locations: ['L0001'] });
+    const opts = calls.find((c) => c.text.includes('SELECT DISTINCT r.location_id, r.location_name'));
+    expect(opts?.params).toEqual([true, [], ['L0001']]);
+    const north = await call(base, '/api/filters', ANALYST, 'regional_planner_north');
+    expect(north.body.regions).toEqual(['North']);
+  });
+
+  it('/api/recommendations/by-store is scoped to the persona, even when the client asks for another region', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    const res = await call(base, '/api/recommendations/by-store?region=South', ANALYST, 'store_manager_l0001');
+    expect(res.status).toBe(200);
+    expect(res.body.rows).toEqual([]);
+    const q = calls.find((c) => c.text.includes('GROUP BY r.location_id'));
+    expect(q?.params.slice(0, 7)).toEqual(['South', null, null, null, true, [], ['L0001']]);
+  });
+
+  it('/api/recommendations/:id: an in-scope line opens (cost masked), another store is 404 with nothing leaked', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    const own = await call(base, '/api/recommendations/z-1', ANALYST, 'store_manager_l0001');
+    expect(own.status).toBe(200);
+    expect(own.body.recommendation).toMatchObject({ recommendation_id: 'z-1', unit_cost: null });
+    calls.length = 0;
+    const other = await call(base, '/api/recommendations/s-1', ANALYST, 'store_manager_l0001');
+    expect(other.status).toBe(404);
+    expect(other.body).toEqual({ error: 'Recommendation not found' });
+    // The audit trail is never read for a line outside the scope.
+    expect(calls.some((c) => c.text.includes('FROM replenishment.decision_events'))).toBe(false);
+  });
+});
+
 describe('"Viewing as" personas: write scope', () => {
   it('store manager L0001 deciding another store (North L0021) gets 403 and nothing is written', async () => {
     const { db, calls } = fakeLakebase();
@@ -293,6 +376,51 @@ describe('"Viewing as" personas: write scope', () => {
     expect(insert?.params[6]).toBe('store_manager_l0001');
     const event = calls.find((c) => c.text.includes('INSERT INTO replenishment.decision_events'));
     expect(event?.params[6]).toBe('store_manager_l0001');
+  });
+
+  it('accept-routine as store manager: the server computes an L0001-only set, in one transaction, with acting_persona', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    // The client asks for every region; the server still recomputes inside the persona's scope.
+    const routine = await call(base, '/api/recommendations/routine', ANALYST, 'store_manager_l0001');
+    expect(routine.status).toBe(200);
+    expect(routine.body).toMatchObject({ count: 2, valueAtCost: null });
+    calls.length = 0;
+    const res = await call(base, '/api/recommendations/accept-routine', ANALYST, 'store_manager_l0001', {
+      filters: {},
+      expected: { count: 2, snapshot: routine.body.snapshot },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ requested: 2, accepted: 2 });
+    const recompute = calls.find((c) => c.text.includes('cardinality(x.exception_reasons) = 0'));
+    expect(recompute?.params.slice(4, 7)).toEqual([true, [], ['L0001']]);
+    const insert = calls.find((c) => c.text.includes('INSERT INTO replenishment.order_decisions'));
+    expect(insert?.params[0]).toEqual(['z-1', 'z-2']);
+    expect(insert?.params[2]).toEqual(['L0001', 'L0001']);
+    expect(insert?.params[6]).toBe('store_manager_l0001');
+    const event = calls.find((c) => c.text.includes('INSERT INTO replenishment.decision_events'));
+    expect(event?.params[6]).toBe('store_manager_l0001');
+    // All or nothing: one transaction around the recompute and every write, committed once, never rolled back.
+    const texts = calls.map((c) => c.text);
+    expect(texts.filter((t) => t === 'BEGIN')).toHaveLength(1);
+    expect(texts.filter((t) => t === 'COMMIT')).toHaveLength(1);
+    expect(texts).not.toContain('ROLLBACK');
+    const begin = texts.indexOf('BEGIN');
+    expect(texts.findIndex((t) => t.includes('cardinality(x.exception_reasons) = 0'))).toBeGreaterThan(begin);
+    expect(texts.indexOf('COMMIT')).toBeGreaterThan(texts.findIndex((t) => t.includes('decision_events')));
+  });
+
+  it('accept-routine as store manager with a network-wide snapshot: 409 and nothing written', async () => {
+    const { db, calls } = fakeLakebase();
+    const base = await start(db);
+    const all = await call(base, '/api/recommendations/routine', ANALYST);
+    calls.length = 0;
+    const res = await call(base, '/api/recommendations/accept-routine', ANALYST, 'store_manager_l0001', {
+      filters: {},
+      expected: { count: all.body.count, snapshot: all.body.snapshot },
+    });
+    expect(res.status).toBe(409);
+    expect(wrote(calls)).toBe(false);
   });
 
   it('auditor: every write is 403 before any transaction (single, bulk, routine)', async () => {
@@ -371,6 +499,34 @@ describe('"Viewing as" personas: validation and the DEMO_PERSONAS flag', () => {
     expect((await call(base, '/api/personas', NORTH)).body).toEqual({ enabled: false, personas: [] });
   });
 
+  it('a malformed UC answer is 503 (not 400) and is not cached: the next good read works', async () => {
+    const { db, calls } = fakeLakebase();
+    const answers: unknown[] = [{}, { data: 'nope' }, { rows: MAPPING }, { data: MAPPING }];
+    let reads = 0;
+    const source = ucPersonaSource({ query: () => Promise.resolve(answers[reads++]) });
+    const base = await start(db, { enabled: true, source });
+    for (let i = 0; i < 3; i++) {
+      const res = await call(base, '/api/recommendations', ANALYST, 'store_manager_l0001');
+      expect(res.status).toBe(503);
+      expect(res.body.code).toBe('PERSONAS_UNAVAILABLE');
+    }
+    expect(wrote(calls)).toBe(false);
+    const ok = await call(base, '/api/recommendations', ANALYST, 'store_manager_l0001');
+    expect(ok.status).toBe(200);
+    expect(listScope(calls)).toEqual([true, [], ['L0001']]);
+    // Cached now: a repeat request does not read UC again.
+    await call(base, '/api/recommendations', ANALYST, 'auditor');
+    expect(reads).toBe(4);
+  });
+
+  it('/api/personas is 503 on a malformed UC answer', async () => {
+    const { db } = fakeLakebase();
+    const base = await start(db, { enabled: true, source: ucPersonaSource({ query: () => Promise.resolve(null) }) });
+    const res = await call(base, '/api/personas', ANALYST);
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe('PERSONAS_UNAVAILABLE');
+  });
+
   it('personasEnabled only for DEMO_PERSONAS=true', () => {
     expect(personasEnabled({ DEMO_PERSONAS: 'true' })).toBe(true);
     for (const v of [undefined, '', 'false', '1', 'yes']) expect(personasEnabled({ DEMO_PERSONAS: v })).toBe(false);
@@ -415,6 +571,32 @@ describe('persona helpers', () => {
     });
     expect(personas.find((p) => p.id === 'auditor')).toMatchObject({ canDecide: false, scope: { restricted: false } });
     expect(personas.some((p) => p.role === ('SERVICE' as string))).toBe(false);
+  });
+
+  it('rowsOf accepts only { data: [rows] }', () => {
+    expect(rowsOf({ data: [{ a: 1 }] })).toEqual([{ a: 1 }]);
+    expect(rowsOf({ data: [] })).toEqual([]);
+    for (const bad of [null, undefined, {}, { data: 'x' }, { data: [1] }, { data: [null] }, [], 'data'])
+      expect(() => rowsOf(bad)).toThrow();
+  });
+
+  it('a persona whose mapping rows disagree on can_decide / sees_unit_cost fails closed (false)', () => {
+    const row = MAPPING.find((r) => r.persona_id === 'regional_planner_north');
+    const personas = personasFromRows([
+      { ...row },
+      { ...row, region: 'Central', can_decide: 'false', sees_unit_cost: 'true' },
+      { ...row, region: 'East', can_decide: 'true', sees_unit_cost: 'false' },
+    ]);
+    expect(personas[0]).toMatchObject({
+      canDecide: false,
+      seesUnitCost: false,
+      scope: { restricted: true, regions: ['North', 'Central', 'East'] },
+    });
+    // Consistent rows keep their flags.
+    expect(personasFromRows([{ ...row }, { ...row, region: 'Central' }])[0]).toMatchObject({
+      canDecide: true,
+      seesUnitCost: true,
+    });
   });
 
   it('narrowScope is never wider than either side', () => {

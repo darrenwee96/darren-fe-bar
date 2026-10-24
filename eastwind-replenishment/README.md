@@ -171,8 +171,13 @@ INSERT INTO replenishment.user_scope (user_email, location_id) VALUES ('<email>'
 DELETE FROM replenishment.user_scope WHERE lower(user_email) = lower('<email>');
 ```
 
-The warehouse charts show aggregated history and forecasts and run as the app service principal. While viewing as a
-single-region or single-store persona they are pinned to that region / store.
+**The summary charts are illustrative, not a security boundary.** Forecast vs actual, the waste KPI and the line
+sheet's SKU forecast are aggregate SQL-warehouse queries that run as the app service principal (which sees every row)
+with filters the browser supplies. While viewing as a single-region or single-store persona the client pins them to
+that region / store, but nothing on the server stops a caller asking for another one. Access is enforced only by (1)
+the server-scoped Lakebase routes (`/api/*`: order lines, KPI counts, store ranking, routine set, line detail and every
+decision) and (2) Unity Catalog's row filter and column mask on `gold.replenishment_recommendations_current` for
+queries run as the caller (SQL, Genie).
 
 ## "Viewing as" personas: Unity Catalog governance demo
 
@@ -218,7 +223,9 @@ group), so the weekly MERGE and Lakebase load, the Genie space and the app's own
 **What is UC-enforced at query time vs app-enforced.** The row filter and column mask run inside Unity Catalog for any
 warehouse or Genie query on the Gold table, for whoever runs it (Genie runs as the signed-in user). The app's order
 lines and decisions come from a **Lakebase copy** (`serving.recommendations`), where UC policies do not run; the app
-applies the same UC mapping on the server instead. The Governance drawer puts both side by side: rows the app returns
+applies the same UC mapping on the server instead. The warehouse summary charts are neither: they run as the app
+service principal with client-supplied filters, so treat them as illustrative (see Planner scope above). The
+Governance drawer puts both side by side: rows the app returns
 (Lakebase) and rows UC returns for the persona (`persona_row_visible` over the Gold table). They match: 782 for North,
 31 for L0001. Personas are a demo of the policy, not an impersonation: the persona's account group is not checked
 against your own membership; it can only narrow what you already have.
@@ -233,8 +240,9 @@ reports each missing group as `SKIPPED` until then): `eastwind_head_office`, `ea
 
 1. **(0-10 s)** "Same app, same data. Viewing as **Me**: 2,247 store-SKUs, 231 lines need review." Point at the
    **Viewing as** picker.
-2. **(10-25 s)** Pick **Store Manager · Zhongshan Shop L0001**. Everything re-scopes: 31 store-SKUs, 2 lines need
-   review, the forecast is Zhongshan Shop's, the store filter offers one store, and unit cost shows **Masked**.
+2. **(10-25 s)** Pick **Store Manager · Zhongshan Shop L0001**. The order lines and KPIs re-scope on the server: 31
+   store-SKUs, 2 lines need review, the store filter offers one store, unit cost shows **Masked**. (The forecast chart
+   follows to Zhongshan Shop too, but that is a display convenience, not access control: say so if asked.)
 3. **(25-40 s)** Click **Governance**: role, scope Store L0001, _Can decide_, unit cost masked; rows **31 / 2,247** in
    the app and **31 / 2,247** from UC's row filter; the actual `rf_store_scope` predicate and `mask_unit_cost`, read live
    from `information_schema`; the grants on the table.

@@ -68,16 +68,21 @@ export const personasEnabled = (env: NodeJS.ProcessEnv = process.env) => env.DEM
 const ROLES = new Set(['ANALYST', 'PLANNER', 'STORE_MANAGER', 'AUDITOR']);
 const PERSONA_ID = /^[a-z0-9_]{1,64}$/;
 
-const rowsOf = (result: unknown): Record<string, unknown>[] =>
-  typeof result === 'object' && result !== null && 'data' in result && Array.isArray(result.data)
-    ? (result.data as Record<string, unknown>[])
-    : [];
+/** Rows of an AppKit JSON result (`{ data: [...] }`). Anything else throws, so a bad answer is never cached or used. */
+export function rowsOf(result: unknown): Record<string, unknown>[] {
+  if (typeof result !== 'object' || result === null || !('data' in result) || !Array.isArray(result.data))
+    throw new Error('Warehouse returned no result set');
+  if (!result.data.every((r) => typeof r === 'object' && r !== null))
+    throw new Error('Warehouse returned malformed rows');
+  return result.data as Record<string, unknown>[];
+}
 const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
 const bool = (v: unknown) => v === true || v === 'true';
 
 /**
  * Group persona_access rows into personas (several rows = several bindings of one persona). SERVICE rows (pipeline
  * owner, app service principal) are not selectable. A persona's scope is open only with an explicit region '*'.
+ * can_decide and sees_unit_cost must hold on EVERY row of a persona: rows that disagree fail closed (false).
  */
 export function personasFromRows(rows: Record<string, unknown>[]): Persona[] {
   const byId = new Map<string, Persona & { order: number }>();
@@ -89,8 +94,8 @@ export function personasFromRows(rows: Record<string, unknown>[]): Persona[] {
       id,
       label: str(r.persona_label) ?? id,
       role: role as Persona['role'],
-      canDecide: false,
-      seesUnitCost: false,
+      canDecide: true,
+      seesUnitCost: true,
       scope: { restricted: true, regions: [], locations: [] },
       bindings: [],
       order: Number(r.sort_order ?? 99),
@@ -98,8 +103,8 @@ export function personasFromRows(rows: Record<string, unknown>[]): Persona[] {
     const region = str(r.region);
     const storeId = str(r.store_id);
     p.bindings.push({ ucGroup: str(r.uc_group), region, storeId });
-    p.canDecide ||= bool(r.can_decide);
-    p.seesUnitCost ||= bool(r.sees_unit_cost);
+    p.canDecide &&= bool(r.can_decide);
+    p.seesUnitCost &&= bool(r.sees_unit_cost);
     if (region === '*') p.scope = { restricted: false, regions: [], locations: [] };
     else if (p.scope.restricted) {
       if (region && !p.scope.regions.includes(region)) p.scope.regions.push(region);
@@ -115,7 +120,10 @@ export const PERSONAS_SQL = `
   FROM ${UC.mappingTable}
   WHERE role <> 'SERVICE'`;
 
-/** Personas from the UC mapping, cached briefly. A failed read throws (callers fail closed) and is retried next time. */
+/**
+ * Personas from the UC mapping, cached briefly. A failed or malformed read throws (callers answer 503) and is not
+ * cached, so the next request reads again.
+ */
 export function ucPersonaSource(warehouse: Warehouse, ttlMs = 60_000): PersonaSource {
   let cached: { at: number; personas: Persona[] } | null = null;
   return {
