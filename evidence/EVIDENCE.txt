@@ -6,47 +6,239 @@ FE Bar build evidence (single consolidated file)
 Project      : Eastwind Gourmet - multi-channel weekly demand forecasting and
                shelf-life-aware replenishment (F&B / specialty retail, synthetic data)
 Workspace    : fevm-darren-fe-bar.cloud.databricks.com (CLI profile fe-bar)
-Catalog      : darren_fe_bar_catalog (schemas raw / eval / bronze / silver / gold / ml)
+Catalog      : darren_fe_bar_catalog (schemas raw / eval / bronze / silver / gold / ml / governance)
 SQL warehouse: Serverless Starter Warehouse (221da0ceb437f8a8)
-Compiled     : 2026-10-12, from live Databricks queries against the runs below plus
-               committed task outputs; every number is from a Databricks run, table,
-               log, or API response captured the same day unless a date is shown.
-Git lineage  : main 61fb851 (initial build)
-               + polly/app-control-panel befec64 (control panel, identity/scope, layout)
-               + polly/forecast-fixes 68f8d82 (event alignment, backtest corrections)
-               consolidated on branch polly/evidence-consolidation.
+Compiled     : first written 2026-10-12 (commit 99e636d); REFRESHED 2026-10-24
+               against live Databricks state (section 1b, pulled 2026-10-24
+               14:57-15:01Z, read-only). Every number is from a Databricks run,
+               table, API response, or a repo file cited inline; dates shown where a
+               figure was captured earlier and re-confirmed live.
+Git lineage  : main 61fb851 (initial build) -> forecast fixes 68f8d82 -> app v2
+               exception queue 552e546..7651f84 -> UC RBAC personas a318adb..eebcf86
+               -> deck + architecture 11c17d8..caed27f, merged at main e9d803b;
+               this refresh on branch polly/evidence-refresh.
 
-No secrets or tokens appear in this file. All data is synthetic (seed 42);
-no customer-identifying information is present.
+No secrets or tokens appear in this file (OAuth tokens used by the live pulls
+were piped, never printed). All data is synthetic (seed 42); no customer-
+identifying information is present.
 
 
 ================================================================================
-1. REQUIREMENTS TRACEABILITY MATRIX
+1. REQUIREMENT -> EVIDENCE MAP
 ================================================================================
 
-Requirement (Project.md / industry-problem.md)            Section  Status
---------------------------------------------------------- -------  -------------------------
-Lakeflow ingests the raw data (5 sources, incremental)      3      EVIDENCED
-Unity Catalog governs it (grants, comments, lineage)        4, 9b  PARTIAL - grants, table
-                                                                  comments, lineage live; row
-                                                                  filter + column mask + persona
-                                                                  mapping DEPLOYED on gold.
-                                                                  replenishment_recommendations_
-                                                                  current (9b); account groups
-                                                                  NOT created (grants skipped);
-                                                                  decision-history Gold tables
-                                                                  unfiltered
-Lakebase operational serving + decision write-back          7      EVIDENCED
-ML makes it intelligent (forecast, registered @champion)    5      EVIDENCED
-Genie Agent answers in natural language                     8      EVIDENCED
-Databricks App surfaces it to the business                  9      EVIDENCED
-Evidence the build ran, readable as text                    all    EVIDENCED (this file)
-Specific industry problem, integrated journey             1, 3-9   EVIDENCED (one data flow:
-                                                                  raw -> bronze -> silver ->
-                                                                  gold -> ML -> Lakebase ->
-                                                                  app -> decisions -> gold)
-Quantified value in the buyer's KPIs                      6, 10    EVIDENCED, with honest
-                                                                  caveats on annualisation
+Status key: MET = built, ran, and output quoted here. PARTIAL = built and ran,
+with a stated gap. GAP = not demonstrated.
+
+A. Project.md - build stages and submission requirements
+Requirement                                    Status   Evidence (section)
+---------------------------------------------- -------- ---------------------------------
+Lakeflow ingests raw data (synthetic, 5 feeds,  MET      3: pipeline eastwind-etl, 4 updates
+  incremental)                                           COMPLETED; 2 drops = exact deltas
+                                                         (+12,079 POS, +15,729 inventory)
+Unity Catalog governs it                        PARTIAL  4, 9b, 1b.4: grants, comments, 577
+                                                         lineage rows; row filter
+                                                         rf_store_scope + mask
+                                                         mask_unit_cost LIVE on gold.
+                                                         replenishment_recommendations_
+                                                         current (2,247 / 782 / 31 rows by
+                                                         persona). GAPS: the 4 account
+                                                         groups do not exist (0 found
+                                                         live), so their grants are
+                                                         skipped; decision-history Gold
+                                                         tables have no row filter; the
+                                                         app, not UC, scopes Lakebase reads
+Lakebase - operational serving                  MET      7, 1b.3: serving.recommendations
+                                                         2,247 rows / 278,410 units = Gold;
+                                                         decisions + audit tables; 0 real
+                                                         decisions today
+ML makes it intelligent                         MET      5, 1b.2: LightGBM p50 + p90,
+                                                         darren_fe_bar_catalog.ml.
+                                                         eastwind_demand v6 = @champion;
+                                                         weekly scoring 13,482 rows
+Genie Agent - natural language                  MET      8, 1b.5: space on 8 governed tables,
+                                                         16 benchmarks pass --check; native
+                                                         eval 11/11 on the earlier 11-
+                                                         question set (16-question eval run
+                                                         not yet executed)
+Databricks App surfaces it to the business      MET      9, 9b, 1b.3: app RUNNING, deployment
+                                                         01f1cf95915f...; exception queue
+                                                         231 / 1,561; "Viewing as" personas;
+                                                         73 tests
+Integrated journey (not siloed)                 MET      3-9: raw -> bronze -> silver -> gold
+                                                         -> ML -> Gold recs -> Lakebase ->
+                                                         app -> decisions -> Gold; lineage
+                                                         in 4
+Specific industry problem                       MET      industry-problem.md: Eastwind
+                                                         Gourmet, 80 stores x 3 formats,
+                                                         moving lunar festivals (2, 3)
+Evidence the build ran, readable as text        MET      this file; every section quotes
+                                                         command / query / API output
+Presentation deck (PDF / md)                    MET      12: docs/deck/eastwind-deck.pdf
+                                                         (9 pages), docs/deck/deck.md
+Quantified value in the buyer's KPIs            PARTIAL  10: $2-3M/yr is a TARGET (20-30%
+                                                         of ~$10.3M peak-gift lost sales);
+                                                         backtest supports direction, not
+                                                         a full-year dollar figure
+Decisions and trade-offs documented             MET      7 (psycopg vs synced tables), 5
+                                                         (model gate), 9b (what UC vs the
+                                                         app enforces), 11
+No real customer data                           MET      2: synthetic generator, seed 42
+
+B. industry-problem.md - success measures
+Success measure                                Status   Evidence (section)
+---------------------------------------------- -------- ---------------------------------
+Forecast accuracy (MAPE) by channel             MET      5 (technical evidence): model WMAPE
+  (technical measure; not shown in the app or            23.6-26.6% by channel vs 38.1-47.7%
+  deck by design)                                        seasonal naive, both holiday folds
+Stockout rate on peak gift SKUs                 PARTIAL  10, 1b.6: baseline measured live
+                                                         (18.7-21.1% of peak-gift store-days
+                                                         in Mid-Autumn 2025 vs 8.6% overall);
+                                                         forecast policy lowers modelled lost
+                                                         sales in 6 of 6 holiday windows; no
+                                                         live post-adoption rate yet
+Expired and marked-down inventory value         MET (as  10, 6: baseline $3.87M/yr; backtest
+  (guardrail: hold flat)                        guard-   net waste change ~$42k/yr, ~1% of
+                                                rail)    baseline - held flat; no saving
+                                                         claimed
+Share of orders placed from the forecast        GAP      10, 1b.3: 0 real decisions in Lakebase
+                                                         and Gold; the app shows "not enough
+                                                         decisions yet (0 of 20 needed)"
+Recover 20-30% of peak-gift lost sales          PARTIAL  10, 6: TARGET ~$2-3M/yr; direction
+  (~$2-3M/yr)                                            shown in backtest, full-year replay
+                                                         not done
+Hold expiry + markdown (~$3.87M/yr) flat        MET (in  6, 10: see guardrail row above
+                                                backtest)
+
+
+================================================================================
+1b. LIVE STATE SNAPSHOT (2026-10-24, read-only, profile fe-bar)
+================================================================================
+
+Nothing in Databricks was changed: SELECT / GET / list calls only; the Lakebase
+session was opened read-only and rolled back; no Accept / Adjust / Reject /
+bulk / routine call was made.
+
+1b.1 Jobs - `databricks jobs list-runs --job-id <id> --limit 3 -p fe-bar`
+    (run at 2026-10-24T14:57:41Z; latest run first)
+  152660798785027 eastwind-forecast-training 235471966557438 TERMINATED SUCCESS
+                  2026-10-12T05:49:49Z 2026-10-12T06:14:47Z
+  152660798785027 eastwind-forecast-training 409721950765040 INTERNAL_ERROR FAILED
+                  2026-10-12T05:37:13Z 2026-10-12T05:48:29Z   (superseded by the run above)
+  26281524780601  eastwind-forecast-weekly-scoring 856491626271166 TERMINATED SUCCESS
+                  2026-10-12T06:15:21Z 2026-10-12T06:20:56Z
+  26281524780601  eastwind-forecast-weekly-scoring 938785124085419 TERMINATED SUCCESS
+                  2026-10-12T05:02:35Z 2026-10-12T05:07:57Z
+  -> No job has run since 2026-10-12; the runs quoted in sections 5-7 are the
+     latest. Recommendations are for order week as_of 2026-08-31.
+
+1b.2 Model - `databricks registered-models get darren_fe_bar_catalog.ml.
+    eastwind_demand --include-aliases` and `model-versions get ... 6`
+    (2026-10-24T14:57:55Z)
+  aliases: [{'alias_name': 'champion', 'version_num': 6}]
+  v6 status READY run b375e8acd12342b6a1fea39855ce0636
+     created 2026-10-12T06:00:52.771000+00:00
+
+1b.3 App, Lakebase, Gold counts
+  `databricks apps get eastwind-replenishment -p fe-bar` (2026-10-24T14:57:55Z)
+    app_status RUNNING compute ACTIVE
+    active_deployment 01f1cf95915f12488bcba8154112a993 SUCCEEDED 2026-10-24T10:27:52Z
+    url https://eastwind-replenishment-7474660797782218.aws.databricksapps.com
+  `databricks experimental aitools tools query ...` (2026-10-24T14:58:10Z / 14:59:00Z)
+    who darren.wee@databricks.com | recs_visible_to_me 2247 |
+    gold_decisions 0 | gold_events 0
+    gold.replenishment_recommendations_current: store_skus 2247, lines_to_order
+    1561, units 278410, cost_at_unit_cost 3204091.0, stores 80, as_of
+    2026-08-31, model_version 6
+    gold.demand_forecasts_current: rows 13482, runs 1 (e8260bd8b83f4367a58db45ad0110c54),
+    weeks 2026-08-31..2026-10-05
+  Lakebase (psycopg, read_only session, OAuth database credential for the
+  signed-in user; 2026-10-24T15:00:02Z):
+    select count(*) from replenishment.order_decisions -> (0,)
+    select count(*) from replenishment.decision_events -> (0,)
+    select count(*), sum(recommended_units) from serving.recommendations -> (2247, 278410)
+    select count(*) from replenishment.line_context -> (2247,)
+    select count(*) from replenishment.user_scope -> (3,)
+  App API, GET only, owner bearer token (2026-10-24T15:00:15Z):
+    GET /api/recommendations/summary -> store_skus 2247, lines_to_order 1561,
+      exception_pending 231, exception_pending_at_risk 2601670.6,
+      exception_pending_stores 77, routine_pending 1330, routine_pending_units
+      180518, routine_pending_value_at_cost 1716664.8, peak_lines 908,
+      peak_needs_order 481, peak_needs_order_sales 3604048.16, decided_lines 0,
+      accepted 0, adjusted 0, rejected 0
+    GET /api/recommendations/routine -> {"count":1330,"truncated":false,
+      "units":180518,"valueAtCost":1716664.8,"snapshot":"d33858c90a7c4dec"}
+      (counts + snapshot only, no ids)
+    x-eastwind-persona: regional_planner_north -> summary store_skus 782,
+      lines_to_order 544, exception_pending 82, routine_pending 462;
+      governance rows {"visible":782,"total":2247}
+    x-eastwind-persona: store_manager_l0001 -> store_skus 31, lines_to_order 20,
+      exception_pending 2, routine_pending 18, order_value_at_cost null,
+      routine_pending_value_at_cost null; governance costMasked true,
+      rows {"visible":31,"total":2247}
+    x-eastwind-persona: auditor -> canDecide false, rows {"visible":2247,"total":2247}
+    GET /api/personas -> {"enabled":true, personas: head_office_analyst,
+      regional_planner_north, store_manager_l0001, auditor} (SERVICE rows excluded)
+
+1b.4 Unity Catalog governance objects (2026-10-24T14:58:10Z)
+  SELECT table_name, filter_name, target_columns FROM information_schema.row_filters
+    replenishment_recommendations_current | darren_fe_bar_catalog.governance.
+    rf_store_scope | region, location_id      (the only row filter in the catalog)
+  SELECT table_name, column_name, mask_name FROM information_schema.column_masks
+    replenishment_recommendations_current | unit_cost | darren_fe_bar_catalog.
+    governance.mask_unit_cost                  (the only column mask)
+  information_schema.routines (schema governance), rf_store_scope:
+    EXISTS (SELECT 1 FROM darren_fe_bar_catalog.governance.persona_access p
+      WHERE ((p.uc_group IS NOT NULL AND is_account_group_member(p.uc_group))
+             OR (p.principal IS NOT NULL AND lower(p.principal) = lower(current_user())))
+        AND (p.region = '*' OR p.region = row_region OR p.store_id = row_location_id))
+  mask_unit_cost:
+    CASE WHEN EXISTS (SELECT 1 FROM ...governance.persona_access p
+      WHERE p.sees_unit_cost AND ((p.uc_group IS NOT NULL AND
+      is_account_group_member(p.uc_group)) OR (p.principal IS NOT NULL AND
+      lower(p.principal) = lower(current_user())))) THEN unit_cost ELSE NULL END
+  (plus persona_row_visible / persona_sees_unit_cost: same predicates for a
+  named persona, used by the governance panel)
+  SELECT * FROM governance.persona_access (access table, 6 rows; trimmed):
+    persona_id              role           region store_id can_decide sees_unit_cost uc_group / principal
+    head_office_analyst     ANALYST        *      -        true       true           eastwind_head_office
+    regional_planner_north  PLANNER        North  -        true       true           eastwind_planners_north
+    store_manager_l0001     STORE_MANAGER  -      L0001    true       false          eastwind_store_l0001
+    auditor                 AUDITOR        *      -        false      true           eastwind_auditors
+    svc_pipeline_owner      SERVICE        *      -        false      true           principal = pipeline owner
+    svc_app                 SERVICE        *      -        false      true           principal = app SP f4a2a131-...
+  Rows per persona via persona_row_visible / persona_sees_unit_cost:
+    head_office_analyst 2247 true | regional_planner_north 782 true |
+    store_manager_l0001 31 false | auditor 2247 true | svc_pipeline_owner 2247
+    true | svc_app 2247 true
+  `databricks groups list --filter 'displayName sw "eastwind"'`
+  (2026-10-24T15:00:37Z) -> 0 groups: []
+  information_schema.table_privileges on gold + governance, non-user grantees:
+    only the pipeline identity (ALL_PRIVILEGES/MANAGE) and the app SP f4a2a131-...
+    (SELECT on channel_weekly_kpis, demand_forecasts, forecast_accuracy,
+    persona_access, replenishment_recommendations_current, weekly_demand_features).
+    No grant to any eastwind_* group exists - consistent with the groups being
+    absent and their GRANTs skipped.
+
+1b.5 Genie (2026-10-24T15:00:37Z)
+  `databricks genie get-space 01f1c49f288b170f8fd01b3f047f1a87 --include-serialized-space`
+    title "Eastwind Gourmet: Demand & Replenishment", warehouse 221da0ceb437f8a8,
+    live benchmarks 16, tables 8 (matches genie/serialized_space.json)
+  `databricks api get /api/2.0/genie/spaces/<id>/eval-runs` -> 3 runs, all DONE:
+    01f1c4a09384178d91d238593939a3a7  num_correct 11 / num_questions 11
+    01f1c49fe5701c2db46289b530d34d49  num_correct  5 / 11
+    01f1c49f30f413aca1caf9a4065397ec  num_correct  3 / 11, needs_review 2
+    -> No eval run over the current 16 benchmarks exists.
+
+1b.6 KPI baselines (2026-10-24T15:01:02Z, the Genie benchmark SQL)
+  peak_gift_stockout_day_rate, gold.channel_weekly_kpis, weeks 2025-09-15..2025-10-07:
+    AIRPORT 0.2114 | DOWNTOWN 0.1882 | HIGHWAY 0.1870
+  overall_stockout_day_rate (all weeks, all SKUs): 0.0857
+  gold.business_impact_summary, SUM over 6 fold x channel rows:
+    forecast_lost 2620672 | manual_lost 15528880 | lost_delta 12908208
+    forecast_waste 544326 | manual_waste 564632 | waste_delta 20306
+    (delta = manual - forecast, ml/src/train_forecast.py:701-702; positive =
+    the forecast policy is lower). lost_sales_delta > 0 in all 6 rows.
 
 
 ================================================================================
@@ -71,9 +263,11 @@ by channel (per year)          true_rev     observed_rev      lost_sales   expir
   HIGHWAY                     45,057,150       40,401,191       4,306,020     542,936          349,940
   AIRPORT                     52,893,072       47,749,311       4,774,812     675,394          368,949
 
-Share of lost sales on peak gift SKUs: 57.5%. Stockout days: 8.6% of ranged
-store-SKU-days. These are the numbers behind the industry-problem.md impact
-claims (10-15% stockout cut ~= $2-3M; 20% waste cut ~= $1M).
+Share of lost sales on peak gift SKUs: 57.5% (~$10.3M of $17.8M/yr). Stockout
+days: 8.6% of ranged store-SKU-days (live 0.0857, section 1b.6). These are the
+numbers behind the industry-problem.md impact target: recover 20-30% of
+peak-gift lost sales (~$2-3M/yr, a target) while holding expiry + markdown
+(~$3.87M/yr) flat as a guardrail.
 
 Rows written per source and drop (two drops prove incremental ingestion):
   pos_sales         2026-08-24: 1,838,149  2026-08-31: 12,079
@@ -345,18 +539,25 @@ $12,359,963 ($9,562,007 in the narrower event windows). The manual-policy replay
 shows $15,528,880 - it is a policy-screening simulation, not a byte-for-byte
 replay of the generator's daily manual ordering.
 
-Honest readout vs the industry-problem.md claims ($2-3M lost sales, ~$1M waste):
-- The forecast policy reduces MODELLED lost sales in every fold and channel.
-- The $26.8M/yr pooled figure annualises the two highest-stress holiday windows;
-  it must NOT be quoted as a whole-year finance estimate. A full-year replay is
-  needed before claiming the $2-3M.
-- Waste moves the wrong way overall (+$42k/yr): MA2025 airport/downtown improve,
-  LNY2026 worsens. The p90 order-up-to policy buys availability at the cost of
-  some waste; waste-aware constraints are future work. The ~$1M waste claim is
-  NOT demonstrated.
+Sign convention: delta = manual - forecast (ml/src/train_forecast.py:693-702),
+so a positive delta means the forecast policy loses / wastes LESS. Re-verified
+live 2026-10-24 (section 1b.6): same six rows, lost_delta $12,908,208, waste_delta
++$20,306.
+
+Honest readout vs industry-problem.md (target: recover 20-30% of ~$10.3M/yr
+peak-gift lost sales = ~$2-3M/yr; hold ~$3.87M/yr waste flat):
+- The forecast policy reduces MODELLED lost sales in 6 of 6 fold x channel
+  holiday windows.
+- The $26.8M/yr pooled figure annualises only the two highest-stress holiday
+  windows (25 peak weeks x 52/25). It is NOT a whole-year finance estimate and is
+  not used to support the $2-3M target; a full-year replay is needed first.
+- Waste guardrail: roughly flat. Net waste is $20,306 lower in the 25 replay
+  weeks (+$42,237/yr pooled, ~1% of the $3.87M/yr baseline), but mixed by window:
+  MA2025 airport/downtown improve, LNY2026 is worse in all three channels. No
+  waste saving is claimed; a waste-aware order rule is future work.
 - The defensible claim is operational: event-aligned, uncensored forecasts cut
-  stockout exposure (modelled lost sales down in every window) with roughly
-  neutral waste.
+  stockout exposure (modelled lost sales down in every window) while holding
+  waste flat.
 
 
 ================================================================================
@@ -476,9 +677,12 @@ App log at startup:
   "[replenishment] line_context refreshed: 2247 lines (recommendations loaded
    2026-10-12 06:20:23.548793+00)"
 
+Live re-check 2026-10-24 (section 1b.3): still RUNNING, now on deployment
+01f1cf95915f12488bcba8154112a993 (the 9b deploy, which superseded 01f1cef775a1...).
+
 One view: one-line header (order week, data loaded, model version); four KPI
-tiles (peak lines needing an order, peak sales at risk, lines that need you
-today, waste guardrail); forecast vs actual (p90 band, festival-week markers)
+tiles (client/src/components/KpiStrip.tsx:162 - peak lines needing an order,
+peak sales at risk, lines that need you today, waste guardrail); forecast vs actual (p90 band, festival-week markers)
 next to order need by store; then the Needs review queue; docked Ask Genie.
 No forecast-error (WMAPE/MAPE) figure anywhere: the accuracy tile, its query
 (config/queries/accuracy_by_channel.sql) and the WMAPE Genie starter question
@@ -539,8 +743,9 @@ and decision_events (default 'single'), constraint order_decisions_source_check,
 table replenishment.line_context.
 
 Demo fixes:
-- Adoption ("Orders from forecast") shows "not enough decisions yet (0 of 20
-  needed)" until 20 real decisions exist in scope.
+- Adoption ("Orders from forecast", client/src/components/OrderQueue.tsx:71-78)
+  shows "not enough decisions yet (0 of 20 needed)" until 20 real decisions
+  exist in scope.
 - Order reasons in plain words, strongest first, zero-unit drivers dropped.
   Hero line live (North -> Zhongshan Shop L0001 -> SKU-MC01, 804 units):
   "Mid-Autumn in 3 weeks - forecast 15.9x recent sales | Stock covers 0.2 of
@@ -565,9 +770,11 @@ Test decisions cleared (2026-10-23):
     gold.order_decisions_history            3 -> 0  (num_affected_rows 3)
     gold.order_decision_events              4 -> 0  (num_affected_rows 4)
   Rows: L0008 SKU-MC01 ADJUSTED 672 -> 600, L0022 SKU-MC02 REJECTED,
-  L0026 SKU-MC02 ACCEPTED. Recounted 0 / 0 after the read-only browser checks.
+  L0026 SKU-MC02 ACCEPTED. Recounted 0 / 0 after the read-only browser checks,
+  and again live 2026-10-24 (section 1b.3: Lakebase 0 / 0, Gold 0 / 0).
 
-Gates (2026-10-23, eastwind-replenishment/):
+Gates (2026-10-23, eastwind-replenishment/; historical - the current suite is
+73 tests, section 9b):
   npm run typecheck     OK (tsc server + client, 0 errors)
   npm run lint          OK (eslint, 0 problems) | npx appkit lint: no violations
   npx vitest run        3 files, 47 tests passed (47 it() cases, no
@@ -700,7 +907,8 @@ every statement OK or SKIPPED, same results):
   Column masks: gold.replenishment_recommendations_current.unit_cost
                 darren_fe_bar_catalog.governance.mask_unit_cost
 
-Account groups: NOT created. `databricks groups create` from this workspace
+Account groups: NOT created (re-checked live 2026-10-24, section 1b.4: 0 groups
+named eastwind*, no grant to any eastwind_* principal). `databricks groups create` from this workspace
 makes a workspace-local group (meta.resourceType WorkspaceGroup; one was
 created as a test and deleted), which UC cannot grant to, and the account API
 is not available to this identity. The 15 GRANTs to eastwind_head_office,
@@ -761,6 +969,9 @@ Gates (2026-10-24, eastwind-replenishment/):
       hold on every row of a persona, otherwise false
     helpers: mapping parsing, narrowScope never wider, source cache + retry
   databricks apps validate --profile fe-bar: all validation checks passed
+  (Static re-count 2026-10-24 of it()/test() cases in the committed test files:
+  replenishment-routes 20, bulk-accept 23, personas 26, reasons 4 = 73. Not
+  re-executed in this refresh: the evidence worktree has no node_modules.)
 
 Deploy: databricks bundle deploy + bundle run app (profile fe-bar), final
 deployment 01f1cf95915f12488bcba8154112a993 (after the review fixes),
@@ -828,74 +1039,122 @@ acting_persona to Gold yet.
 10. KPIs VS industry-problem.md SUCCESS MEASURES
 ================================================================================
 
-Success measure                         Where                 Result
---------------------------------------- --------------------- -------------------------------
-Forecast accuracy by channel            Section 5 table       Model WMAPE 23.6-26.6% by
-                                        (gold.forecast_        channel vs 38.1-47.7% seasonal
-                                        accuracy)              naive: a 36-50% relative
-                                                               improvement, ahead of the 20-30%
-                                                               improvement the impact estimate
-                                                               assumes.
-Stockout rate on peak gift SKUs         gold.channel_weekly_  Baseline pain, MA2025 window:
-                                        kpis (live)            AIRPORT 21.1%, DOWNTOWN 18.8%,
-                                                               HIGHWAY 18.7% of peak-gift
-                                                               series-days stocked out.
-                                                               Forward-looking: 481 of 908 peak
-                                                               lines currently need an order to
-                                                               avoid a stockout ($3.60M at risk).
-Expired + marked-down inventory value   gold.channel_weekly_  Baseline $3.87M/yr ($2.53M
-                                        kpis (live)            expired + $1.33M markdown).
-                                                               Backtest: waste roughly neutral
-                                                               under the current p90 policy
-                                                               (+$42k/yr) - NOT yet the ~20%
-                                                               cut the problem hopes for.
-Share of orders from the forecast       Lakebase decisions    0 real decisions (the 3 test
-                                                               decisions were cleared on
-                                                               2026-10-23). The app shows "not
-                                                               enough decisions yet" until 20
-                                                               decisions exist, then the share.
+The business story (app tiles, deck) uses four measures; forecast accuracy is
+kept as technical evidence in section 5 and is deliberately not shown in the app
+or deck (no forecast-error tile; the accuracy query and Genie starter were
+removed, section 9).
 
-Estimated business impact (industry-problem.md: $2-3M lost sales recovered,
-~$1M waste saved): the policy backtest shows modelled lost-sales reduction in
-every stressed window ($12.9M raw over 25 holiday weeks vs the manual policy),
-but the annualised $26.8M is a stressed-window extrapolation and the waste
-benefit is not demonstrated. Section 6 has the honest readout. The calibration
-(section 2) shows the synthetic business has $17.8M/yr of lost sales and
-$3.9M/yr of waste at stake, so the problem sizes are realistic.
+Success measure                 Source                    Result
+------------------------------- ------------------------- ---------------------------------
+Stockout rate on peak gift SKUs gold.channel_weekly_kpis  Baseline pain, Mid-Autumn 2025
+                                (live 2026-10-24, 1b.6)    window: AIRPORT 21.1%, DOWNTOWN
+                                                           18.8%, HIGHWAY 18.7% of peak-gift
+                                                           store-days out of stock, vs 8.6%
+                                                           across all SKUs and weeks.
+                                /api/recommendations/      Forward-looking: 481 of 908 peak
+                                summary (live, 1b.3)       lines need an order this order
+                                                           week ($3.60M peak sales at risk).
+                                                           No post-adoption stockout rate
+                                                           exists yet (no real orders).
+Lost sales recovered            gold.business_impact_     Modelled lost sales lower in 6 of
+                                summary (live, 1b.6)       6 holiday windows ($12.9M over 25
+                                                           peak weeks vs the manual policy).
+                                                           $2-3M/yr is a TARGET: 20-30% of
+                                                           ~$10.3M/yr peak-gift lost sales
+                                                           (section 2). It is not yet proven
+                                                           at full-year scale. The $26.8M/yr
+                                                           pooled figure annualises peak
+                                                           weeks only and is not a whole-
+                                                           year estimate (section 6).
+Share of orders placed from     Lakebase + Gold (live,    0 real decisions (Lakebase 0 / 0,
+the forecast                    1b.3)                      Gold 0 / 0). The app shows "not
+                                                           enough decisions yet (0 of 20
+                                                           needed)". The measure is wired
+                                                           (decision_source, acting_persona,
+                                                           audit events) but has no value yet.
+Expired + marked-down inventory gold.channel_weekly_kpis  Baseline $3.87M/yr ($2.53M expired
+value (guardrail)               (section 3);              + $1.33M markdown). Backtest: held
+                                business_impact_summary    flat - net ~$42k/yr lower under the
+                                (1b.6)                     forecast policy (~1% of baseline),
+                                                           mixed by window. No waste saving
+                                                           is claimed.
+Forecast accuracy by channel    gold.forecast_accuracy    Model WMAPE 23.6-26.6% by channel
+(technical)                     (section 5)                vs 38.1-47.7% seasonal naive in
+                                                           both holiday folds.
+
+Manager workload (how the measures are acted on): 231 of 1,561 lines to order
+need review (~15%); 1,330 are routine (180,518 units, $1.72M at cost) and can be
+accepted in one server-side, all-or-nothing step (section 9; live 1b.3).
+
+Calibration context (section 2): the synthetic business has $17.8M/yr of lost
+sales (57.5% / ~$10.3M on peak gifts) and $3.87M/yr of expiry + markdown, so the
+problem sizes are realistic.
 
 
 ================================================================================
 11. KNOWN LIMITATIONS & NEXT STEPS
 ================================================================================
 
-1. Governance (sections 4, 9b): row filter + column mask + persona mapping are
-   DEPLOYED on gold.replenishment_recommendations_current. Still open: the four
-   persona account groups are NOT created (an account admin must create them and
-   rerun etl/governance/apply_governance.py; grants are skipped until then); the
-   decision-history Gold tables are unfiltered; no UC column comments. Next:
-   create the groups, filter the decision-history tables, move the Genie space
-   definitions into UC comments.
-2. Policy backtest is a simulation on synthetic data (section 6): stressed-window
-   annualisation is not a whole-year estimate; waste needs a waste-aware order
-   policy before any saving is claimed. Next: full-year replay; add waste-aware
-   constraints to the p90 order-up-to rule.
+1. Governance (sections 4, 9b, 1b.4): row filter + column mask + persona mapping
+   are live on gold.replenishment_recommendations_current. Still open:
+   - the four persona ACCOUNT groups (eastwind_head_office,
+     eastwind_planners_north, eastwind_store_l0001, eastwind_auditors) do not
+     exist, so their GRANTs are skipped; today only the principal bindings
+     (pipeline owner, app SP) match the filter. Next: an account admin creates
+     the groups and reruns etl/governance/apply_governance.py.
+   - the app, not UC, enforces scope on its Lakebase reads (same UC mapping,
+     applied server-side); "Viewing as" narrows the signed-in user's scope and
+     does not check group membership.
+   - the summary charts (forecast vs actual, waste KPI, line-sheet SKU forecast)
+     are filtered for convenience only and are NOT a security boundary.
+   - gold.order_decisions_history / order_decision_events have no row filter;
+     ingest_decisions does not copy decision_source or acting_persona to Gold.
+   - no UC column comments; definitions live in the Genie space config.
+2. Policy backtest is a simulation on synthetic data (section 6): peak-week
+   annualisation is not a whole-year estimate; $2-3M/yr is a target. Next:
+   full-year replay; waste-aware constraints on the p90 order-up-to rule.
 3. Censoring: weeks with 2+ out-of-stock days are excluded from training, not
-   demand-corrected (12,950 full-stockout target rows dropped). Bias vs ground
-   truth is quantified in section 5 but a proper censored-demand estimator is
-   future work.
+   demand-corrected (12,950 full-stockout target rows dropped). A censored-demand
+   estimator is future work.
 4. Forecast shape: the model still dampens some aggregate festival-week SKU
-   forecasts below the generator curve (section 5 ratio table). Event features
-   fixed the alignment bug; amplitude tuning remains.
-5. Genie: 16 benchmarks validated by --check; a native eval run has only scored
-   the older 11-question set (11/11). Eval-driven tuning guidance is ~30
-   phrasings. Override questions return nothing until real decisions exist
-   (test decisions cleared 2026-10-23).
-6. Test data: the 3 decisions written during app verification (L0008, L0022,
-   L0026) were backed up and cleared on 2026-10-23 (section 9).
+   forecasts below the generator curve (section 5 ratio table).
+5. Genie: 16 benchmarks validated by --check; the only native eval runs scored
+   the earlier 11-question set (11/11, live 1b.5). Override questions return
+   nothing until real decisions exist.
+6. Adoption: 0 real decisions, so "share of orders from the forecast" has no
+   value yet (section 10). The 3 test decisions were backed up to
+   _generated/backup/test-decisions-20261023T223955.json (outside the repo) and
+   deleted on 2026-10-23.
 7. Lakebase load is a full idempotent upsert over psycopg because this workspace
    cannot create a Lakebase UC catalog for synced tables; if CREATE CATALOG is
    granted, swap in a triggered synced table (app unchanged).
-8. A local dev server may still be running on localhost:8000 from verification.
+8. No job has run since 2026-10-12 (1b.1); the order week is as_of 2026-08-31 on
+   synthetic data.
+
+
+================================================================================
+12. SUBMISSION ARTIFACTS
+================================================================================
+
+Artifact                         Path (repo)                    Notes
+-------------------------------- ------------------------------ -----------------------------
+Build evidence (this file)       evidence/EVIDENCE.txt          single text evidence file
+Business deck, PDF               docs/deck/eastwind-deck.pdf    9 pages (one per slide)
+Business deck, text export       docs/deck/deck.md              9 slides with TELL / SHOW /
+                                                                TELL notes, 8-beat demo run-
+                                                                of-show, Q&A sheet; quotes no
+                                                                forecast-error percentages
+Deck source                      docs/deck/index.html           visual version of the PDF
+Architecture diagram             docs/architecture.html         one diagram: Unify -> Predict
+                                                                -> Decide -> Ask, UC across,
+                                                                decisions back to gold
+Code                             src/data_generation, etl/,     generator, Lakeflow bundle +
+                                 ml/, genie/, eastwind-         UC governance SQL, training /
+                                 replenishment/                 scoring / Lakebase sync,
+                                                                Genie space builder, AppKit app
+Note: deck.md cites this file as "E<line>" against the earlier
+polly/app-viewer-rbac version; those line numbers do not match this refreshed
+file. Section numbers are the stable reference.
 
 --------------------------------------------------------------------------------
 End of evidence. All identifiers (run IDs, update IDs, model versions, space ID)
