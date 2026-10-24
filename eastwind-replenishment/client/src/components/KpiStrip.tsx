@@ -186,85 +186,91 @@ export function KpiStrip({
     : 'Lakebase serving.recommendations';
   const busy = loading && !s;
 
+  // Columns follow the width left beside the Genie dock (container query), not the viewport.
   return (
-    <section aria-label="Key figures" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <KpiTile
-        icon={Gift}
-        label="Peak lines needing an order"
-        loading={busy}
-        error={error}
-        tone={peakNeeds > 0 ? 'critical' : 'default'}
-        value={s ? formatInt(peakNeeds) : '—'}
-        unit={s && `of ${formatInt(peakLines)} peak lines`}
-        detail={s && 'Stock + inbound is below peak demand until the next delivery'}
-        source={source}
+    <div className="@container">
+      <section
+        aria-label="Key figures"
+        className="grid grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[1080px]:grid-cols-4"
       >
-        {s && (
-          <SplitBar
-            total={peakNeeds}
-            ariaLabel={`${formatInt(peakPending)} of ${formatInt(peakNeeds)} peak lines needing an order are still pending`}
-            segments={[
-              { label: `${formatInt(peakPending)} pending`, value: peakPending, className: 'bg-critical' },
-              {
-                label: `${formatInt(peakNeeds - peakPending)} decided`,
-                value: peakNeeds - peakPending,
-                className: 'bg-critical/35',
-              },
-            ]}
-          />
-        )}
-      </KpiTile>
-      <KpiTile
-        icon={TriangleAlert}
-        label="Peak sales at risk"
-        loading={busy}
-        error={error}
-        tone={peakSales > 0 ? 'critical' : 'default'}
-        value={s ? formatUsd(peakSales) : '—'}
-        detail={s && 'Lost before the next delivery if those peak lines are not ordered'}
-        source={source}
-      >
-        {s && (
-          <SplitBar
-            total={allSales}
-            ariaLabel={`${formatUsd(peakSales)} of ${formatUsd(allSales)} sales at risk is on peak gift lines`}
-            segments={[
-              { label: `Peak gifts ${formatUsd(peakSales)}`, value: peakSales, className: 'bg-critical' },
-              {
-                label: `Other lines ${formatUsd(allSales - peakSales)}`,
-                value: allSales - peakSales,
-                className: 'bg-critical/35',
-              },
-            ]}
-          />
-        )}
-      </KpiTile>
-      <KpiTile
-        icon={ListChecks}
-        label="Lines that need you today"
-        loading={busy}
-        error={error}
-        value={s ? formatInt(review) : '—'}
-        unit={s && `of ${formatInt(linesToOrder)} lines`}
-        detail={
-          s &&
-          `${formatUsd(s.exception_pending_at_risk)} at risk across ${formatInt(s.exception_pending_stores)} stores · the other ${formatInt(routine)} are routine`
-        }
-        source="Exception rules · Lakebase serving.recommendations + replenishment.*"
-      >
-        {s && (
-          <SplitBar
-            total={linesToOrder}
-            ariaLabel={`${formatInt(review)} lines need review, ${formatInt(routine)} routine, ${formatInt(decided)} decided`}
-            segments={[
-              { label: `${formatInt(review)} need review`, value: review, className: 'bg-primary' },
-              { label: `${formatInt(routine)} routine`, value: routine, className: 'bg-primary/30' },
-              { label: `${formatInt(decided)} decided`, value: decided, className: 'bg-muted-foreground/40' },
-            ]}
-          />
-        )}
-      </KpiTile>
-      <WasteTile filters={filters} />
-    </section>
+        <KpiTile
+          icon={Gift}
+          label="Peak lines needing an order"
+          loading={busy}
+          error={error}
+          tone={peakNeeds > 0 ? 'critical' : 'default'}
+          value={s ? formatInt(peakNeeds) : '—'}
+          unit={s && `of ${formatInt(peakLines)} peak lines`}
+          detail={s && 'Stock + inbound is below peak demand until the next delivery'}
+          source={source}
+        >
+          {s && (
+            <SplitBar
+              total={peakNeeds}
+              ariaLabel={`${formatInt(peakPending)} of ${formatInt(peakNeeds)} peak lines needing an order are still pending`}
+              segments={[
+                { label: `${formatInt(peakPending)} pending`, value: peakPending, className: 'bg-critical' },
+                {
+                  label: `${formatInt(peakNeeds - peakPending)} decided`,
+                  value: peakNeeds - peakPending,
+                  className: 'bg-critical/35',
+                },
+              ]}
+            />
+          )}
+        </KpiTile>
+        <KpiTile
+          icon={TriangleAlert}
+          label="Peak sales at risk"
+          loading={busy}
+          error={error}
+          tone={peakSales > 0 ? 'critical' : 'default'}
+          value={s ? formatUsd(peakSales) : '—'}
+          detail={s && 'Lost before the next delivery if those peak lines are not ordered'}
+          source={source}
+        >
+          {s && (
+            <SplitBar
+              total={allSales}
+              ariaLabel={`${formatUsd(peakSales)} of ${formatUsd(allSales)} sales at risk is on peak gift lines`}
+              segments={[
+                { label: `Peak gifts ${formatUsd(peakSales)}`, value: peakSales, className: 'bg-critical' },
+                {
+                  label: `Other lines ${formatUsd(allSales - peakSales)}`,
+                  value: allSales - peakSales,
+                  className: 'bg-critical/35',
+                },
+              ]}
+            />
+          )}
+        </KpiTile>
+        <KpiTile
+          icon={ListChecks}
+          label="Lines that need you today"
+          loading={busy}
+          error={error}
+          value={s ? formatInt(review) : '—'}
+          unit={s && `of ${formatInt(linesToOrder)} lines`}
+          detail={
+            s &&
+            `${formatUsd(s.exception_pending_at_risk)} at risk across ${formatInt(s.exception_pending_stores)} stores · the other ${formatInt(routine)} are routine`
+          }
+          source="Exception rules · Lakebase serving.recommendations + replenishment.*"
+        >
+          {s && (
+            <SplitBar
+              total={linesToOrder}
+              ariaLabel={`${formatInt(review)} lines need review, ${formatInt(routine)} routine, ${formatInt(decided)} decided`}
+              segments={[
+                { label: `${formatInt(review)} need review`, value: review, className: 'bg-primary' },
+                { label: `${formatInt(routine)} routine`, value: routine, className: 'bg-primary/30' },
+                { label: `${formatInt(decided)} decided`, value: decided, className: 'bg-muted-foreground/40' },
+              ]}
+            />
+          )}
+        </KpiTile>
+        <WasteTile filters={filters} />
+      </section>
+    </div>
   );
 }

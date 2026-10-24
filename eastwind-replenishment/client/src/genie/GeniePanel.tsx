@@ -15,8 +15,8 @@ import {
   SheetHeader,
   SheetTitle,
   Spinner,
-  useIsMobile,
 } from '@databricks/appkit-ui/react';
+import { useSyncExternalStore } from 'react';
 import { PanelRightClose, RotateCcw, ShieldCheck, Sparkles } from 'lucide-react';
 import type { ScopeFilters } from '../lib/api';
 import { titleCase } from '../lib/format';
@@ -137,16 +137,29 @@ function GenieContent({
   );
 }
 
+/** Below 1024px a 400px dock would squeeze the charts, so Genie opens as a sheet there instead. */
+const NARROW = '(max-width: 1023px)';
+function useNarrow() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(NARROW);
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(NARROW).matches
+  );
+}
+
 /**
  * Ask-your-data panel over the curated Genie space, docked to the right of the control panel on wide screens (the
- * workspace reflows beside it) and a sheet on small screens. Trust cues: who is asking and the identity queries run
+ * workspace reflows beside it) and a sheet below 1024px. Trust cues: who is asking and the identity queries run
  * as, each answer's generated SQL (expandable in the message), live status, and a persistent AI disclaimer.
  */
 export function GenieDock(props: { email: string | null; filters: ScopeFilters; storeName: string | undefined }) {
   const { open, setOpen } = useGenie();
-  const isMobile = useIsMobile();
+  const narrow = useNarrow();
 
-  if (isMobile) {
+  if (narrow) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full gap-0 p-0">

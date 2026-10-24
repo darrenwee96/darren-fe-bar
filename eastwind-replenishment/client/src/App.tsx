@@ -72,7 +72,7 @@ function Header({
         </div>
         <h1 className="truncate text-[15px] font-semibold text-foreground">Eastwind replenishment</h1>
         {summary?.as_of_date && (
-          <p className="hidden truncate border-l pl-3 text-xs text-muted-foreground tabular-nums 2xl:block">
+          <p className="hidden truncate border-l pl-3 text-xs text-muted-foreground tabular-nums xl:block">
             Order week {formatDate(summary.as_of_date)} · data loaded {formatDateTime(summary.loaded_at)} · model v
             {summary.model_version}
           </p>
@@ -97,7 +97,7 @@ function Header({
         {email && (
           <Badge
             variant="secondary"
-            className="hidden max-w-[220px] truncate font-normal lg:inline-flex"
+            className="hidden max-w-[220px] truncate font-normal 2xl:inline-flex"
             title="Decisions you save are recorded under this identity"
           >
             {email}

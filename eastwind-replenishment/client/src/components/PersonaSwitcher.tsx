@@ -36,11 +36,11 @@ export function PersonaSwitcher({
           id="viewing-as"
           size="sm"
           aria-label="Viewing as"
-          className="h-8 w-[150px] min-w-0 bg-card sm:w-[200px] xl:w-[270px] [&>span]:truncate"
+          className="h-8 w-[150px] min-w-0 bg-card sm:w-[220px] xl:w-[300px] [&>span]:truncate"
         >
           <SelectValue />
         </SelectTrigger>
-        <SelectContent align="end" className="w-[300px]">
+        <SelectContent align="end" className="w-[340px]">
           <SelectItem value={SELF_PERSONA}>
             <span className="flex items-center gap-2">
               <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -62,9 +62,9 @@ export function PersonaSwitcher({
         </SelectContent>
       </Select>
       <Button variant="outline" size="sm" className="h-8 shrink-0 px-2.5" onClick={onGovernance} title="Governance">
-        <ShieldCheck className="h-4 w-4 xl:mr-1" aria-hidden />
-        <span className="hidden xl:inline">Governance</span>
-        <span className="sr-only xl:hidden">Governance</span>
+        <ShieldCheck className="h-4 w-4 2xl:mr-1" aria-hidden />
+        <span className="hidden 2xl:inline">Governance</span>
+        <span className="sr-only 2xl:hidden">Governance</span>
       </Button>
     </div>
   );
