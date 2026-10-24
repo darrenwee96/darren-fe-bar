@@ -13,3 +13,8 @@ env:
   # without a user_scope row is fail-closed: no order lines, 403 on decisions.
   - name: REPLENISHMENT_ANALYSTS
     value: 'darren.wee@databricks.com'
+  # "Viewing as" demo personas (Unity Catalog RBAC showcase). When 'true', the header picks a persona from
+  # darren_fe_bar_catalog.governance.persona_access; it can only narrow the signed-in user's scope. Any other value:
+  # the persona header is ignored and everyone sees their own scope.
+  - name: DEMO_PERSONAS
+    value: 'true'

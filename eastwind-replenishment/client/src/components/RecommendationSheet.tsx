@@ -22,7 +22,7 @@ import {
   useAnalyticsQuery,
 } from '@databricks/appkit-ui/react';
 import { sql } from '@databricks/appkit-ui/js';
-import { Check, CircleAlert, Gift, History, Layers, PencilLine, Store, X } from 'lucide-react';
+import { Check, CircleAlert, Gift, History, Layers, Lock, PencilLine, Store, X } from 'lucide-react';
 import {
   ApiError,
   fetchRecommendation,
@@ -34,7 +34,16 @@ import {
 } from '../lib/api';
 import { coverWeeks, EXCEPTION_LABEL, exceptionDetail, exceptionRuleText } from '../lib/exceptions';
 import { orderReasons, shortEventName } from '../lib/reasons';
-import { formatDate, formatDateTime, formatInt, formatUsd, titleCase, toNumber } from '../lib/format';
+import {
+  costOf,
+  formatCost,
+  formatDate,
+  formatDateTime,
+  formatInt,
+  formatUsd,
+  titleCase,
+  toNumber,
+} from '../lib/format';
 import { STOCK_STATUS } from '../lib/risk';
 import { useNumeric } from '../lib/useNumeric';
 import { ScenarioChart } from './ScenarioChart';
@@ -47,6 +56,8 @@ interface Props {
   onSaved: () => void;
   /** Drill the whole control panel down to this store. */
   onFocusStore: (locationId: string) => void;
+  /** Why decisions are disabled ("Viewing as" a read-only persona), or null. The server refuses them with 403 anyway. */
+  readOnly?: string | null;
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -128,7 +139,8 @@ function AuditTrail({ events }: { events: DecisionEvent[] }) {
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {ev.changed_by} · {formatDateTime(ev.changed_at)}
+            {ev.changed_by}
+            {ev.acting_persona ? ` viewing as ${ev.acting_persona}` : ''} · {formatDateTime(ev.changed_at)}
             {ev.reason ? ` · “${ev.reason}”` : ''}
           </p>
         </li>
@@ -137,7 +149,14 @@ function AuditTrail({ events }: { events: DecisionEvent[] }) {
   );
 }
 
-export function RecommendationSheet({ recommendationId, rules, onClose, onSaved, onFocusStore }: Props) {
+export function RecommendationSheet({
+  recommendationId,
+  rules,
+  onClose,
+  onSaved,
+  onFocusStore,
+  readOnly = null,
+}: Props) {
   const [detail, setDetail] = useState<RecommendationDetail | null>(null);
   const [events, setEvents] = useState<DecisionEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -319,7 +338,8 @@ export function RecommendationSheet({ recommendationId, rules, onClose, onSaved,
                 <Stat label="Expected to expire" value={formatUsd(detail.est_expiry_value)} />
                 <Stat
                   label="Order value at cost"
-                  value={formatUsd(toNumber(detail.recommended_units) * toNumber(detail.unit_cost))}
+                  value={formatCost(costOf(detail.recommended_units, detail.unit_cost))}
+                  hint={detail.unit_cost === null ? 'Unit cost is masked by Unity Catalog in this view' : undefined}
                 />
               </section>
 
@@ -360,14 +380,19 @@ export function RecommendationSheet({ recommendationId, rules, onClose, onSaved,
                     />
                   </div>
                 </div>
+                {readOnly && (
+                  <p className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden /> {readOnly}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  <Button disabled={saving} onClick={() => void decide('ACCEPTED')}>
+                  <Button disabled={saving || !!readOnly} onClick={() => void decide('ACCEPTED')}>
                     <Check className="mr-1 h-4 w-4" /> Accept {formatInt(detail.recommended_units)}
                   </Button>
-                  <Button variant="secondary" disabled={saving} onClick={() => void decide('ADJUSTED')}>
+                  <Button variant="secondary" disabled={saving || !!readOnly} onClick={() => void decide('ADJUSTED')}>
                     <PencilLine className="mr-1 h-4 w-4" /> Save adjusted quantity
                   </Button>
-                  <Button variant="outline" disabled={saving} onClick={() => void decide('REJECTED')}>
+                  <Button variant="outline" disabled={saving || !!readOnly} onClick={() => void decide('REJECTED')}>
                     <X className="mr-1 h-4 w-4" /> Reject
                   </Button>
                 </div>

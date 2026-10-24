@@ -1,5 +1,5 @@
 import type { ExceptionReason, ExceptionRules, RecommendationRow } from './api';
-import { formatInt, formatUsd, toNumber } from './format';
+import { costOf, formatInt, formatUsd, toNumber } from './format';
 
 /** Short chip label per exception rule. The thresholds come from the server (EXCEPTION_RULES, via /api/whoami). */
 export const EXCEPTION_LABEL: Record<ExceptionReason, string> = {
@@ -44,6 +44,8 @@ export function exceptionDetail(reason: ExceptionReason, r: RecommendationRow): 
     case 'VS_RECENT':
       return `Forecast ${formatInt(forecast)} units over ${weeks} wks vs ${formatInt(toNumber(r.recent_weekly_units) * weeks)} at recent sales`;
     case 'HIGH_VALUE':
-      return `${formatUsd(toNumber(r.recommended_units) * toNumber(r.unit_cost))} at cost`;
+      return r.unit_cost === null
+        ? 'High order value at cost (unit cost is masked in this view)'
+        : `${formatUsd(costOf(r.recommended_units, r.unit_cost))} at cost`;
   }
 }

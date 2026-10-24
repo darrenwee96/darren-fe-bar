@@ -26,7 +26,8 @@ import { formatInt, formatUsd } from '../lib/format';
 
 interface BulkRequestBase {
   units: number;
-  valueAtCost: number;
+  /** null when unit cost is masked for the persona. */
+  valueAtCost: number | null;
   /** Human label for a line id, used to list lines that could not be accepted. */
   labelFor?: (id: string) => string;
 }
@@ -116,8 +117,16 @@ export function BulkAcceptDialog({
                 <>
                   <p>
                     Orders <span className="font-medium text-foreground tabular-nums">{formatInt(request.units)}</span>{' '}
-                    units (<span className="tabular-nums">{formatUsd(request.valueAtCost)}</span> at cost) at the
-                    recommended quantities.
+                    units
+                    {request.valueAtCost === null ? (
+                      ''
+                    ) : (
+                      <>
+                        {' '}
+                        (<span className="tabular-nums">{formatUsd(request.valueAtCost)}</span> at cost)
+                      </>
+                    )}{' '}
+                    at the recommended quantities.
                   </p>
                   <p>
                     Each line is saved as its own decision under {email ?? 'your name'}, marked as a bulk accept and

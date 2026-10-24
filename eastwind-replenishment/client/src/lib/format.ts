@@ -10,6 +10,14 @@ export const formatUsd = (value: number | string | null | undefined): string => 
   return `$${n.toFixed(0)}`;
 };
 
+/** A cost value, or "Masked" when Unity Catalog masks unit cost for the persona (the API sends null). */
+export const formatCost = (value: number | string | null | undefined): string =>
+  value === null || value === undefined ? 'Masked' : formatUsd(value);
+
+/** Units × unit cost, or null when unit cost is masked. */
+export const costOf = (units: number | string | null | undefined, unitCost: number | string | null | undefined) =>
+  unitCost === null || unitCost === undefined ? null : toNumber(units) * toNumber(unitCost);
+
 export const formatPct = (value: number | string | null | undefined, digits = 1): string =>
   `${(toNumber(value) * 100).toFixed(digits)}%`;
 

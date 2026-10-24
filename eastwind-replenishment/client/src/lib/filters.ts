@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { sql } from '@databricks/appkit-ui/js';
-import type { ScopeFilters } from './api';
+import { SELF_PERSONA, type Scope, type ScopeFilters } from './api';
 
 export const ALL = 'ALL';
 
@@ -44,7 +44,18 @@ export function useGlobalFilters() {
     [setParams]
   );
 
-  const clear = useCallback(() => setParams(new URLSearchParams(), { replace: true }), [setParams]);
+  const clear = useCallback(
+    () =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const key of KEYS) next.delete(key);
+          return next;
+        },
+        { replace: true }
+      ),
+    [setParams]
+  );
   const active = KEYS.filter((k) => filters[k]).length;
   return { filters, setFilter, clear, active };
 }
@@ -57,4 +68,42 @@ export function warehouseParams(filters: ScopeFilters) {
     category: sql.string(filters.category ?? ALL),
     location_id: sql.string(filters.location ?? ALL),
   };
+}
+
+const PERSONA_KEY = 'viewAs';
+
+/**
+ * The "Viewing as" persona, kept in the URL (?viewAs=store_manager_l0001) so a view can be shared. Switching persona
+ * drops the global filters, which may point outside the new scope. The server validates the persona and can only
+ * narrow the signed-in scope with it.
+ */
+export function usePersonaParam() {
+  const [params, setParams] = useSearchParams();
+  const persona = params.get(PERSONA_KEY) || SELF_PERSONA;
+  const setPersona = useCallback(
+    (id: string) =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const key of KEYS) next.delete(key);
+          if (id === SELF_PERSONA) next.delete(PERSONA_KEY);
+          else next.set(PERSONA_KEY, id);
+          return next;
+        },
+        { replace: true }
+      ),
+    [setParams]
+  );
+  return { persona, setPersona };
+}
+
+/**
+ * Pin the warehouse-fed charts (forecast, waste) to a persona's single region or store. Those charts are aggregate
+ * SQL-warehouse reads; the order lines, KPIs and decisions are scoped on the server.
+ */
+export function pinToScope(filters: ScopeFilters, scope: Scope | undefined): ScopeFilters {
+  if (!scope?.restricted) return filters;
+  if (scope.locations.length === 1 && scope.regions.length === 0) return { ...filters, location: scope.locations[0] };
+  if (scope.regions.length === 1 && scope.locations.length === 0) return { ...filters, region: scope.regions[0] };
+  return filters;
 }

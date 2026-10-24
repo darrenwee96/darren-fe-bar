@@ -42,7 +42,7 @@ import {
 } from '../lib/api';
 import { EXCEPTION_LABEL, exceptionDetail, exceptionRuleText } from '../lib/exceptions';
 import { ALL } from '../lib/filters';
-import { formatInt, formatPct, formatUsd, titleCase, toNumber } from '../lib/format';
+import { costOf, formatCost, formatInt, formatPct, formatUsd, titleCase, toNumber } from '../lib/format';
 import { orderReasons } from '../lib/reasons';
 import { STOCK_STATUS } from '../lib/risk';
 import { useAsync } from '../lib/useAsync';
@@ -104,11 +104,14 @@ function ExceptionChips({ row, rules }: { row: RecommendationListRow; rules: Exc
 function RoutineSummary({
   summary,
   loadingItems,
+  readOnly,
   onReview,
   onAcceptAll,
 }: {
   summary: Summary;
   loadingItems: boolean;
+  /** Why decisions are disabled in this view, or null when the viewer can decide. */
+  readOnly: string | null;
   onReview: () => void;
   onAcceptAll: () => void;
 }) {
@@ -121,7 +124,7 @@ function RoutineSummary({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground tabular-nums">
-          {formatInt(count)} routine lines · {formatUsd(summary.routine_pending_value_at_cost)} at cost
+          {formatInt(count)} routine lines · {formatCost(summary.routine_pending_value_at_cost)} at cost
         </p>
         <p className="text-xs text-muted-foreground tabular-nums">
           {formatInt(summary.routine_pending_units)} units where no exception rule fired: the order follows the
@@ -132,7 +135,7 @@ function RoutineSummary({
         <Button variant="ghost" size="sm" onClick={onReview}>
           Review list
         </Button>
-        <Button size="sm" onClick={onAcceptAll} disabled={loadingItems}>
+        <Button size="sm" onClick={onAcceptAll} disabled={loadingItems || !!readOnly} title={readOnly ?? undefined}>
           {loadingItems ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <CheckCheck className="mr-1.5 h-4 w-4" />}
           Accept all routine
         </Button>
@@ -147,6 +150,7 @@ export function OrderQueue({
   revision,
   rules,
   email,
+  readOnly = null,
   onOpen,
   onChanged,
 }: {
@@ -155,6 +159,8 @@ export function OrderQueue({
   revision: number;
   rules: ExceptionRules | null;
   email: string | null;
+  /** Why decisions are disabled ("Viewing as" a read-only persona); the server refuses them with 403 anyway. */
+  readOnly?: string | null;
   onOpen: (id: string) => void;
   onChanged: () => void;
 }) {
@@ -205,7 +211,7 @@ export function OrderQueue({
     [data, overrides]
   );
   const total = data?.total ?? 0;
-  const selectable = (r: RecommendationListRow) => !r.decision_status && toNumber(r.recommended_units) > 0;
+  const selectable = (r: RecommendationListRow) => !readOnly && !r.decision_status && toNumber(r.recommended_units) > 0;
 
   /** One-click accept with an optimistic row update; reverts and explains on conflict or failure. */
   async function accept(r: RecommendationListRow) {
@@ -266,7 +272,9 @@ export function OrderQueue({
         expectedVersion: r.version === null ? null : toNumber(r.version),
       })),
       units: lines.reduce((s, r) => s + toNumber(r.recommended_units), 0),
-      valueAtCost: lines.reduce((s, r) => s + toNumber(r.recommended_units) * toNumber(r.unit_cost), 0),
+      valueAtCost: lines.some((r) => r.unit_cost === null)
+        ? null
+        : lines.reduce((s, r) => s + (costOf(r.recommended_units, r.unit_cost) ?? 0), 0),
       labelFor: (id) => names.get(id) ?? id,
     });
   }
@@ -356,6 +364,7 @@ export function OrderQueue({
         <RoutineSummary
           summary={summary}
           loadingItems={loadingRoutine}
+          readOnly={readOnly}
           onReview={() => setView('ROUTINE')}
           onAcceptAll={() => void acceptAllRoutine()}
         />
@@ -557,7 +566,8 @@ export function OrderQueue({
                               size="sm"
                               variant="outline"
                               className="h-7 px-2.5"
-                              disabled={busy !== null}
+                              disabled={busy !== null || !!readOnly}
+                              title={readOnly ?? undefined}
                               onClick={() => void accept(r)}
                               aria-label={`Accept ${formatInt(recommended)} units of ${r.sku_name} for ${r.location_name}`}
                             >

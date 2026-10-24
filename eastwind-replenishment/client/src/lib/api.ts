@@ -1,6 +1,8 @@
 // Typed client for the replenishment API (server/routes/replenishment-routes.ts).
 // Postgres numeric / bigint values arrive as strings, so numbers are converted with Number() at render.
 // Every endpoint applies the caller's planning scope server-side; the filters sent here only narrow within it.
+// The "Viewing as" persona travels as the x-eastwind-persona header; the server validates it against the Unity Catalog
+// mapping and can only narrow the signed-in scope with it.
 
 export type Risk = 'HIGH' | 'MEDIUM' | 'LOW';
 export type DecisionStatus = 'ACCEPTED' | 'ADJUSTED' | 'REJECTED';
@@ -24,7 +26,8 @@ export interface Summary {
   store_skus: Numeric;
   lines_to_order: Numeric;
   recommended_units: Numeric;
-  order_value_at_cost: Numeric;
+  /** Cost-derived values are null when Unity Catalog masks unit cost for the persona. */
+  order_value_at_cost: Numeric | null;
   needs_order: Numeric;
   needs_order_sales: Numeric;
   peak_lines: Numeric;
@@ -36,7 +39,7 @@ export interface Summary {
   expiry_value: Numeric;
   decided_lines: Numeric;
   pending_lines: Numeric;
-  pending_value_at_cost: Numeric;
+  pending_value_at_cost: Numeric | null;
   accepted: Numeric;
   adjusted: Numeric;
   rejected: Numeric;
@@ -47,7 +50,7 @@ export interface Summary {
   routine_lines: Numeric;
   routine_pending: Numeric;
   routine_pending_units: Numeric;
-  routine_pending_value_at_cost: Numeric;
+  routine_pending_value_at_cost: Numeric | null;
   /** Lines with last year's festival-week demand loaded; 0 means the last-year rule cannot fire yet. */
   last_year_context_lines: Numeric;
 }
@@ -96,7 +99,8 @@ export interface RecommendationRow {
   overstock_risk: Risk;
   est_lost_sales_if_no_order: Numeric;
   est_expiry_value: Numeric;
-  unit_cost: Numeric;
+  /** NULL when Unity Catalog masks unit cost for the persona. */
+  unit_cost: Numeric | null;
   recent_weekly_units: Numeric;
   demand_cover_units: Numeric;
   lead_time_days: Numeric;
@@ -111,6 +115,8 @@ export interface RecommendationRow {
   decided_at: string | null;
   version: Numeric | null;
   decision_source: DecisionSource | null;
+  /** The persona the decision was made under (null = the decider's own scope). */
+  acting_persona: string | null;
 }
 
 export interface RecommendationListRow extends RecommendationRow {
@@ -142,6 +148,7 @@ export interface DecisionEvent {
   changed_by: string;
   changed_at: string;
   decision_source: DecisionSource | null;
+  acting_persona: string | null;
 }
 
 /** Global control-panel filters (undefined = all). */
@@ -172,8 +179,21 @@ export class ApiError extends Error {
   }
 }
 
+export const SELF_PERSONA = 'self';
+let activePersona = SELF_PERSONA;
+
+/** Every API call from now on is made "viewing as" this persona ('self' = your own scope). */
+export function setActivePersona(id: string) {
+  activePersona = id;
+}
+
+function withPersona(init: RequestInit = {}): RequestInit {
+  if (activePersona === SELF_PERSONA) return init;
+  return { ...init, headers: { ...(init.headers as Record<string, string>), 'x-eastwind-persona': activePersona } };
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, withPersona(init));
   const body: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message =
@@ -202,8 +222,64 @@ export interface ExceptionRules {
   minCasesForSwing: number;
 }
 
+export type PersonaRole = 'ANALYST' | 'PLANNER' | 'STORE_MANAGER' | 'AUDITOR';
+
+/** A persona from the Unity Catalog mapping governance.persona_access. */
+export interface Persona {
+  id: string;
+  label: string;
+  role: PersonaRole;
+  canDecide: boolean;
+  seesUnitCost: boolean;
+  scope: Scope;
+  bindings: { ucGroup: string | null; region: string | null; storeId: string | null }[];
+}
+
+export interface Whoami {
+  email: string;
+  executesAs: string;
+  /** Effective scope: your own, narrowed by the persona. */
+  scope: Scope;
+  ownScope: Scope;
+  canDecide: boolean;
+  costMasked: boolean;
+  persona: Persona | null;
+  personasEnabled: boolean;
+  exceptionRules: ExceptionRules;
+}
+
 export function fetchWhoami() {
-  return request<{ email: string; executesAs: string; scope: Scope; exceptionRules: ExceptionRules }>('/api/whoami');
+  return request<Whoami>('/api/whoami');
+}
+
+export function fetchPersonas() {
+  return request<{ enabled: boolean; personas: Persona[] }>('/api/personas');
+}
+
+export interface UcGovernance {
+  table: string;
+  mappingTable: string;
+  rowFilter: { name: string; columns: string; definition: string | null } | null;
+  masks: { column: string; name: string; definition: string | null }[];
+  grants: { grantee: string; privilege: string }[];
+  personaCounts: Record<string, { visible: number; total: number; seesUnitCost: boolean }>;
+  readAt: string;
+}
+
+export interface Governance {
+  persona: Persona | null;
+  scope: Scope;
+  ownScope: Scope;
+  canDecide: boolean;
+  costMasked: boolean;
+  /** Lakebase rows the app returns for this view vs all rows. */
+  rows: { visible: number; total: number };
+  uc: UcGovernance | null;
+  ucError: string | null;
+}
+
+export function fetchGovernance() {
+  return request<Governance>('/api/governance');
 }
 
 export function fetchFilterOptions() {
@@ -253,7 +329,7 @@ export interface RoutinePending {
   count: number;
   truncated: boolean;
   units: number;
-  valueAtCost: number;
+  valueAtCost: number | null;
   /** Fingerprint of the exact routine set; sent back on confirm so the server can detect a change. */
   snapshot: string;
 }
@@ -299,11 +375,14 @@ export function acceptRoutine(
 }
 
 async function postBulk(url: string, payload: unknown): Promise<BulkOutcome> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const res = await fetch(
+    url,
+    withPersona({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  );
   const body: unknown = await res.json().catch(() => ({}));
   if (typeof body === 'object' && body !== null && 'results' in body && Array.isArray(body.results)) {
     return body as BulkOutcome;

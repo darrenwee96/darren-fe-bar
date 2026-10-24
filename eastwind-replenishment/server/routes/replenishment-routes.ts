@@ -16,13 +16,31 @@
 // Management by exception (./exceptions): each line to order either needs review or is routine. Routine lines, and
 // any selection of lines, can be accepted in bulk; every line still gets its own decision row, audit event, version
 // check and scope check, and the response reports each line that could not be accepted.
+//
+// "Viewing as" personas (./personas, DEMO_PERSONAS=true): the x-eastwind-persona header picks a persona from the Unity
+// Catalog mapping governance.persona_access. Its scope is intersected with the caller's own scope (never wider), a
+// read-only persona gets 403 on every write, cost columns UC masks for it are nulled, and decisions and audit events
+// record the persona as acting_persona.
 
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { Application, Response } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
 import { EXCEPTION_RULES, exceptionReasonsSql } from './exceptions';
 import { createIdentityResolver, defaultIdentityOptions, requireUser, type IdentityOptions } from './identity';
 import { startLineContextSync, type Warehouse } from './line-context';
+import {
+  maskCost,
+  narrowScope,
+  PERSONA_HEADER,
+  PersonaError,
+  personasEnabled,
+  requestedPersona,
+  ucGovernanceSource,
+  ucPersonaSource,
+  type Persona,
+  type PersonaSource,
+  type UcGovernance,
+} from './personas';
 
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -96,6 +114,9 @@ const SETUP_SQL = [
        ADD CONSTRAINT order_decisions_source_check CHECK (decision_source IN ('single', 'bulk'));
    EXCEPTION WHEN duplicate_object THEN NULL;
    END $$`,
+  // v3: the "Viewing as" persona a decision was made under (NULL = the user's own scope).
+  `ALTER TABLE replenishment.order_decisions ADD COLUMN IF NOT EXISTS acting_persona TEXT`,
+  `ALTER TABLE replenishment.decision_events ADD COLUMN IF NOT EXISTS acting_persona TEXT`,
   `CREATE TABLE IF NOT EXISTS replenishment.line_context (
      recommendation_id TEXT PRIMARY KEY,
      forecast_run_id TEXT,
@@ -185,7 +206,7 @@ export interface Scope {
  * Resolve the caller's planning scope from replenishment.user_scope. Fail-closed: a user without rows gets an empty
  * scope (sees nothing, 403 on decisions). region = '*' is the explicit network-wide grant.
  */
-export async function resolveScope(db: Lakebase, user: string): Promise<Scope> {
+export async function resolveScope(db: Pick<Lakebase, 'query'>, user: string): Promise<Scope> {
   const { rows } = await db.query(
     'SELECT region, location_id FROM replenishment.user_scope WHERE lower(user_email) = lower($1)',
     [user]
@@ -247,7 +268,7 @@ const LIST_SQL = `
          sum(x.at_risk) OVER (PARTITION BY r.location_id) AS store_at_risk,
          count(*) OVER (PARTITION BY r.location_id) AS store_lines,
          d.decision_status, d.final_order_units, d.decided_by, d.decided_at, d.version, d.decision_source,
-         count(*) OVER () AS total
+         d.acting_persona, count(*) OVER () AS total
   ${LINES_FROM}
   WHERE ${FILTER_SQL}
     AND ($8::text IS NULL OR r.stockout_risk = $8)
@@ -385,12 +406,13 @@ const OPTIONS_SQL = `
 const DETAIL_SQL = `
   SELECT r.*, r.as_of_date::text AS as_of_date, c.last_year_cover_units, x.exception_reasons, x.at_risk,
          d.decision_id, d.decision_status, d.final_order_units, d.reason, d.decided_by, d.decided_at, d.version,
-         d.decision_source
+         d.decision_source, d.acting_persona
   ${LINES_FROM}
   WHERE r.recommendation_id = $1 AND ${scopeSql(2)}`;
 
 const EVENTS_SQL = `
-  SELECT event_id, previous_status, new_status, previous_units, new_units, reason, changed_by, changed_at, decision_source
+  SELECT event_id, previous_status, new_status, previous_units, new_units, reason, changed_by, changed_at, decision_source,
+         acting_persona
   FROM replenishment.decision_events
   WHERE recommendation_id = $1
   ORDER BY changed_at DESC`;
@@ -405,6 +427,84 @@ const unavailable = (err: unknown, fallback: string) =>
 /** The verified caller set by `requireUser`. */
 const userOf = (res: Response): string => String(res.locals.user);
 
+/** What the caller may see and do on this request: their own scope, narrowed by the persona they are viewing as. */
+export interface Access {
+  /** Effective read and write scope. */
+  scope: Scope;
+  /** The caller's own scope from replenishment.user_scope. */
+  own: Scope;
+  canDecide: boolean;
+  persona: Persona | null;
+  /** UC masks unit cost for this persona: cost columns and values derived from them are nulled. */
+  costMasked: boolean;
+}
+
+const accessOf = (res: Response): Access => res.locals.access as Access;
+
+export interface PersonaOptions {
+  /** DEMO_PERSONAS=true: honour the x-eastwind-persona header. Off = the header is ignored. */
+  enabled: boolean;
+  source: PersonaSource | null;
+  /** Live UC metadata for the governance panel. */
+  governance?: (() => Promise<UcGovernance>) | null;
+}
+
+const STORES_SQL = 'SELECT DISTINCT location_id, region FROM serving.recommendations';
+
+const VISIBLE_SQL = `
+  SELECT count(*) FILTER (WHERE ${scopeSql(1)}) AS visible, count(*) AS total
+  FROM serving.recommendations r`;
+
+/** Resolve the caller's access for this request. Throws PersonaError (400 / 503) for a bad or unreadable persona. */
+export async function resolveAccess(
+  db: Pick<Lakebase, 'query'>,
+  user: string,
+  personaHeader: string | undefined,
+  personas: PersonaOptions
+): Promise<Access> {
+  const own = await resolveScope(db, user);
+  const id = requestedPersona(personaHeader, personas.enabled);
+  if (!id) return { scope: own, own, canDecide: true, persona: null, costMasked: false };
+  if (!personas.source) throw new PersonaError('Personas are not available', 503, 'PERSONAS_UNAVAILABLE');
+  let list: Persona[];
+  try {
+    list = await personas.source.list();
+  } catch (err) {
+    console.error('Failed to read the persona mapping from Unity Catalog:', err);
+    throw new PersonaError(
+      'The governed persona mapping could not be read. Switch back to your own view or try again.',
+      503,
+      'PERSONAS_UNAVAILABLE'
+    );
+  }
+  const persona = list.find((p) => p.id === id);
+  if (!persona) throw new PersonaError('Unknown persona', 400, 'UNKNOWN_PERSONA');
+  const stores =
+    own.restricted && persona.scope.restricted
+      ? (await db.query(STORES_SQL)).rows.map((r) => ({ location_id: String(r.location_id), region: String(r.region) }))
+      : [];
+  return {
+    scope: narrowScope(own, persona.scope, stores),
+    own,
+    canDecide: persona.canDecide,
+    persona,
+    costMasked: !persona.seesUnitCost,
+  };
+}
+
+/** 403 for a read-only persona, before any write is attempted. Returns true when the request was refused. */
+function refuseReadOnly(res: Response): boolean {
+  const access = accessOf(res);
+  if (access.canDecide) return false;
+  res.status(403).json({
+    error: `${access.persona?.label ?? 'This view'} is read-only: you can see these order lines but not decide them.`,
+    code: 'READ_ONLY_PERSONA',
+  });
+  return true;
+}
+
+const personaOf = (res: Response): string | null => accessOf(res).persona?.id ?? null;
+
 /**
  * Register the API on an Express app. Exported separately from setup so tests can mount it on a bare app with a fake
  * Lakebase and a fake token verifier. Every route requires a verified identity (401 otherwise).
@@ -412,29 +512,92 @@ const userOf = (res: Response): string => String(res.locals.user);
 export function registerReplenishmentRoutes(
   app: Application,
   db: Lakebase,
-  identity: IdentityOptions = defaultIdentityOptions()
+  identity: IdentityOptions = defaultIdentityOptions(),
+  personas: PersonaOptions = { enabled: false, source: null }
 ) {
-  const auth = requireUser(createIdentityResolver(identity));
-
-  app.get('/api/whoami', auth, async (_req, res) => {
-    const email = userOf(res);
-    try {
-      const scope = await resolveScope(db, email);
-      res.json({
-        email,
-        executesAs: 'app service principal; identity verified from your forwarded token, decisions attributed to you',
-        scope,
-        exceptionRules: EXCEPTION_RULES,
+  const verify = requireUser(createIdentityResolver(identity));
+  /** After `verify`: the caller's scope (own, narrowed by the persona) as res.locals.access, or 400 / 5xx. */
+  const withAccess = (req: Request, res: Response, next: NextFunction) => {
+    resolveAccess(db, userOf(res), req.header(PERSONA_HEADER), personas)
+      .then((access) => {
+        res.locals.access = access;
+        next();
+      })
+      .catch((err: unknown) => {
+        if (err instanceof PersonaError) {
+          res.status(err.status).json({ error: err.message, code: err.code });
+          return;
+        }
+        console.error('Failed to resolve scope:', err);
+        res
+          .status(servingUnavailable(err) ? 503 : 500)
+          .json({ error: unavailable(err, 'Failed to resolve your planning scope') });
       });
+  };
+
+  app.get('/api/whoami', verify, withAccess, (_req, res) => {
+    const access = accessOf(res);
+    res.json({
+      email: userOf(res),
+      executesAs: 'app service principal; identity verified from your forwarded token, decisions attributed to you',
+      scope: access.scope,
+      ownScope: access.own,
+      canDecide: access.canDecide,
+      costMasked: access.costMasked,
+      persona: access.persona,
+      personasEnabled: personas.enabled,
+      exceptionRules: EXCEPTION_RULES,
+    });
+  });
+
+  /** The selectable personas from the UC mapping (empty when DEMO_PERSONAS is off). */
+  app.get('/api/personas', verify, async (_req, res) => {
+    if (!personas.enabled || !personas.source) {
+      res.json({ enabled: false, personas: [] });
+      return;
+    }
+    try {
+      res.json({ enabled: true, personas: await personas.source.list() });
     } catch (err) {
-      console.error('Failed to resolve scope:', err);
-      res.status(500).json({ error: 'Failed to resolve your planning scope' });
+      console.error('Failed to read the persona mapping from Unity Catalog:', err);
+      res.status(503).json({ error: 'The governed persona mapping could not be read', code: 'PERSONAS_UNAVAILABLE' });
     }
   });
 
-  app.get('/api/filters', auth, async (_req, res) => {
+  /** Governance panel: the effective access, rows visible vs total, and the UC objects that enforce it (live). */
+  app.get('/api/governance', verify, withAccess, async (_req, res) => {
+    const access = accessOf(res);
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { rows } = await db.query(VISIBLE_SQL, scopeParams(access.scope));
+      let uc: UcGovernance | null = null;
+      let ucError: string | null = null;
+      if (personas.governance) {
+        try {
+          uc = await personas.governance();
+        } catch (err) {
+          console.error('Failed to read UC governance metadata:', err);
+          ucError = 'Unity Catalog metadata could not be read right now';
+        }
+      }
+      res.json({
+        persona: access.persona,
+        scope: access.scope,
+        ownScope: access.own,
+        canDecide: access.canDecide,
+        costMasked: access.costMasked,
+        rows: { visible: Number(rows[0]?.visible ?? 0), total: Number(rows[0]?.total ?? 0) },
+        uc,
+        ucError,
+      });
+    } catch (err) {
+      console.error('Failed to load governance:', err);
+      res.status(servingUnavailable(err) ? 503 : 500).json({ error: unavailable(err, 'Failed to load governance') });
+    }
+  });
+
+  app.get('/api/filters', verify, withAccess, async (_req, res) => {
+    try {
+      const { scope } = accessOf(res);
       const { rows } = await db.query(OPTIONS_SQL, scopeParams(scope));
       const stores = new Map<
         string,
@@ -466,30 +629,30 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.get('/api/recommendations/summary', auth, async (req, res) => {
+  app.get('/api/recommendations/summary', verify, withAccess, async (req, res) => {
     const parsed = ScopeFilters.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
       return;
     }
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { scope, costMasked } = accessOf(res);
       const { rows } = await db.query(SUMMARY_SQL, filterParams(parsed.data, scope));
-      res.json(rows[0]);
+      res.json(maskCost(rows[0], costMasked));
     } catch (err) {
       console.error('Failed to load summary:', err);
       res.status(servingUnavailable(err) ? 503 : 500).json({ error: unavailable(err, 'Failed to load summary') });
     }
   });
 
-  app.get('/api/recommendations/by-store', auth, async (req, res) => {
+  app.get('/api/recommendations/by-store', verify, withAccess, async (req, res) => {
     const parsed = ScopeFilters.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
       return;
     }
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { scope } = accessOf(res);
       const { rows } = await db.query(BY_STORE_SQL, filterParams(parsed.data, scope));
       res.json({ rows });
     } catch (err) {
@@ -498,7 +661,7 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.get('/api/recommendations', auth, async (req, res) => {
+  app.get('/api/recommendations', verify, withAccess, async (req, res) => {
     const parsed = ListQuery.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
@@ -506,7 +669,7 @@ export function registerReplenishmentRoutes(
     }
     const q = parsed.data;
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { scope, costMasked } = accessOf(res);
       const { rows } = await db.query(LIST_SQL, [
         ...filterParams(q, scope),
         q.risk ?? null,
@@ -518,7 +681,12 @@ export function registerReplenishmentRoutes(
         q.offset,
         q.segment,
       ]);
-      res.json({ rows, total: rows.length > 0 ? Number(rows[0].total) : 0, limit: q.limit, offset: q.offset });
+      res.json({
+        rows: rows.map((r) => maskCost(r, costMasked)),
+        total: rows.length > 0 ? Number(rows[0].total) : 0,
+        limit: q.limit,
+        offset: q.offset,
+      });
     } catch (err) {
       console.error('Failed to list recommendations:', err);
       res
@@ -527,21 +695,21 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.get('/api/recommendations/routine', auth, async (req, res) => {
+  app.get('/api/recommendations/routine', verify, withAccess, async (req, res) => {
     const parsed = ScopeFilters.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid filters' });
       return;
     }
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { scope, costMasked } = accessOf(res);
       const set = await routineSet(db, parsed.data, scope);
       // Counts + snapshot only: the ids stay on the server, which recomputes them when the user confirms.
       res.json({
         count: set.count,
         truncated: set.truncated,
         units: set.units,
-        valueAtCost: set.valueAtCost,
+        valueAtCost: costMasked ? null : set.valueAtCost,
         snapshot: set.snapshot,
       });
     } catch (err) {
@@ -550,7 +718,8 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.post('/api/recommendations/accept-routine', auth, async (req, res) => {
+  app.post('/api/recommendations/accept-routine', verify, withAccess, async (req, res) => {
+    if (refuseReadOnly(res)) return;
     const parsed = AcceptRoutineBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
@@ -559,8 +728,8 @@ export function registerReplenishmentRoutes(
     const { filters, expected } = parsed.data;
     const user = userOf(res);
     try {
-      const scope = await resolveScope(db, user);
-      const result = await acceptRoutineSet(db, user, scope, filters, expected);
+      const { scope } = accessOf(res);
+      const result = await acceptRoutineSet(db, user, scope, filters, expected, personaOf(res));
       if (result.ok) {
         res.status(200).json(result.outcome);
       } else if (result.reason === 'truncated') {
@@ -581,23 +750,17 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.post('/api/recommendations/bulk-accept', auth, async (req, res) => {
+  app.post('/api/recommendations/bulk-accept', verify, withAccess, async (req, res) => {
+    if (refuseReadOnly(res)) return;
     const parsed = BulkAcceptBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid selection' });
       return;
     }
     const user = userOf(res);
-    let scope: Scope;
+    const { scope } = accessOf(res);
     try {
-      scope = await resolveScope(db, user);
-    } catch (err) {
-      console.error('Failed to resolve scope:', err);
-      res.status(500).json({ error: 'Failed to resolve your planning scope' });
-      return;
-    }
-    try {
-      const outcome = await bulkAccept(db, user, scope, parsed.data.items);
+      const outcome = await bulkAccept(db, user, scope, parsed.data.items, personaOf(res));
       const forbidden = outcome.results.filter((r) => r.status === 403).length;
       // 200 = every line accepted; 403 = none of the lines are in scope; 207 = some lines could not be accepted.
       const status = outcome.accepted === outcome.requested ? 200 : forbidden === outcome.requested ? 403 : 207;
@@ -608,23 +771,24 @@ export function registerReplenishmentRoutes(
     }
   });
 
-  app.get('/api/recommendations/:id', auth, async (req, res) => {
+  app.get('/api/recommendations/:id', verify, withAccess, async (req, res) => {
     try {
-      const scope = await resolveScope(db, userOf(res));
+      const { scope, costMasked } = accessOf(res);
       const { rows } = await db.query(DETAIL_SQL, [req.params.id, ...scopeParams(scope)]);
       if (rows.length === 0) {
         res.status(404).json({ error: 'Recommendation not found' });
         return;
       }
       const events = await db.query(EVENTS_SQL, [req.params.id]);
-      res.json({ recommendation: rows[0], events: events.rows });
+      res.json({ recommendation: maskCost(rows[0], costMasked), events: events.rows });
     } catch (err) {
       console.error('Failed to load recommendation:', err);
       res.status(500).json({ error: 'Failed to load recommendation' });
     }
   });
 
-  app.post('/api/recommendations/:id/decision', auth, async (req, res) => {
+  app.post('/api/recommendations/:id/decision', verify, withAccess, async (req, res) => {
+    if (refuseReadOnly(res)) return;
     const parsed = DecisionBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid decision' });
@@ -632,14 +796,8 @@ export function registerReplenishmentRoutes(
     }
     const body = parsed.data;
     const user = userOf(res);
-    let scope: Scope;
-    try {
-      scope = await resolveScope(db, user);
-    } catch (err) {
-      console.error('Failed to resolve scope:', err);
-      res.status(500).json({ error: 'Failed to resolve your planning scope' });
-      return;
-    }
+    const { scope } = accessOf(res);
+    const persona = personaOf(res);
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
@@ -678,16 +836,17 @@ export function registerReplenishmentRoutes(
         ? await client.query(
             `UPDATE replenishment.order_decisions
              SET decision_status = $2, final_order_units = $3, reason = $4, decided_by = $5,
-                 decided_at = now(), updated_at = now(), version = version + 1, decision_source = $6
+                 decided_at = now(), updated_at = now(), version = version + 1, decision_source = $6,
+                 acting_persona = $7
              WHERE recommendation_id = $1
              RETURNING *`,
-            [req.params.id, body.status, finalUnits, body.reason ?? null, user, 'single']
+            [req.params.id, body.status, finalUnits, body.reason ?? null, user, 'single', persona]
           )
         : await client.query(
             `INSERT INTO replenishment.order_decisions
                (recommendation_id, as_of_date, location_id, sku_id, decision_status, recommended_units,
-                final_order_units, reason, decided_by, decision_source)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                final_order_units, reason, decided_by, decision_source, acting_persona)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
             [
               req.params.id,
@@ -700,14 +859,15 @@ export function registerReplenishmentRoutes(
               body.reason ?? null,
               user,
               'single',
+              persona,
             ]
           );
       const decision = saved.rows[0];
       await client.query(
         `INSERT INTO replenishment.decision_events
            (decision_id, recommendation_id, previous_status, new_status, previous_units, new_units, reason, changed_by,
-            decision_source)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            decision_source, acting_persona)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           decision.decision_id,
           req.params.id,
@@ -718,6 +878,7 @@ export function registerReplenishmentRoutes(
           body.reason ?? null,
           user,
           'single',
+          persona,
         ]
       );
       await client.query('COMMIT');
@@ -758,12 +919,13 @@ export async function bulkAccept(
   db: Lakebase,
   user: string,
   scope: Scope,
-  items: { id: string; expectedVersion: number | null }[]
+  items: { id: string; expectedVersion: number | null }[],
+  persona: string | null = null
 ): Promise<BulkOutcome> {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const outcome = await acceptLines(client, user, scope, items);
+    const outcome = await acceptLines(client, user, scope, items, persona);
     await client.query('COMMIT');
     return outcome;
   } catch (err) {
@@ -779,7 +941,8 @@ async function acceptLines(
   client: PoolClient,
   user: string,
   scope: Scope,
-  items: { id: string; expectedVersion: number | null }[]
+  items: { id: string; expectedVersion: number | null }[],
+  persona: string | null
 ): Promise<BulkOutcome> {
   const ids = items.map((i) => i.id);
   const recs = await client.query(
@@ -835,8 +998,8 @@ async function acceptLines(
     const saved = await client.query(
       `INSERT INTO replenishment.order_decisions
          (recommendation_id, as_of_date, location_id, sku_id, decision_status, recommended_units, final_order_units,
-          reason, decided_by, decision_source)
-       SELECT u.id, u.as_of_date, u.location_id, u.sku_id, 'ACCEPTED', u.units, u.units, NULL, $6, 'bulk'
+          reason, decided_by, decision_source, acting_persona)
+       SELECT u.id, u.as_of_date, u.location_id, u.sku_id, 'ACCEPTED', u.units, u.units, NULL, $6, 'bulk', $7
        FROM unnest($1::text[], $2::date[], $3::text[], $4::text[], $5::int[])
             AS u(id, as_of_date, location_id, sku_id, units)
        ON CONFLICT (recommendation_id) DO NOTHING
@@ -848,6 +1011,7 @@ async function acceptLines(
         inserts.map((r) => r.sku_id),
         inserts.map((r) => r.units),
         user,
+        persona,
       ]
     );
     for (const row of saved.rows) {
@@ -876,11 +1040,12 @@ async function acceptLines(
     const saved = await client.query(
       `UPDATE replenishment.order_decisions d
        SET decision_status = 'ACCEPTED', final_order_units = u.units, reason = NULL, decided_by = $4,
-           decided_at = now(), updated_at = now(), version = d.version + 1, decision_source = 'bulk'
+           decided_at = now(), updated_at = now(), version = d.version + 1, decision_source = 'bulk',
+           acting_persona = $5
        FROM unnest($1::text[], $2::int[], $3::int[]) AS u(id, units, version)
        WHERE d.recommendation_id = u.id AND d.version = u.version
        RETURNING d.decision_id, d.recommendation_id, d.final_order_units, d.version`,
-      [updates.map((u) => u.id), updates.map((u) => u.units), updates.map((u) => u.version), user]
+      [updates.map((u) => u.id), updates.map((u) => u.units), updates.map((u) => u.version), user, persona]
     );
     const byId = new Map(updates.map((u) => [u.id, u]));
     for (const row of saved.rows) {
@@ -904,8 +1069,8 @@ async function acceptLines(
     await client.query(
       `INSERT INTO replenishment.decision_events
          (decision_id, recommendation_id, previous_status, new_status, previous_units, new_units, reason, changed_by,
-          decision_source)
-       SELECT e.decision_id, e.id, e.prev_status, 'ACCEPTED', e.prev_units, e.units, NULL, $6, 'bulk'
+          decision_source, acting_persona)
+       SELECT e.decision_id, e.id, e.prev_status, 'ACCEPTED', e.prev_units, e.units, NULL, $6, 'bulk', $7
        FROM unnest($1::uuid[], $2::text[], $3::text[], $4::int[], $5::int[])
             AS e(decision_id, id, prev_status, prev_units, units)`,
       [
@@ -915,6 +1080,7 @@ async function acceptLines(
         events.map((e) => e.prevUnits),
         events.map((e) => e.units),
         user,
+        persona,
       ]
     );
   }
@@ -947,7 +1113,8 @@ export async function acceptRoutineSet(
   user: string,
   scope: Scope,
   filters: z.infer<typeof ScopeFilters>,
-  expected: { count: number; snapshot: string }
+  expected: { count: number; snapshot: string },
+  persona: string | null = null
 ): Promise<RoutineAcceptResult> {
   const client = await db.pool.connect();
   try {
@@ -965,7 +1132,8 @@ export async function acceptRoutineSet(
       client,
       user,
       scope,
-      current.ids.map((id) => ({ id, expectedVersion: null }))
+      current.ids.map((id) => ({ id, expectedVersion: null })),
+      persona
     );
     if (outcome.accepted !== outcome.requested) {
       await client.query('ROLLBACK');
@@ -996,5 +1164,13 @@ export async function setupReplenishmentRoutes(appkit: AppKitWithLakebase) {
   if (appkit.analytics) startLineContextSync(appkit.lakebase, appkit.analytics);
   else console.warn('[replenishment] analytics plugin missing; the last-year exception rule is off');
 
-  appkit.server.extend((app) => registerReplenishmentRoutes(app, appkit.lakebase));
+  const enabled = personasEnabled();
+  const warehouse = appkit.analytics;
+  const personas: PersonaOptions = {
+    enabled,
+    source: enabled && warehouse ? ucPersonaSource(warehouse) : null,
+    governance: enabled && warehouse ? ucGovernanceSource(warehouse) : null,
+  };
+  console.log(`[replenishment] "Viewing as" personas ${enabled ? 'enabled (DEMO_PERSONAS=true)' : 'off'}`);
+  appkit.server.extend((app) => registerReplenishmentRoutes(app, appkit.lakebase, defaultIdentityOptions(), personas));
 }
