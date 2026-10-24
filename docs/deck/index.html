@@ -70,6 +70,8 @@
   .tbl tbody tr:nth-child(odd) { background: #fff; }
   .tbl tbody tr:nth-child(even) { background: #F3F3F3; }
   .tbl td:first-child { font-weight: 700; color: var(--db-navy); }
+  .tbl.tight td { padding: 8px 16px; }
+  .tbl.tight th { padding: 8px 16px; }
   .tbl td .sub { display: block; font-size: 12px; color: var(--db-ink-muted); margin-top: 4px; }
   .pill { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; white-space: nowrap; }
   .pill.ok { background: #DDF3EA; color: var(--db-green-700); }
@@ -117,6 +119,46 @@
   .beat:first-child { padding-top: 0; }
   .beat:last-child { border-bottom: 0; }
   .beat .n { font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--db-lava); line-height: 1.2; }
+
+.arc { width: 1120px; height: 488px; display: grid; grid-template-columns: 120px 1fr 160px; column-gap: 24px; font-family: var(--font-sans); color: var(--db-ink); }
+.arc * { box-sizing: border-box; }
+.arc .side { display: flex; flex-direction: column; gap: 8px; justify-content: center; position: relative; }
+.arc .side-h { font-size: 12px; font-weight: 700; color: var(--db-navy); line-height: 1.4; margin-bottom: 4px; }
+.arc .src span { display: block; font-size: 12px; font-weight: 700; color: var(--db-navy); background: #fff; border: 1px solid var(--db-line); border-radius: 4px; padding: 8px; margin-bottom: 8px; }
+.arc .src span:last-child { margin-bottom: 0; }
+.arc .into { position: absolute; top: 50%; margin-top: -6px; width: 24px; }
+.arc .band { background: #fff; border: 2px solid var(--db-navy); border-radius: 12px; padding: 16px 24px 16px; display: flex; flex-direction: column; box-shadow: var(--shadow-md); }
+.arc .band-h { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--db-line); margin-bottom: 16px; }
+.arc .band-h .name { font-size: 16px; font-weight: 700; color: var(--db-navy); }
+.arc .band-h .tag { margin-left: auto; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-ink-muted); }
+.arc .stages { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24px; }
+.arc .st { background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 4px; position: relative; height: 232px; }
+.arc .st .ics { display: flex; gap: 8px; height: 32px; }
+.arc .st .ics img { width: 32px; height: 32px; }
+.arc .st .verb { font-size: 24px; font-weight: 700; color: var(--db-navy); line-height: 1.2; margin-top: 8px; }
+.arc .st .prod { font-size: 12px; font-weight: 700; color: var(--db-ink-muted); }
+.arc .st ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.arc .st li { font-size: 12px; line-height: 1.35; color: var(--db-ink-soft); padding-left: 12px; position: relative; }
+.arc .st li::before { content: ""; position: absolute; left: 0; top: 6px; width: 4px; height: 4px; border-radius: 1px; background: var(--db-coral); }
+.arc .st .chip { margin-top: auto; align-self: flex-start; font-size: 12px; font-weight: 700; color: var(--db-green-700); background: #DDF3EA; border-radius: 4px; padding: 4px 8px; }
+.arc .st:not(:last-child)::after { content: ""; position: absolute; right: -21px; top: 31px; width: 14px; height: 2px; background: var(--db-coral); }
+.arc .st:not(:last-child)::before { content: ""; position: absolute; right: -22px; top: 27px; border-left: 7px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.arc .loop { position: relative; height: 64px; }
+.arc .loop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.arc .loop .pill { position: absolute; left: 37.5%; top: 24px; transform: translateX(-50%); background: var(--db-lava); color: #fff; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 4px 16px; white-space: nowrap; }
+.arc .uc { margin-top: 8px; background: var(--db-navy); border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: 32px 1fr; column-gap: 16px; row-gap: 8px; align-items: center; }
+.arc .uc .r2 { display: flex; align-items: center; gap: 8px; }
+.arc .uc .r2 span { flex: none; font-size: 12px; font-weight: 700; color: #fff; background: var(--db-lava); border-radius: 4px; padding: 2px 8px; }
+.arc .uc .r2 .n { flex: 1; margin-left: 8px; }
+.arc .uc img { width: 32px; height: 32px; grid-row: span 2; }
+.arc .uc .t { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arc .uc .t span { font-size: 12px; font-weight: 700; color: #fff; border: 1px solid #4A636B; border-radius: 4px; padding: 2px 8px; }
+.arc .uc .t span.hl { background: var(--db-lava); border-color: var(--db-lava); }
+.arc .uc .n { font-size: 12px; color: #C9D3D7; line-height: 1.4; }
+.arc .who { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--db-line); border-radius: 8px; padding: 12px 8px; }
+.arc .who svg { flex: none; }
+.arc .who b { display: block; font-size: 12px; color: var(--db-navy); line-height: 1.3; }
+.arc .who i { display: block; font-style: normal; font-size: 12px; color: var(--db-ink-soft); line-height: 1.3; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -131,40 +173,40 @@
   </div>
   <div style="margin-top:auto;margin-bottom:56px;max-width:800px;">
     <div class="title" style="font-size:64px;line-height:1.05;">Forecast-driven replenishment</div>
-    <div style="margin-top:24px;font-size:24px;line-height:1.4;color:#B9C6CB;">Eastwind orders festival gifts for the week the festival fell last year, so shelves run empty before Mid-Autumn and fill up after it.</div>
+    <div style="margin-top:24px;font-size:24px;line-height:1.4;color:#B9C6CB;">Order festival gifts for the week the festival falls, not the week it fell last year.</div>
   </div>
   <img src="assets/illustration-nodal-02.svg" alt="" style="position:absolute;right:72px;top:96px;height:288px;opacity:.95;">
-  <div class="footer"><span>For the VP Merchandising and the CIO</span><span>October 2026</span></div>
+  <div class="footer"><span>Prepared for your VP Merchandising and CIO</span><span>October 2026</span></div>
 </div></section>
 
-<!-- 2 · The outcome -->
+<!-- 2 · What you get -->
 <section class="page" id="s2"><div class="slide">
-  <span class="eyebrow">The outcome</span>
+  <span class="eyebrow">Your outcome</span>
   <div class="title">What you get</div>
   <div class="rule"></div>
   <div class="kpis">
     <div class="kpi hl">
-      <span class="lab">Lost sales recovered · target</span>
+      <span class="lab">Peak-gift sales to win back</span>
       <span class="num">$2–3M<small>/yr</small></span>
-      <span class="what">20–30% of the $10.3M/yr you lose on peak gifts</span>
-      <span class="proof">A target for the pilot to prove, not a result yet</span>
+      <span class="what">The opportunity in fuller festival shelves</span>
+      <span class="proof">Expected: 20–30% of the $10.3M/yr you lose on peak gifts today</span>
     </div>
     <div class="kpi">
-      <span class="lab">Waste guardrail</span>
-      <span class="num">+$42k<small>/yr</small></span>
-      <span class="what">Waste roughly flat: ~1% of the $3.87M/yr base, in the backtest</span>
-      <span class="proof">Not a saving. Waste-aware ordering is the day-60 item</span>
+      <span class="lab">Manager time</span>
+      <span class="num">~15%</span>
+      <span class="what">of order lines need a manager. The rest are routine</span>
+      <span class="proof">231 of 1,561 lines this order week need a decision</span>
     </div>
     <div class="kpi">
-      <span class="lab">Flagged this order week</span>
+      <span class="lab">Seen before the week starts</span>
       <span class="num">$3.6M</span>
-      <span class="what">of peak-gift sales at risk without an order</span>
-      <span class="proof">481 of 908 peak-gift lines need an order, order week of Aug 31, 2026</span>
+      <span class="what">of peak-gift sales flagged as at risk</span>
+      <span class="proof">481 of 908 peak-gift lines need an order this week</span>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px;">
-    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> full shelves in the festival lead-up, with orders your managers approve on one screen.</div>
-    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one platform from POS files to approved order, so manager decisions flow back into the data.</div>
+    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> full shelves in the festival lead-up, and your managers spend time only where it matters.</div>
+    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one platform from POS files to approved order, governed in Unity Catalog, with no vendor-to-vendor copies.</div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>2 / 9</span></div>
 </div></section>
@@ -172,11 +214,11 @@
 <!-- 3 · The problem -->
 <section class="page" id="s3"><div class="slide">
   <span class="eyebrow">The problem</span>
-  <div class="title">Last year’s calendar</div>
+  <div class="title">Festivals move. Orders don’t.</div>
   <div class="rule tight"></div>
   <div style="display:grid;grid-template-columns:400px 1fr;gap:32px;">
     <div style="display:flex;flex-direction:column;gap:16px;">
-      <div class="card" style="border-top:4px solid var(--db-lava);padding:16px 24px;"><span class="big" style="color:var(--db-lava);">$17.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">lost sales from empty shelves across 80 stores</span></div>
+      <div class="card" style="border-top:4px solid var(--db-lava);padding:16px 24px;"><span class="big" style="color:var(--db-lava);">$17.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">lost sales from empty shelves across your 80 stores</span></div>
       <div class="card" style="padding:16px 24px;"><span class="big">$10.3M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">of that on peak gifts, 57.5% of all lost sales</span></div>
       <div class="card navy" style="padding:16px 24px;"><span class="big" style="color:#fff;">18.7–21.1%</span><span class="d" style="color:#C9D3D7;">of peak-gift store-days out of stock in Mid-Autumn 2025, vs 8.6% overall</span></div>
     </div>
@@ -223,14 +265,14 @@
 </svg></div>
     </div>
   </div>
-  <div class="source">Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. Chart shows the four weeks in the evidence spot check. Waste is a further $3.87M/yr.</div>
+  <div class="source">Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. Ordering by last year’s calendar week stocked this line for the wrong week.</div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>3 / 9</span></div>
 </div></section>
 
 <!-- 4 · Why it's hard -->
 <section class="page" id="s4"><div class="slide">
-  <span class="eyebrow">For the CIO</span>
-  <div class="title">Why it’s hard</div>
+  <span class="eyebrow">Why it’s hard today</span>
+  <div class="title">Three things in the way</div>
   <div class="rule"></div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;">
     <div class="card" style="min-height:376px;">
@@ -239,14 +281,14 @@
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;">
         <span class="chip">POS</span><span class="chip">ERP inventory</span><span class="chip">Product catalog</span><span class="chip">Store master</span><span class="chip">Holiday calendar</span>
       </div>
-      <span class="d">Different owners, formats, and refresh cycles. Even store IDs differ: <span class="mono">DT001</span> vs <span class="mono">L0001</span>.</span>
-      <div class="fix"><b>How we handle it</b>Lakeflow reconciles all five into one governed gold table.</div>
+      <span class="d">Different owners, formats, and refresh cycles. Even your store IDs differ: <span class="mono">DT001</span> vs <span class="mono">L0001</span>.</span>
+      <div class="fix"><b>With Databricks</b>Lakeflow reconciles all five into one governed gold table.</div>
     </div>
     <div class="card" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:var(--db-lava);">02</span>
       <span class="h">Stockouts hide demand</span>
-      <span class="d">When the shelf is empty, sales stop. History records what sold, not what customers wanted.</span>
-      <div class="fix"><b>How we handle it</b>Training skips weeks with two or more days out of stock.</div>
+      <span class="d">When the shelf is empty, sales stop. Your history records what sold, not what customers wanted.</span>
+      <div class="fix"><b>With Databricks</b>The forecast learns from weeks with stock on the shelf.</div>
     </div>
     <div class="card navy" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:#FFC9BF;">03</span>
@@ -255,7 +297,7 @@
         <span class="chip" style="background:#2A4650;color:#fff;">ETL tool</span><span class="chip" style="background:#2A4650;color:#fff;">Warehouse</span><span class="chip" style="background:#2A4650;color:#fff;">ML platform</span><span class="chip" style="background:#2A4650;color:#fff;">OLTP database</span><span class="chip" style="background:#2A4650;color:#fff;">BI / chat</span><span class="chip" style="background:#2A4650;color:#fff;">App hosting</span>
       </div>
       <span class="d" style="color:#C9D3D7;">Each hop adds a copy, a handoff, and another set of permissions to keep in sync.</span>
-      <div class="fix" style="color:#fff;border-top-color:#33505A;"><b style="color:#FFC9BF;">How we handle it</b>One platform, one governed data flow.</div>
+      <div class="fix" style="color:#fff;border-top-color:#33505A;"><b style="color:#FFC9BF;">With Databricks</b>One platform and one governed data flow.</div>
     </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>4 / 9</span></div>
@@ -263,189 +305,201 @@
 
 <!-- 5 · Architecture -->
 <section class="page" id="s5"><div class="slide">
-  <span class="eyebrow">Architecture</span>
+  <span class="eyebrow">How it works</span>
   <div class="title">One platform, end to end</div>
   <div class="rule tight"></div>
-  <div style="display:grid;grid-template-columns:144px 1fr;gap:40px;">
-    <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;position:relative;">
-      <span style="font-size:12px;font-weight:700;color:var(--db-navy);line-height:1.4;margin-bottom:4px;">Your POS and ERP keep running. They just drop files.</span>
-      <div class="src"><span>POS sales</span><span>ERP inventory</span><span>Product catalog</span><span>Store master</span><span>Holiday calendar</span></div>
-      <svg width="40" height="12" style="position:absolute;right:-40px;top:50%;margin-top:-6px;"><line x1="4" y1="6" x2="30" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M30,1 L38,6 L30,11 z" fill="#FF5F46"/></svg>
+  <div class="arc">
+  <div class="side">
+    <span class="side-h">Your systems keep running. They just drop files.</span>
+    <div class="src"><span>POS sales</span><span>ERP inventory</span><span>Product catalog</span><span>Store master</span><span>Holiday calendar</span></div>
+    <svg class="into" width="24" height="12" style="right:-24px;"><line x1="2" y1="6" x2="14" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M14,1 L22,6 L14,11 z" fill="#FF5F46"/></svg>
+  </div>
+  <div class="band">
+    <div class="band-h">
+      <img src="assets/databricks-logo-full-color.svg" alt="Databricks" style="height:20px;width:auto;">
+      <span class="name">Data Intelligence Platform</span>
+      <span class="tag">One governed data flow</span>
     </div>
-    <div class="band">
-      <div class="band-h">
-        <img src="assets/databricks-logo-full-color.svg" alt="Databricks" style="height:20px;width:auto;">
-        <span style="font-size:16px;font-weight:700;color:var(--db-navy);">Data Intelligence Platform</span>
-        <span style="margin-left:auto;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--db-ink-muted);">One governed data flow</span>
-      </div>
-      <div class="outc">
-        <span style="grid-column:1 / span 2;">Right quantity, right week</span>
-        <span>An order you trust</span>
-        <span>Answers without a ticket</span>
-      </div>
-      <div class="pnodes">
-        <div class="pn"><div class="row"><img class="ic" src="assets/lakeflow-icon-full-color.svg" alt=""></div><span class="biz">Unify</span><span class="prod">Lakeflow · bronze, silver, gold</span><span class="proofl">0 mismatched weeks</span></div>
-        <div class="pn"><div class="row"><img class="ic" src="assets/mosaic-ai-icon-full-color.svg" alt=""></div><span class="biz">Predict</span><span class="prod">ML · MLflow · festival-aligned</span><span class="proofl">@champion gate</span></div>
-        <div class="pn"><div class="row"><img class="ic" src="assets/lakebase-icon-full-color.svg" alt=""><img class="ic" src="assets/apps-icon-full-color.svg" alt=""></div><span class="biz">Decide</span><span class="prod">Lakebase + Databricks App</span><span class="proofl">Audited; conflicting edits rejected</span></div>
-        <div class="pn"><div class="row"><img class="ic" src="assets/genie-icon-full-color.svg" alt=""></div><span class="biz">Ask</span><span class="prod">Genie Agent</span><span class="proofl">Runs on governed data</span></div>
-      </div>
-      <svg id="loop" width="100%" height="48" style="display:block;overflow:visible;margin-top:4px;">
-        <defs><marker id="ah" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#FF3621"/></marker></defs>
-        <path id="loopPath" d="" fill="none" stroke="#FF3621" stroke-width="4" stroke-linejoin="round" marker-end="url(#ah)"/>
-        <rect id="loopBg" x="0" y="18" width="0" height="28" rx="4" fill="#FF3621"/>
-        <text id="loopTxt" x="0" y="37" text-anchor="middle" font-family="DM Sans" font-size="16" font-weight="700" fill="#fff">Manager decisions flow back to gold</text>
+    <div class="stages">
+      <div class="st"><div class="ics"><img src="assets/lakeflow-icon-full-color.svg" alt=""></div><span class="verb">Unify</span><span class="prod">Lakeflow</span><ul><li>Bronze, silver, gold</li><li>Quality expectations</li></ul><span class="chip">0 mismatched weeks</span></div>
+      <div class="st"><div class="ics"><img src="assets/mosaic-ai-icon-full-color.svg" alt=""></div><span class="verb">Predict</span><span class="prod">Mosaic AI · MLflow</span><ul><li>Forecast + p90 band</li><li>Versioned, compared with the live model</li></ul><span class="chip">Festival-aligned</span></div>
+      <div class="st"><div class="ics"><img src="assets/lakebase-icon-full-color.svg" alt=""><img src="assets/apps-icon-full-color.svg" alt=""></div><span class="verb">Decide</span><span class="prod">Lakebase + App</span><ul><li>Exception-based queue</li><li>Every decision audited</li></ul><span class="chip">~15% need you</span></div>
+      <div class="st"><div class="ics"><img src="assets/genie-icon-full-color.svg" alt=""></div><span class="verb">Ask</span><span class="prod">Genie</span><ul><li>Natural language</li><li>Runs as the user, SQL shown</li></ul><span class="chip">No ticket needed</span></div>
+    </div>
+    <div class="loop">
+      <svg viewBox="0 0 740 64" preserveAspectRatio="none">
+        <defs><marker id="arcLoopHead" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#FF3621"/></marker></defs>
+        <path d="M 466 0 L 466 40 L 84 40 L 84 10" fill="none" stroke="#FF3621" stroke-width="4" stroke-linejoin="round" marker-end="url(#arcLoopHead)"/>
       </svg>
-      <div class="uc" style="margin-top:8px;">
-        <img src="assets/unity-catalog-icon-full-color.svg" alt="" style="width:32px;height:32px;">
-        <div><div style="font-size:16px;font-weight:700;color:#fff;">Unity Catalog governs data and lineage at every step</div><div style="font-size:12px;color:#C9D3D7;margin-top:4px;">Store-manager scoping is enforced in the app today. UC row filters and masks are the day-30 governance pack.</div></div>
-      </div>
+      <span class="pill">Manager decisions flow back to gold</span>
+    </div>
+    <div class="uc">
+      <img src="assets/unity-catalog-icon-full-color.svg" alt="">
+      <div class="t">Unity Catalog governs every step: lineage and permissions</div>
+      <div class="r2"><span>Row filter · store and region</span><span>Column mask · unit cost</span><i class="n" style="font-style:normal;">On gold recommendations. The app applies the same mapping to Lakebase reads.</i></div>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · one platform is why the loop closes</span><span>5 / 9</span></div>
+  <div class="side">
+    <svg class="into" width="24" height="12" style="left:-24px;"><line x1="2" y1="6" x2="14" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M14,1 L22,6 L14,11 z" fill="#FF5F46"/></svg>
+    <span class="side-h">Who uses it</span>
+    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11h16l-2-5H10z M9 11v10h14V11 M13 21v-5h6v5" /></g></svg><div><b>Store manager</b><i>Own store’s exceptions</i></div></div>
+    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 25s-6-6.5-6-11a6 6 0 0 1 12 0c0 4.5-6 11-6 11z" /><circle cx="16" cy="14" r="2.2" /></g></svg><div><b>Regional planner</b><i>One region</i></div></div>
+    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 25V8h8v17 M18 13h5v12 M8 25h17 M13 12h2 M13 16h2 M13 20h2" /></g></svg><div><b>Head-office analyst</b><i>All stores, with Genie</i></div></div>
+    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 24V9 M9 24h16 M13 20v-4 M17 20v-8 M21 20v-6" /></g></svg><div><b>Executive</b><i>Outcome KPIs</i></div></div>
+  </div>
+</div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>5 / 9</span></div>
 </div></section>
 
-<!-- 6 · Demo setup -->
+<!-- 6 · Right quantity, right week -->
 <section class="page" id="s6"><div class="slide">
-  <span class="eyebrow">The demo</span>
-  <div class="title">What you’ll see</div>
+  <span class="eyebrow">Outcome 1 · Unify and predict</span>
+  <div class="title">Right quantity, right week</div>
   <div class="rule tight"></div>
   <div style="display:grid;grid-template-columns:1fr 528px;gap:32px;">
     <div style="display:flex;flex-direction:column;gap:16px;">
-      <div class="h" style="font-size:24px;">One store, one mooncake box, one festival</div>
       <div class="beats">
-        <div class="beat"><span class="n">01</span><div><div class="h">The order week</div><div class="d">481 of 908 peak-gift lines need an order. $3.6M of peak sales flagged.</div></div></div>
-        <div class="beat"><span class="n">02</span><div><div class="h">One line you can trust</div><div class="d">Zhongshan Shop’s Classic Lotus Mooncake Box, with its reason and plan-for range.</div></div></div>
-        <div class="beat"><span class="n">03</span><div><div class="h">Approve, then ask</div><div class="d">Accept or adjust with a reason. Then ask Genie which highway stores are most at risk.</div></div></div>
+        <div class="beat"><span class="n">01</span><div><div class="h">Aligned to the festival</div><div class="d">The forecast compares this year with last year’s festival weeks, not last year’s calendar weeks.</div></div></div>
+        <div class="beat"><span class="n">02</span><div><div class="h">A buffer sized to the risk</div><div class="d">Every line carries a p90 plan-for quantity, so safety stock grows into the peak.</div></div></div>
+        <div class="beat"><span class="n">03</span><div><div class="h">Fewer empty shelves</div><div class="d">In the holiday backtest, modelled lost sales fell in all 6 season and channel windows.</div></div></div>
       </div>
     </div>
     <div class="card" style="gap:12px;">
       <span class="lab">Zhongshan Shop · Classic Lotus Mooncake Box · 2026</span>
-      <span class="h">The forecast fixes the calendar mistake</span>
+      <span class="h">Volume moves into the lead-up weeks</span>
       <div style="display:flex;gap:24px;font-size:12px;font-weight:500;color:var(--db-ink-soft);"><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#1B5162;display:inline-block;"></span>Same week last year</span><span style="display:flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:2px;background:#FF3621;display:inline-block;"></span>New forecast</span></div>
-      <div style="margin-top:8px;"><svg viewBox="0 0 480 248" width="480" height="248" role="img" font-family="DM Sans" style="display:block;overflow:visible;">
-<line x1="40" x2="472" y1="192.0" y2="192.0" stroke="#E4E2DD" stroke-width="1"/>
-<text x="32" y="196.0" text-anchor="end" font-size="12" fill="#8A8580">0</text>
-<line x1="40" x2="472" y1="136.0" y2="136.0" stroke="#E4E2DD" stroke-width="1"/>
-<text x="32" y="140.0" text-anchor="end" font-size="12" fill="#8A8580">200</text>
-<line x1="40" x2="472" y1="80.0" y2="80.0" stroke="#E4E2DD" stroke-width="1"/>
-<text x="32" y="84.0" text-anchor="end" font-size="12" fill="#8A8580">400</text>
+      <div style="margin-top:8px;"><svg viewBox="0 0 480 272" width="480" height="272" role="img" font-family="DM Sans" style="display:block;overflow:visible;">
+<line x1="40" x2="472" y1="216.0" y2="216.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="220.0" text-anchor="end" font-size="12" fill="#8A8580">0</text>
+<line x1="40" x2="472" y1="152.0" y2="152.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="156.0" text-anchor="end" font-size="12" fill="#8A8580">200</text>
+<line x1="40" x2="472" y1="88.0" y2="88.0" stroke="#E4E2DD" stroke-width="1"/>
+<text x="32" y="92.0" text-anchor="end" font-size="12" fill="#8A8580">400</text>
 <line x1="40" x2="472" y1="24.0" y2="24.0" stroke="#E4E2DD" stroke-width="1"/>
 <text x="32" y="28.0" text-anchor="end" font-size="12" fill="#8A8580">600</text>
-<path d="M60.6,192.0 L60.6,192.0 Q60.6,188.1 64.5,188.1 L89.1,188.1 Q93.0,188.1 93.0,192.0 L93.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 7: 14 units</title></path>
-<text x="76.8" y="182.1" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">14</text>
-<path d="M95.0,192.0 L95.0,143.4 Q95.0,139.4 99.0,139.4 L123.4,139.4 Q127.4,139.4 127.4,143.4 L127.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 7: 188 units</title></path>
-<text x="111.2" y="133.4" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">188</text>
-<text x="94.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 7</text>
-<path d="M168.6,192.0 L168.6,172.2 Q168.6,168.2 172.6,168.2 L197.0,168.2 Q201.0,168.2 201.0,172.2 L201.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 14: 85 units</title></path>
-<text x="184.8" y="162.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">85</text>
-<path d="M203.0,192.0 L203.0,79.5 Q203.0,75.5 207.0,75.5 L231.4,75.5 Q235.4,75.5 235.4,79.5 L235.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 14: 416 units</title></path>
-<text x="219.2" y="69.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">416</text>
-<text x="202.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 14</text>
-<rect x="260.0" y="8" width="100.0" height="184" rx="4" fill="#FF3621" fill-opacity="0.06"/>
+<path d="M60.6,216.0 L60.6,215.5 Q60.6,211.5 64.6,211.5 L89.0,211.5 Q93.0,211.5 93.0,215.5 L93.0,216.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 7: 14 units</title></path>
+<text x="76.8" y="205.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">14</text>
+<path d="M95.0,216.0 L95.0,159.8 Q95.0,155.8 99.0,155.8 L123.4,155.8 Q127.4,155.8 127.4,159.8 L127.4,216.0 Z" fill="#FF3621"><title>New forecast, week of Sep 7: 188 units</title></path>
+<text x="111.2" y="149.8" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">188</text>
+<text x="94.0" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 7</text>
+<path d="M168.6,216.0 L168.6,192.8 Q168.6,188.8 172.6,188.8 L197.0,188.8 Q201.0,188.8 201.0,192.8 L201.0,216.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 14: 85 units</title></path>
+<text x="184.8" y="182.8" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">85</text>
+<path d="M203.0,216.0 L203.0,86.9 Q203.0,82.9 207.0,82.9 L231.4,82.9 Q235.4,82.9 235.4,86.9 L235.4,216.0 Z" fill="#FF3621"><title>New forecast, week of Sep 14: 416 units</title></path>
+<text x="219.2" y="76.9" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">416</text>
+<text x="202.0" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 14</text>
+<rect x="260.0" y="8" width="100.0" height="208" rx="4" fill="#FF3621" fill-opacity="0.06"/>
 <text x="310.0" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#FF3621">Festival week</text>
-<path d="M276.6,192.0 L276.6,97.2 Q276.6,93.2 280.6,93.2 L305.0,93.2 Q309.0,93.2 309.0,97.2 L309.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 21: 353 units</title></path>
-<text x="292.8" y="87.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">353</text>
-<path d="M311.0,192.0 L311.0,128.5 Q311.0,124.5 315.0,124.5 L339.4,124.5 Q343.4,124.5 343.4,128.5 L343.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 21: 241 units</title></path>
-<text x="327.2" y="118.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">241</text>
-<text x="310.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 21</text>
-<path d="M384.6,192.0 L384.6,54.9 Q384.6,50.9 388.6,50.9 L413.0,50.9 Q417.0,50.9 417.0,54.9 L417.0,192.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 28: 504 units</title></path>
-<text x="400.8" y="44.9" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">504</text>
-<path d="M419.0,192.0 L419.0,192.0 Q419.0,189.2 421.8,189.2 L448.6,189.2 Q451.4,189.2 451.4,192.0 L451.4,192.0 Z" fill="#FF3621"><title>New forecast, week of Sep 28: 10 units</title></path>
-<text x="435.2" y="183.2" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">10</text>
-<text x="418.0" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 28</text>
-<line x1="40" x2="472" y1="192" y2="192" stroke="#8A8580" stroke-width="1"/>
+<path d="M276.6,216.0 L276.6,107.0 Q276.6,103.0 280.6,103.0 L305.0,103.0 Q309.0,103.0 309.0,107.0 L309.0,216.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 21: 353 units</title></path>
+<text x="292.8" y="97.0" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">353</text>
+<path d="M311.0,216.0 L311.0,142.9 Q311.0,138.9 315.0,138.9 L339.4,138.9 Q343.4,138.9 343.4,142.9 L343.4,216.0 Z" fill="#FF3621"><title>New forecast, week of Sep 21: 241 units</title></path>
+<text x="327.2" y="132.9" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">241</text>
+<text x="310.0" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 21</text>
+<path d="M384.6,216.0 L384.6,58.7 Q384.6,54.7 388.6,54.7 L413.0,54.7 Q417.0,54.7 417.0,58.7 L417.0,216.0 Z" fill="#1B5162"><title>Same week last year, week of Sep 28: 504 units</title></path>
+<text x="400.8" y="48.7" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">504</text>
+<path d="M419.0,216.0 L419.0,216.0 Q419.0,212.8 422.2,212.8 L448.2,212.8 Q451.4,212.8 451.4,216.0 L451.4,216.0 Z" fill="#FF3621"><title>New forecast, week of Sep 28: 10 units</title></path>
+<text x="435.2" y="206.8" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3139">10</text>
+<text x="418.0" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 28</text>
+<line x1="40" x2="472" y1="216" y2="216" stroke="#8A8580" stroke-width="1"/>
 </svg></div>
-      <span class="small">Forecast units from the latest weekly run. Mid-Autumn 2026 is Sep 25. A forecast, not an outcome.</span>
+      <span class="small">Forecast units from the latest weekly run. Mid-Autumn 2026 is Sep 25.</span>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>6 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Lakeflow, Mosaic AI, MLflow</span><span>6 / 9</span></div>
 </div></section>
 
-<!-- 7 · What managers see -->
+<!-- 7 · Managers review only the exceptions -->
 <section class="page" id="s7"><div class="slide">
-  <span class="eyebrow">The app</span>
-  <div class="title">What managers see</div>
+  <span class="eyebrow">Outcome 2 · Decide</span>
+  <div class="title">Managers review only the exceptions</div>
   <div class="rule tight"></div>
-  <div style="display:grid;grid-template-columns:528px 1fr;gap:80px;align-items:start;padding-left:16px;margin-top:8px;">
-    <div style="display:flex;flex-direction:column;gap:24px;">
+  <div style="display:grid;grid-template-columns:1fr 456px;gap:40px;align-items:start;padding-left:16px;margin-top:8px;">
+    <div style="display:flex;flex-direction:column;gap:32px;">
       <div style="position:relative;">
-        <div class="shot">
-          <img src="assets/app-order-need.png" alt="Order need by store, Region North: top 10 stores ranked by sales lost if not ordered, including Zhongshan Shop">
-          <div class="box" style="left:4px;right:4px;top:152px;height:26px;"></div>
-        </div>
+        <div class="shot"><img src="assets/app-queue.png" alt="Needs review: 231 of 1,561 lines need you; 1,330 routine lines, $1.72M at cost, with Accept all routine"></div>
         <div class="mk" style="left:-16px;top:-16px;">1</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:16px;">
-        <div class="co" style="align-items:center;"><div class="mk">1</div><div class="d"><b style="color:var(--db-navy);">Region North, ranked:</b> Zhongshan Shop is in the top ten.</div></div>
-        <div class="co"><div class="mk">2</div><div class="d"><b style="color:var(--db-navy);">Why this quantity</b><br>Mid-Autumn in 3 weeks · forecast 15.9x recent sales<br>Model v6 · shelf life 30 days · no cap applied</div></div>
-        <div class="co" style="align-items:center;"><div class="mk">3</div><div class="d"><b style="color:var(--db-navy);">Plan for the peak:</b> forecast and p90 peak before the festival.</div></div>
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <div class="co"><div class="mk">1</div><div><div class="h">231 of 1,561 lines need you</div><div class="d">The 1,330 routine lines follow the forecast and can be accepted in one step.</div></div></div>
+        <div class="co"><div class="mk">2</div><div><div class="h">Why this line needs you</div><div class="d">Peak gift at risk, $22.5K of sales if not ordered. High value, $12.1K at cost.</div></div></div>
+        <div class="co"><div class="mk">3</div><div><div class="h">Why this quantity</div><div class="d">Mid-Autumn in 3 weeks, forecast 15.9x recent sales. Model v6.</div></div></div>
       </div>
     </div>
-    <div style="position:relative;width:364px;">
-      <div class="shot" style="height:458px;">
-        <img src="assets/app-line-detail.png" alt="Line sheet for Zhongshan Shop, Classic Lotus Mooncake Box: holiday-driven reason, stock and shelf-life stats, forecast with p90 band vs last year">
-        <div class="box" style="left:6px;right:6px;top:74px;height:96px;"></div>
-        <div class="box" style="left:6px;right:6px;top:308px;height:146px;"></div>
+    <div style="position:relative;">
+      <div class="shot">
+        <img src="assets/app-line-sheet.png" alt="Line sheet for Zhongshan Shop, Classic Lotus Mooncake Box: 804 units, reasons, why this line needs you, stock">
+        <div class="box" style="left:6px;right:6px;top:141px;height:57px;"></div>
+        <div class="box" style="left:6px;right:6px;top:248px;height:80px;"></div>
       </div>
-      <div class="mk" style="left:-16px;top:58px;">2</div>
-      <div class="mk" style="left:-16px;top:292px;">3</div>
+      <div class="mk" style="left:-16px;top:125px;">3</div>
+      <div class="mk" style="left:-16px;top:232px;">2</div>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Live Databricks App, captured 23 Oct 2026: Region North, Zhongshan Shop</span><span>7 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Live Databricks App, captured 24 Oct 2026: review queue and the Zhongshan Shop line</span><span>7 / 9</span></div>
 </div></section>
 
-<!-- 8 · Impact and proof -->
+<!-- 8 · Ask and govern -->
 <section class="page" id="s8"><div class="slide">
-  <span class="eyebrow">Impact and proof</span>
-  <div class="title">Proven vs next</div>
+  <span class="eyebrow">Outcome 3 · Ask, governed</span>
+  <div class="title">Ask anything, see only your stores</div>
   <div class="rule tight"></div>
-  <div style="display:grid;grid-template-columns:1fr 288px;gap:24px;align-items:start;">
-    <table class="tbl">
-      <thead><tr><th style="width:24%;">Success measure</th><th>Evidence</th><th style="width:15%;">Status</th><th style="width:21%;">Next</th></tr></thead>
-      <tbody>
-        <tr><td>Forecast accuracy by channel</td><td>Beats last year’s method in every channel and both holiday seasons</td><td><span class="pill ok">Proven</span></td><td>Track live by channel</td></tr>
-        <tr><td>Stockouts on peak gift SKUs</td><td>Modelled lost sales down in 6 of 6 holiday windows<span class="sub">Baseline: 18.7–21.1% of peak-gift days out</span></td><td><span class="pill part">Simulated</span></td><td>Measure in the pilot</td></tr>
-        <tr><td>Expired and marked-down value</td><td>Roughly flat: +$42k/yr, ~1% of the $3.87M/yr base</td><td><span class="pill part">Guardrail</span></td><td>Waste-aware ordering</td></tr>
-        <tr><td>Orders placed from forecast</td><td>Not measured yet: test decisions only</td><td><span class="pill no">Not yet</span></td><td>Measure in the pilot</td></tr>
-      </tbody>
-    </table>
-    <div class="card navy" style="gap:12px;">
-      <span class="lab">Holiday backtest</span>
-      <span style="font-size:56px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;">6 of 6</span>
-      <span style="font-size:16px;line-height:1.45;color:#fff;">holiday windows with lower lost sales; waste roughly flat, up ~1%</span>
-      <span style="font-size:12px;line-height:1.5;color:#B9C6CB;padding-top:12px;border-top:1px solid #33505A;">Mid-Autumn 2025 and Lunar New Year 2026, each in 3 channels. Simulation on synthetic data</span>
+  <div style="display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:start;">
+    <div class="card" style="gap:8px;padding:16px 24px;">
+      <div style="display:flex;align-items:center;gap:12px;"><img src="assets/genie-icon-full-color.svg" alt="" style="width:32px;height:32px;"><span class="h">Ask Genie</span></div>
+      <div style="background:var(--db-oat-light);border:1px solid var(--db-line);border-radius:8px;padding:8px 12px;font-size:16px;line-height:1.4;color:var(--db-navy);">“Which highway stores face the highest Mid-Autumn stockout risk?”</div>
+      <div class="d"><b style="color:var(--db-navy);">Taian Service Area N</b>: 6 SKUs, $56,791 at risk</div>
+      <div class="small">Runs as you, on governed gold tables, SQL shown.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="lab" style="color:var(--db-lava);">Viewing as · same table, different access</div>
+      <table class="tbl tight">
+        <thead><tr><th>Persona</th><th style="text-align:right;">Store-SKUs visible</th><th>Unit cost</th></tr></thead>
+        <tbody>
+          <tr><td>Head-office analyst</td><td class="mono" style="text-align:right;">2,247</td><td>Visible</td></tr>
+          <tr><td>Regional planner, North</td><td class="mono" style="text-align:right;">782</td><td>Visible</td></tr>
+          <tr><td>Store manager, Zhongshan Shop</td><td class="mono" style="text-align:right;">31</td><td><span class="pill no">Masked</span></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
-  <div style="margin-top:24px;display:flex;align-items:center;gap:24px;background:#fff;border:1px solid var(--db-line);border-radius:8px;padding:16px 24px;">
-    <span class="lab" style="color:var(--db-lava);white-space:nowrap;">For the CIO</span>
-    <span class="d" style="color:var(--db-navy);"><b>0</b> mismatched weeks, gold vs source</span>
-    <span class="d" style="color:var(--db-navy);"><b>40 of 40</b> planted bad records quarantined</span>
-    <span class="d" style="color:var(--db-navy);"><b>Spoofed identity ignored;</b> out-of-scope decisions refused</span>
+  <div style="display:grid;grid-template-columns:456px 1fr;gap:32px;margin-top:24px;align-items:start;">
+    <div class="shot" style="padding:8px;display:flex;flex-direction:column;gap:4px;">
+      <img src="assets/app-viewing-as.png" alt="Viewing as Store Manager, Zhongshan Shop L0001: can decide, unit cost masked">
+      <img src="assets/app-governance.png" alt="Governance drawer rows: App Lakebase 31 of 2,247 rows; Unity Catalog row filter 31 of 2,247 rows">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="d" style="color:var(--db-navy);"><b>31 of 2,247 rows</b> for this store manager, in the app and in Unity Catalog.</div>
+      <div class="small">Row filter and column mask on the gold recommendations table; the app applies the same mapping to its Lakebase reads.</div>
+      <div style="display:flex;flex-direction:column;gap:4px;padding-top:8px;border-top:1px solid var(--db-line);">
+        <span class="lab" style="color:var(--db-lava);">For the CIO</span>
+        <span class="d" style="color:var(--db-navy);"><b>0</b> mismatched weeks, gold vs source</span>
+        <span class="d" style="color:var(--db-navy);"><b>40 of 40</b> planted bad records quarantined</span>
+        <span class="d" style="color:var(--db-navy);"><b>Spoofed identity ignored;</b> out-of-scope decisions refused</span>
+      </div>
+    </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>8 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Genie, Unity Catalog · live app, captured 24 Oct 2026</span><span>8 / 9</span></div>
 </div></section>
 
-<!-- 9 · Roadmap and ask -->
+<!-- 9 · How your Monday changes -->
 <section class="page" id="s9"><div class="slide white">
-  <span class="eyebrow">Roadmap</span>
-  <div class="title">30 / 60 / 90 days</div>
-  <div class="rule"></div>
-  <div class="tl">
-    <div class="nd"><div class="dot"></div><span class="when">Day 30</span><span class="h">Governance pack</span><span class="d">UC row filters by region, cost masks, persona groups, column comments.</span></div>
-    <div class="nd"><div class="dot"></div><span class="when">Day 60</span><span class="h">Waste-aware ordering</span><span class="d">Shelf-life and waste limits in the order rule; replay a full year.</span></div>
-    <div class="nd"><div class="dot"></div><span class="when">Day 90</span><span class="h">One-region pilot</span><span class="d">Timed to cover the next Lunar New Year peak. Managers order from the app.</span></div>
-  </div>
+  <span class="eyebrow">What changes for you</span>
+  <div class="title">How your Monday changes</div>
+  <div class="rule tight"></div>
+  <table class="tbl">
+    <thead><tr><th style="width:42%;">Today</th><th>With Databricks</th></tr></thead>
+    <tbody>
+      <tr><td>Order by gut feel and last year’s calendar week</td><td>Order for the festival week, with a p90 buffer sized to the risk</td></tr>
+      <tr><td>Peak gifts run out before the festival</td><td>Volume lands in the lead-up weeks, when customers buy</td></tr>
+      <tr><td>Every line approved by hand</td><td>Review the ~15% of lines that need you; accept the routine rest in one step</td></tr>
+      <tr><td>POS, ERP, catalog, store, and holiday data apart, with no single view</td><td>One governed view in Unity Catalog; ask Genie, and decisions flow back to gold</td></tr>
+    </tbody>
+  </table>
   <div style="margin-top:auto;margin-bottom:8px;background:var(--db-navy);border-radius:12px;padding:24px 32px;display:grid;grid-template-columns:1fr 1.25fr;gap:32px;align-items:center;">
     <div>
-      <div class="lab" style="color:#FFC9BF;">The ask</div>
-      <div style="font-size:32px;font-weight:700;color:#fff;margin-top:8px;letter-spacing:-.01em;">Approve a one-region pilot</div>
+      <div class="lab" style="color:#FFC9BF;">Suggested next step</div>
+      <div style="font-size:32px;font-weight:700;color:#fff;margin-top:8px;letter-spacing:-.01em;">Plan your next order week together</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <div class="lab" style="color:#B9C6CB;">You measure</div>
-      <div style="font-size:16px;line-height:1.4;color:#fff;">Peak-gift out-of-stock rate vs the 18.7–21.1% baseline</div>
-      <div style="font-size:16px;line-height:1.4;color:#fff;">Share of orders placed from the forecast</div>
-      <div style="font-size:16px;line-height:1.4;color:#fff;">Waste vs today’s $3.87M/yr base</div>
-    </div>
+    <div style="font-size:16px;line-height:1.45;color:#C9D3D7;">Your POS and ERP teams drop the five feeds, your planners review the first queue with us, and you see your own peak-gift exposure before the next Lunar New Year.</div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>9 / 9</span></div>
 </div></section>
@@ -458,25 +512,6 @@
     if (!m) return;
     var el = document.getElementById('s' + m[1]);
     if (el) { document.body.classList.add('single'); el.classList.add('on'); }
-  })();
-  // slide 5: draw the decision loop from Decide back to Unify, measured from the live layout
-  (function () {
-    var svg = document.getElementById('loop');
-    var nodes = document.querySelectorAll('#s5 .pn');
-    if (!svg || nodes.length < 3) return;
-    function draw() {
-      var s = svg.getBoundingClientRect();
-      if (!s.width) return;
-      var a = nodes[2].getBoundingClientRect(), b = nodes[0].getBoundingClientRect();
-      var x1 = a.left + a.width / 2 - s.left, x2 = b.left + b.width / 2 - s.left;
-      document.getElementById('loopPath').setAttribute('d', 'M ' + x1 + ' 0 L ' + x1 + ' 32 L ' + x2 + ' 32 L ' + x2 + ' 10');
-      var t = document.getElementById('loopTxt'), bg = document.getElementById('loopBg');
-      var mid = (x1 + x2) / 2; t.setAttribute('x', mid);
-      var w = t.getComputedTextLength() + 24; bg.setAttribute('x', mid - w / 2); bg.setAttribute('width', w);
-    }
-    draw(); window.addEventListener('resize', draw);
-    if (document.fonts) document.fonts.ready.then(draw);
-    window.addEventListener('beforeprint', draw);
   })();
 </script>
 </body>
