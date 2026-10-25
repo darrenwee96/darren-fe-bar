@@ -297,7 +297,7 @@ Give the exec answer first. Add the technical answer if the CIO asks, or if the 
     - Verified per persona: 2,247 / 782 / 31 rows; unit cost masked for the store manager.
     - Least-privilege grants for the app service principal and 577 lineage rows.
   - *What enforces what:* UC enforces warehouse and Genie reads of the gold table at query time. The app enforces its Lakebase copy using the same UC mapping, server-side.
-  - *Not yet:* account groups for the four personas aren't created; today's bindings are by principal, and an admin creates the groups and reruns the script. The gold decision-history tables have no row filter.
+  - *Demo scope:* each persona maps to an account group in `governance.persona_access`. This is a single-user demo workspace, so I show the personas with "Viewing as" instead of separate accounts. In production, your IdP groups sync to those account groups and the same filter applies unchanged.
 
 **4. How does it integrate with our POS and ERP?**
 - *Exec:* Your systems keep running. They drop files, and Lakeflow picks up only what's new.

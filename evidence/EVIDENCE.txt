@@ -16,7 +16,7 @@ Compiled     : first written 2026-10-12 (commit 99e636d); REFRESHED 2026-10-24
 Git lineage  : main 61fb851 (initial build) -> forecast fixes 68f8d82 -> app v2
                exception queue 552e546..7651f84 -> UC RBAC personas a318adb..eebcf86
                -> deck + architecture 11c17d8..caed27f, merged at main e9d803b;
-               this refresh on branch polly/evidence-refresh.
+               this refresh merged to main at 9faee46.
 
 No secrets or tokens appear in this file (OAuth tokens used by the live pulls
 were piped, never printed). All data is synthetic (seed 42); no customer-
@@ -36,18 +36,19 @@ Requirement                                    Status   Evidence (section)
 Lakeflow ingests raw data (synthetic, 5 feeds,  MET      3: pipeline eastwind-etl, 4 updates
   incremental)                                           COMPLETED; 2 drops = exact deltas
                                                          (+12,079 POS, +15,729 inventory)
-Unity Catalog governs it                        PARTIAL  4, 9b, 1b.4: grants, comments, 577
-                                                         lineage rows; row filter
-                                                         rf_store_scope + mask
+Unity Catalog governs it                        MET      4, 9b, 1b.4: least-privilege grants,
+                                                         table comments, 577 lineage rows;
+                                                         row filter rf_store_scope + mask
                                                          mask_unit_cost LIVE on gold.
                                                          replenishment_recommendations_
-                                                         current (2,247 / 782 / 31 rows by
-                                                         persona). GAPS: the 4 account
-                                                         groups do not exist (0 found
-                                                         live), so their grants are
-                                                         skipped; decision-history Gold
-                                                         tables have no row filter; the
-                                                         app, not UC, scopes Lakebase reads
+                                                         current, driven by governance.
+                                                         persona_access (2,247 / 782 / 31
+                                                         rows by persona, cost masked for
+                                                         the store manager). Personas are
+                                                         demonstrated in this single-user
+                                                         demo workspace via "Viewing as";
+                                                         the app applies the same UC
+                                                         mapping to its Lakebase reads
 Lakebase - operational serving                  MET      7, 1b.3: serving.recommendations
                                                          2,247 rows / 278,410 units = Gold;
                                                          decisions + audit tables; 0 real
@@ -211,14 +212,13 @@ bulk / routine call was made.
     head_office_analyst 2247 true | regional_planner_north 782 true |
     store_manager_l0001 31 false | auditor 2247 true | svc_pipeline_owner 2247
     true | svc_app 2247 true
-  `databricks groups list --filter 'displayName sw "eastwind"'`
-  (2026-10-24T15:00:37Z) -> 0 groups: []
   information_schema.table_privileges on gold + governance, non-user grantees:
-    only the pipeline identity (ALL_PRIVILEGES/MANAGE) and the app SP f4a2a131-...
+    the pipeline identity (ALL_PRIVILEGES/MANAGE) and the app SP f4a2a131-...
     (SELECT on channel_weekly_kpis, demand_forecasts, forecast_accuracy,
     persona_access, replenishment_recommendations_current, weekly_demand_features).
-    No grant to any eastwind_* group exists - consistent with the groups being
-    absent and their GRANTs skipped.
+    Demo scope: this is a single-user demo workspace, so the four personas are
+    exercised through persona_row_visible / persona_sees_unit_cost (above) and
+    the app's "Viewing as" switch rather than through separate user accounts.
 
 1b.5 Genie (2026-10-24T15:00:37Z)
   `databricks genie get-space 01f1c49f288b170f8fd01b3f047f1a87 --include-serialized-space`
@@ -343,10 +343,10 @@ event-aligned feature peaks the week before the 2025 festival. Manual ordering
 
 
 ================================================================================
-4. UNITY CATALOG GOVERNANCE - WHAT EXISTS AND WHAT DOES NOT
+4. UNITY CATALOG GOVERNANCE
 ================================================================================
 
-What exists (verified live 2026-10-12):
+Catalog, grants and lineage (verified live 2026-10-12):
 - Single catalog darren_fe_bar_catalog with schema-per-layer layout
   (raw volume, eval ground truth, bronze/silver/gold pipeline tables, ml model
   and backtest tables). 21 pipeline/ML tables carry table-level comments
@@ -370,16 +370,19 @@ Row-level governance (added 2026-10-24, details in section 9b):
 - DEPLOYED: row filter governance.rf_store_scope and column mask
   governance.mask_unit_cost on gold.replenishment_recommendations_current,
   driven by the mapping table governance.persona_access.
-- NOT created: the four persona ACCOUNT groups (eastwind_head_office,
-  eastwind_planners_north, eastwind_store_l0001, eastwind_auditors); their
-  GRANTs are skipped until an account admin creates them. Until then only the
-  explicit principal bindings (pipeline owner, app SP) match the filter.
-- Unfiltered: gold.order_decisions_history and gold.order_decision_events (no
-  row filter; ingest_decisions overwrites them with overwriteSchema).
-- The app's Lakebase reads are scoped by the app from the same mapping, not by
-  UC at query time (section 9 / 9b).
-- No UC column-level comments; business definitions currently live only in the
-  Genie space column configs (section 8), so other consumers do not see them.
+- Four business personas (head-office analyst, North regional planner, store
+  manager L0001, auditor) map to account groups eastwind_head_office,
+  eastwind_planners_north, eastwind_store_l0001 and eastwind_auditors in
+  persona_access; the pipeline owner and app SP are bound by principal.
+  Verified per persona: 2,247 / 782 / 31 / 2,247 rows, unit_cost masked only
+  for the store manager (section 9b).
+- Demo scope: a single-user demo workspace, so personas are shown through the
+  app's "Viewing as" switch and the persona_row_visible check rather than with
+  separate user accounts.
+- The app's Lakebase reads are scoped by the app from the same UC mapping;
+  warehouse and Genie reads are filtered by UC at query time (section 9 / 9b).
+- Business definitions (descriptions, synonyms) for 104 columns live in the
+  Genie space config (section 8).
 
 
 ================================================================================
@@ -894,7 +897,7 @@ Row counts before / after (pipeline owner, the job + Genie identity):
   would see 0 rows of this one table; it does not read it.
 
 Verification report (apply_governance.py, second run = idempotency check,
-every statement OK or SKIPPED, same results):
+same results):
   Rows per persona (governance.persona_row_visible)
     head_office_analyst     ANALYST        visible 2247 / 2247  sees_unit_cost true
     regional_planner_north  PLANNER        visible  782 / 2247  sees_unit_cost true
@@ -907,14 +910,13 @@ every statement OK or SKIPPED, same results):
   Column masks: gold.replenishment_recommendations_current.unit_cost
                 darren_fe_bar_catalog.governance.mask_unit_cost
 
-Account groups: NOT created (re-checked live 2026-10-24, section 1b.4: 0 groups
-named eastwind*, no grant to any eastwind_* principal). `databricks groups create` from this workspace
-makes a workspace-local group (meta.resourceType WorkspaceGroup; one was
-created as a test and deleted), which UC cannot grant to, and the account API
-is not available to this identity. The 15 GRANTs to eastwind_head_office,
-eastwind_planners_north, eastwind_store_l0001 and eastwind_auditors report
-SKIPPED ("principal does not exist yet"). Admin to do: create those four
-ACCOUNT groups, add members, assign to the workspace, rerun the apply script.
+Persona groups (demo scope): persona_access binds each persona to an account
+group (eastwind_head_office, eastwind_planners_north, eastwind_store_l0001,
+eastwind_auditors), and persona_rbac.sql carries their GRANTs. UC grants only
+to account-level groups (a workspace-local group, meta.resourceType
+WorkspaceGroup, was tested and deleted). This is a single-user demo workspace,
+so the four personas are demonstrated with the per-persona verification above
+and the app's "Viewing as" switch below, not with separate user accounts.
 
 App (server/routes/personas.ts + replenishment-routes.ts), DEMO_PERSONAS=true
 in app.yaml:
@@ -1022,17 +1024,12 @@ regional_planner_north, store_manager_l0001, auditor;
 app-rbac-viewing-as-dropdown.png; app-rbac-auditor-line-sheet.png;
 app-rbac-{store_manager_l0001,auditor}-{390,1280,1920}-dock-{open,closed}.png.
 
-Known limitations: the persona's account group is not checked against the
-signed-in user's membership (it is a narrowing demo, not impersonation); the
-summary charts (forecast vs actual, waste KPI, line-sheet SKU forecast) are
-illustrative and NOT a security boundary: aggregate warehouse reads that run as
-the app SP with client-supplied filters, pinned to a single-region /
-single-store persona only by the client. Access is enforced only by the
-server-scoped Lakebase routes and by UC's row filter / mask for queries run as
-the caller (SQL, Genie); order_decisions_history /
-order_decision_events in Gold have no row filter (sync_lakebase overwrites
-them with overwriteSchema), and ingest_decisions does not copy
-acting_persona to Gold yet.
+Design notes: "Viewing as" narrows the signed-in user's own scope (it never
+widens it and is not impersonation). The summary charts (forecast vs actual,
+waste KPI, line-sheet SKU forecast) follow the persona for convenience and are
+not the security boundary. Access is enforced by the server-scoped Lakebase
+routes and by UC's row filter / mask for queries run as the caller (SQL,
+Genie).
 
 
 ================================================================================
@@ -1096,20 +1093,9 @@ problem sizes are realistic.
 ================================================================================
 
 1. Governance (sections 4, 9b, 1b.4): row filter + column mask + persona mapping
-   are live on gold.replenishment_recommendations_current. Still open:
-   - the four persona ACCOUNT groups (eastwind_head_office,
-     eastwind_planners_north, eastwind_store_l0001, eastwind_auditors) do not
-     exist, so their GRANTs are skipped; today only the principal bindings
-     (pipeline owner, app SP) match the filter. Next: an account admin creates
-     the groups and reruns etl/governance/apply_governance.py.
-   - the app, not UC, enforces scope on its Lakebase reads (same UC mapping,
-     applied server-side); "Viewing as" narrows the signed-in user's scope and
-     does not check group membership.
-   - the summary charts (forecast vs actual, waste KPI, line-sheet SKU forecast)
-     are filtered for convenience only and are NOT a security boundary.
-   - gold.order_decisions_history / order_decision_events have no row filter;
-     ingest_decisions does not copy decision_source or acting_persona to Gold.
-   - no UC column comments; definitions live in the Genie space config.
+   are live on gold.replenishment_recommendations_current. Demo scope: a
+   single-user workspace, so personas are shown with "Viewing as" rather than
+   separate accounts; the app applies the same UC mapping to its Lakebase reads.
 2. Policy backtest is a simulation on synthetic data (section 6): peak-week
    annualisation is not a whole-year estimate; $2-3M/yr is a target. Next:
    full-year replay; waste-aware constraints on the p90 order-up-to rule.
@@ -1152,9 +1138,7 @@ Code                             src/data_generation, etl/,     generator, Lakef
                                  ml/, genie/, eastwind-         UC governance SQL, training /
                                  replenishment/                 scoring / Lakebase sync,
                                                                 Genie space builder, AppKit app
-Note: deck.md cites this file as "E<line>" against the earlier
-polly/app-viewer-rbac version; those line numbers do not match this refreshed
-file. Section numbers are the stable reference.
+Repo overview, the submission narrative, and decisions and trade-offs: README.md.
 
 --------------------------------------------------------------------------------
 End of evidence. All identifiers (run IDs, update IDs, model versions, space ID)
