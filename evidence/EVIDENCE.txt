@@ -1131,9 +1131,10 @@ Business deck, text export       docs/deck/deck.md              9 slides with TE
                                                                 of-show, Q&A sheet; quotes no
                                                                 forecast-error percentages
 Deck source                      docs/deck/index.html           visual version of the PDF
-Architecture diagram             docs/architecture.html         one diagram: Unify -> Predict
-                                                                -> Decide -> Ask, UC across,
-                                                                decisions back to gold
+Architecture diagram             docs/architecture.html         sources -> ingestion -> medallion
+                                                                -> intelligence/serving -> users;
+                                                                UC + Lakeflow Jobs bands; same
+                                                                diagram as slide 5
 Code                             src/data_generation, etl/,     generator, Lakeflow bundle +
                                  ml/, genie/, eastwind-         UC governance SQL, training /
                                  replenishment/                 scoring / Lakebase sync,

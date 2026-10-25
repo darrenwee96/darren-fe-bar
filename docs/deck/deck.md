@@ -8,18 +8,17 @@ Business deck, text export. This file holds:
 
 The visual version is `index.html` and `eastwind-deck.pdf`. The architecture diagram also stands alone as `docs/architecture.html`.
 
-**Sources:** every figure comes from `evidence/EVIDENCE.txt` (cited as E + line number). The governance and exception-queue figures come from the version of that file on branch `polly/app-viewer-rbac`, sections 9 and 9b; lines 1–393 are the same as on main. All data is synthetic (seed 42). Accuracy is described in words only; this deck quotes no forecast-error percentages.
+**Sources:** business figures come from `evidence/EVIDENCE.txt` (section numbers are the stable reference). All data is synthetic (seed 42). The slides speak in business and technical objectives; build-level detail (row counts, model versions, test results) stays in the evidence file and the Q&A backup.
 
 **In the room**
 - **VP Merchandising** (executive sponsor): owns lost sales, waste, and margin. Stay at outcome altitude: dollars, shelves, and manager time.
 - **CIO** (domain owner): must unify fragmented data and put an explainable forecast into ordering. Go one level deeper on request: pipeline, governance, MLOps, security.
 
-**Storyline: from a Monday guess to a Monday order.** You get three outcomes on one platform:
-1. **Right quantity, right week.** Lakeflow unifies your five feeds, and Mosaic AI forecasts against the festival, not the calendar week.
-2. **Managers review only the exceptions.** The Databricks App on Lakebase routes the ~15% of lines that need judgement and lets the routine rest go through in one step, with every decision audited.
-3. **Ask anything, see only your stores.** Genie answers in plain language on governed data. Unity Catalog policies define what each person can see, and the app applies the same mapping to its Lakebase reads.
-
-Manager decisions flow back to gold, so next week's forecast learns from them. One platform is the reason that loop closes.
+**Storyline: problem first, then how Databricks helps.**
+1. **The business problem (slides 2–3).** Festivals move every year, orders follow last year's calendar, and the shelves are empty when customers arrive. The data to fix it sits in five systems.
+2. **How Databricks helps (slides 4–5).** Three business objectives for the VP, three technical objectives for the CIO, and one governed platform that delivers them.
+3. **What it looks like (slides 6–8).** Right quantity in the right week; managers review only the exceptions; anyone can ask, and everyone sees only their own stores.
+4. **What changes (slide 9)** and the next step.
 
 ---
 
@@ -27,9 +26,9 @@ Manager decisions flow back to gold, so next week's forecast learns from them. O
 
 > "Today Eastwind orders festival gifts for the week the festival fell last year. So shelves run empty before Mid-Autumn and fill up after it.
 >
-> Across your 80 stores that costs about $17.8M a year in lost sales, and $10.3M of it is on peak gifts. In Mid-Autumn 2025, about one in five peak-gift store-days was out of stock.
+> Across your 80 stores that costs about $17.8M a year in lost sales, and $10.3M of it is on peak gifts.
 >
-> In the next 20 minutes I'll show you three things. First, what you get: $2–3M a year of peak-gift sales to win back, with your managers looking only at the ~15% of lines that need them. Then one store, one mooncake box and one festival, from forecast to an order the manager approves in one click. Finally, how it runs on one Databricks platform, governed in Unity Catalog, so each person sees only their own stores.
+> I'll start with that problem and why it's hard to fix today. Then I'll show how Databricks helps: what this project sets out to deliver for each of you, and the platform behind it. Then the app your managers would use on Monday, live.
 >
 > [VP name], I'll keep us on outcomes. [CIO name], stop me anywhere and I'll go as deep as you want."
 
@@ -50,140 +49,132 @@ Prepared for your VP Merchandising and CIO · October 2026
 
 ---
 
-## Slide 2 · Your outcome: what you get
-
-| Tile | Value | What it means | Note |
-|---|---|---|---|
-| Peak-gift sales to win back | **$2–3M/yr** | The opportunity in fuller festival shelves | Expected: 20–30% of the $10.3M/yr you lose on peak gifts today |
-| Manager time | **~15%** | of order lines need a manager. The rest are routine | 231 of 1,561 lines this order week need a decision |
-| Seen before the week starts | **$3.6M** | of peak-gift sales flagged as at risk | 481 of 908 peak-gift lines need an order this week |
-
-- **VP Merchandising:** full shelves in the festival lead-up, and your managers spend time only where it matters.
-- **CIO:** one platform from POS files to approved order, governed in Unity Catalog, with no vendor-to-vendor copies.
-
-**Speaker notes**
-- **TELL:** "Three numbers, in your terms."
-- **SHOW:** The opportunity is $2–3M a year: winning back 20–30% of the $10.3M you lose on peak gifts. Your managers' time goes where it matters, because only 231 of this week's 1,561 lines, about 15%, need a decision. And you see the exposure before the week starts: $3.6M of peak-gift sales flagged across 481 of 908 peak lines.
-- **TELL:** "More festival sales, less manager effort, and no surprises on Monday."
-
----
-
-## Slide 3 · The problem: festivals move, orders don't
+## Slide 2 · The business problem: festivals move, orders don't
 
 - **$17.8M/yr** lost sales from empty shelves across your 80 stores
-- **$10.3M/yr** of that on peak gifts, 57.5% of all lost sales
-- **18.7–21.1%** of peak-gift store-days out of stock in Mid-Autumn 2025, vs 8.6% overall
+- **$10.3M/yr** of that on peak gifts, the products customers buy for festivals
+- **1 in 5** peak-gift shelves empty at Mid-Autumn, more than twice the usual rate
 
-**Chart: Zhongshan Shop · Classic Lotus Mooncake Box · Mid-Autumn 2025.** Stocked for 2024's peak, out of stock for 2025's.
-
-| Week of (2025) | Same week last year (what gets ordered) | Sold in 2025 | Days out of stock |
-|---|---|---|---|
-| Sep 8 | 312 | 14 | 0 |
-| Sep 22 | 6 | 353 | 0 |
-| Sep 29 | 17 | 72 | 6 |
-| Oct 6 (festival week) | 11 | 0 | 7 |
-
-Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. Ordering by last year's calendar week stocked this line for the wrong week.
+**Chart: one store, one mooncake box, Mid-Autumn 2025.** Stocked for 2024's peak, out of stock for 2025's. Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025, so ordering by last year's calendar week stocked this line for the wrong week.
 
 **Speaker notes**
 - **TELL:** "Here's where your money leaks, and why."
-- **SHOW:** $17.8M a year in lost sales, $10.3M of it on peak gifts. Then one store-SKU line: in 2025 the shelf was stocked to 2024's peak week. Customers came two weeks later, and the line was out of stock 6 and 7 days in its two peak weeks.
+- **SHOW:** $17.8M a year in lost sales, $10.3M of it on the gifts customers buy for festivals. Then one line from one store: the order followed 2024's peak week, customers came two weeks later, and the shelf was empty for most of the festival fortnight.
 - **TELL:** "That isn't a bad manager. It's the calendar. The festival moved and the order didn't."
 
 ---
 
-## Slide 4 · Why it's hard today: three things in the way
+## Slide 3 · Why it's hard today: three things in the way
 
-1. **Fragmented feeds:** POS, ERP inventory, product catalog, store master, holiday calendar. Each has its own owner, format, and refresh cycle. Even your store IDs differ: `DT001` vs `L0001`. *With Databricks:* Lakeflow reconciles all five into one governed gold table.
-2. **Stockouts hide demand.** When the shelf is empty, sales stop, so your history records what sold, not what customers wanted. *With Databricks:* the forecast learns from weeks with stock on the shelf.
-3. **The usual fix: six tools.** ETL tool, warehouse, ML platform, OLTP database, BI/chat, app hosting. Each hop adds a copy, a handoff, and another set of permissions to keep in sync. *With Databricks:* one platform and one governed data flow.
+1. **Fragmented feeds.** POS, ERP inventory, product catalog, store master and holiday calendar each have their own owner, format and refresh cycle; even the store IDs differ. *What it costs you:* no single view of demand, so every forecast starts from a spreadsheet.
+2. **Stockouts hide demand.** When the shelf is empty, sales stop, so history records what sold, not what customers wanted. *What it costs you:* history understates the peak, so next year's order is short again.
+3. **The usual fix: six tools.** ETL tool, warehouse, ML platform, OLTP database, BI/chat, app hosting. *What it costs you:* slow, costly projects, and access rules that drift apart.
 
 **Speaker notes**
 - **TELL:** "Three reasons this is harder than it looks."
-- **SHOW:** The feeds don't share keys. History undercounts demand exactly when shelves are empty. And the usual answer is a chain of six tools, each with its own copy of the data and its own permissions.
-- **TELL:** "Databricks fixes the first two in the data and the model. The third is a platform choice, and it's what lets the loop close."
+- **SHOW:** The data doesn't line up across systems. The history is wrong exactly when it matters, because empty shelves record zero sales. And the usual answer is a chain of six tools, each with its own copy of the data and its own permissions.
+- **TELL:** "So the question isn't just 'can we forecast'. It's 'can we get a trusted forecast into the order, on data the CIO can govern'. That's what Databricks is for."
 
 ---
 
-## Slide 5 · How it works: one platform, end to end
+## Slide 4 · How Databricks helps: what this project delivers
 
-Your systems keep running; they just drop files. The five feeds (POS sales, ERP inventory, product catalog, store master, holiday calendar) go into one **Databricks Data Intelligence Platform** (one governed data flow):
+**Business objectives · VP Merchandising**
 
-| Step | Product | What it does | Proof label |
-|---|---|---|---|
-| **Unify** | Lakeflow | Bronze, silver, gold; quality expectations | 0 mismatched weeks |
-| **Predict** | Mosaic AI · MLflow | Forecast + p90 band; registered, versioned, and compared with the live model before promotion | Festival-aligned |
-| **Decide** | Lakebase + App | Exception-based queue; every decision audited | ~15% need you |
-| **Ask** | Genie | Natural language; runs as the user, SQL shown | No ticket needed |
+| Objective | Target | How |
+|---|---|---|
+| Win back peak-gift sales | **$2–3M/yr** (20–30% of today's peak-gift lost sales) | Holiday-aware forecast: order for the week the festival falls |
+| Manager time where it matters | **~15%** of order lines need a decision | Exception-based ordering app; the routine rest accepted in one step |
+| No extra waste | Expiry and markdowns held **flat** | Buffers capped by shelf life |
 
-- **Loop:** manager decisions flow back to gold, so next week's forecast learns. This is the most prominent element on the slide.
-- **Unity Catalog governs every step:** lineage and permissions, plus a **row filter** (store and region scope) and a **column mask** (unit cost) on the gold recommendations table. The app applies the same Unity Catalog mapping to its Lakebase reads.
-- **Who uses it:** store manager (own store's exceptions), regional planner (one region), head-office analyst (all stores, with Genie), executive (outcome KPIs).
+**Technical objectives · CIO**
+
+| Objective | How | Products |
+|---|---|---|
+| One governed view of demand | Five source systems unified and quality-checked in one place | Lakeflow · Unity Catalog |
+| An explainable forecast inside ordering | Each recommended order reaches the manager with its reasons; every decision is recorded | Mosaic AI · Lakebase · Databricks Apps |
+| Self-service without new risk | Plain-language questions, with the same permissions in the app, SQL and Genie | Genie · Unity Catalog |
 
 **Speaker notes**
-- **TELL:** "One platform, four steps, and a loop."
-- **SHOW:** Your systems just drop files. Lakeflow unifies them, and gold matches source with zero mismatched weeks. Mosaic AI forecasts each store and SKU against the festival, tracked in MLflow, and each new model is registered, versioned, and compared with the live model before it is promoted. Lakebase and the app put each line in front of the right manager, but only the ~15% that need judgement. Genie answers on the same governed tables. Then the red arrow: decisions flow back to gold for the next run. Unity Catalog sits underneath all of it.
+- **TELL:** "Here's what this project sets out to deliver, for each of you."
+- **SHOW (VP):** $2–3M a year is the target: winning back 20–30% of what you lose on peak gifts today. Your managers look only at the lines that need judgement, about one in seven. And we hold waste flat, because the extra buffer never exceeds what the shelf life allows.
+- **SHOW (CIO):** One governed view of demand across your five systems. A forecast that arrives inside the ordering process with its reasons, and a record of every decision. And self-service questions that respect the same permissions everywhere.
+- **TELL:** "Next, the platform that delivers all six on one governed data flow."
+
+---
+
+## Slide 5 · How Databricks helps: one governed platform, from source to order
+
+Proposed architecture, left to right:
+
+| Column | Products | Role |
+|---|---|---|
+| **Eastwind source systems** | POS sales, ERP inventory, product catalog, store master, holidays | Your systems keep running as they are |
+| **Data ingestion** | Lakeflow Connect; Auto Loader on UC Volumes | Managed CDC from the POS and ERP databases; catalog, store and holiday files load incrementally |
+| **Lakehouse · Medallion** | Bronze → Silver → Gold, built by Lakeflow Spark Declarative Pipelines | Raw history → cleansed and conformed (store IDs matched) → weekly demand by store, product and channel. Quality checks quarantine bad records before they reach the forecast |
+| **Intelligence · Serving** | Mosaic AI · MLflow; Lakebase; Databricks SQL | Holiday-aware forecast with a risk buffer; orders to approve and manager decisions in Postgres; a serverless warehouse on Gold. Decisions flow back to Gold (dashed arrow) |
+| **Business users · AI agents** | Databricks App; Genie Agent | Review exceptions and approve orders; ask questions in plain language on governed data |
+
+- **Unified governance band:** Unity Catalog for access control, row filters and column masks, lineage, auditing and the model registry.
+- **Orchestration band:** Lakeflow Jobs runs the weekly cycle (refresh data → forecast → recommend orders → serve to the app) on Delta Lake and serverless compute.
+
+**Speaker notes**
+- **TELL:** "Left to right is your data's journey, from your five systems to an approved order. Underneath are the two things that hold it together: one governance layer and one scheduler."
+- **SHOW (business altitude, ~45 s):** Your systems keep running. Lakeflow brings their data in and cleans it up, so there's one trusted view of demand. Mosaic AI forecasts every store and product against the festival, not last year's calendar. Lakebase puts each order in front of the right manager, and only the ones that need judgement. Genie answers questions on the same governed data. And every decision comes back to Gold, so you can see where managers trust the forecast and where they override it.
+- **SHOW (technical altitude, if the CIO leans in):** Lakeflow Connect pulls CDC from the POS and ERP databases; master data and the holiday calendar arrive as files that Auto Loader picks up incrementally. Declarative pipelines build Bronze, Silver and Gold, with expectations that quarantine bad records. The model is tracked in MLflow and registered in Unity Catalog, and a new version replaces the live one only if it passes a gate. One weekly Lakeflow job runs the cycle end to end.
 - **TELL:** "No export to a second vendor and back. [CIO], the store and region scope is a real Unity Catalog row filter and the cost mask is a real column mask; I'll show you both live."
+- **If asked "is this what the prototype runs?":** "The prototype runs every stage on this diagram. Its sources are synthetic file drops, so ingestion uses Auto Loader; Lakeflow Connect is how we'd connect to your live POS and ERP databases. It lands in the same Bronze tables, so nothing downstream changes."
 
 ---
 
 ## Slide 6 · Outcome 1 (unify and predict): right quantity, right week
 
 1. **Aligned to the festival:** the forecast compares this year with last year's festival weeks, not last year's calendar weeks.
-2. **A buffer sized to the risk:** every line carries a p90 plan-for quantity, so safety stock grows into the peak.
-3. **Fewer empty shelves:** in the holiday backtest, modelled lost sales fell in all 6 season and channel windows.
+2. **A buffer sized to the risk:** every order carries a buffer sized to the risk, so safety stock grows into the peak.
+3. **Fewer empty shelves:** stock lands in the lead-up weeks, when customers actually buy.
 
-**Chart: Zhongshan Shop · Classic Lotus Mooncake Box · 2026.** Volume moves into the lead-up weeks.
-
-| Week of (2026) | Same week last year | New forecast (units) |
-|---|---|---|
-| Sep 7 | 14 | 188 |
-| Sep 14 | 85 | 416 |
-| Sep 21 (festival week) | 353 | 241 |
-| Sep 28 | 504 | 10 |
-
-The forecast units are from the latest weekly run. Mid-Autumn 2026 is Sep 25.
+**Chart: one store and gift box, 2026.** Last year's calendar puts the volume in the festival week and the week after; the new forecast moves it into the two lead-up weeks. Mid-Autumn 2026 falls on Sep 25.
 
 **Speaker notes**
 - **TELL:** "The first outcome: the right quantity in the right week."
-- **SHOW:** The same store and box. Last year's calendar would order 353 and 504 for the festival week and the week after, when demand has already passed. The forecast puts the volume in the two lead-up weeks: 188, then 416. The p90 plan-for adds buffer where the risk is. And when we replayed two holiday seasons, modelled lost sales fell in every season and channel.
+- **SHOW:** The same store and box. Last year's calendar would put the big orders in the festival week and the week after, when demand has already passed. The forecast moves the volume into the lead-up weeks, and adds a buffer where the risk is.
 - **TELL:** "Your shelves are full when customers arrive, not a week after."
 
 ---
 
 ## Slide 7 · Outcome 2 (decide): managers review only the exceptions
 
-Two crops from the live Databricks App, captured read-only on 24 Oct 2026:
-1. **231 of 1,561 lines need you.** The 1,330 routine lines follow the forecast and can be accepted in one step (the queue header with "Accept all routine").
-2. **Why this line needs you:** peak gift at risk, $22.5K of sales if not ordered; high value, $12.1K at cost (the Zhongshan Shop × Classic Lotus Mooncake Box line sheet).
-3. **Why this quantity:** Mid-Autumn in 3 weeks, forecast 15.9x recent sales. Model v6.
+Two crops from the Databricks App:
+1. **Only the exceptions need you.** About one line in seven is flagged; routine lines follow the forecast and are accepted in one step.
+2. **Why this line needs you:** each flagged line says why, for example a peak gift at risk or an order big enough to check.
+3. **Why this quantity:** reasons in plain words, such as an upcoming festival or low stock cover, so managers can trust or override it.
 
 **Speaker notes**
 - **TELL:** "The second outcome: your managers spend their time only where it matters. I'll switch to the live app now."
 - **SHOW:** Follow the run-of-show below (beats 1–5).
-- **TELL:** "About 15% of lines get a human look, with the reason in plain words. The rest go through in one step. The Accept / Adjust / Reject buttons sit below this view, and I'll use them live."
+- **TELL:** "A human looks at the lines that need judgement, with the reason in plain words. The rest go through in one step, and every decision is recorded."
 
 ---
 
 ## Slide 8 · Outcome 3 (ask, governed): ask anything, see only your stores
 
-**Ask Genie:** "Which highway stores face the highest Mid-Autumn stockout risk?" The answer is Taian Service Area N: 6 SKUs, $56,791 at risk. Genie runs as you, on governed gold tables, with the SQL shown.
+**Ask Genie:** "Which highway stores face the highest Mid-Autumn stockout risk?" Genie lists the highway kiosks most at risk, ranked by sales at stake. It runs as you, on governed gold tables, with the SQL shown.
 
 **Viewing as: same table, different access**
 
-| Persona | Store-SKUs visible | Unit cost |
+| Persona | Sees | Unit cost |
 |---|---|---|
-| Head-office analyst | 2,247 | Visible |
-| Regional planner, North | 782 | Visible |
-| Store manager, Zhongshan Shop | 31 | Masked |
+| Head-office analyst | All stores | Visible |
+| Regional planner, North | North region only | Visible |
+| Store manager, Zhongshan Shop | Own store only | Masked |
 
-The inset shows the live "Viewing as Store Manager · Zhongshan Shop L0001" strip and the governance drawer, where both the app (Lakebase) and the Unity Catalog row filter count 31 of 2,247 rows. The row filter and column mask sit on the gold recommendations table; the app applies the same mapping to its Lakebase reads.
+**One set of permissions, enforced everywhere:** in the app, in SQL and in Genie, defined once in Unity Catalog as a row filter and a column mask.
 
-**For the CIO:** 0 mismatched weeks, gold vs source · 40 of 40 planted bad records quarantined · spoofed identity ignored; out-of-scope decisions refused.
+**For the CIO:** lineage from every order back to its source system · bad records quarantined before they reach the forecast · every manager decision audited.
 
 **Speaker notes**
 - **TELL:** "The third outcome: anyone can ask a question, and everyone sees only what they should."
-- **SHOW:** Genie answers a planner's question in plain language and shows its SQL. Then "Viewing as": the same gold table returns 2,247 store-SKUs to head office, 782 to the North planner, and 31 to the Zhongshan store manager, with unit cost masked. The governance drawer proves the app and Unity Catalog agree.
+- **SHOW:** Genie answers a planner's question in plain language and shows its SQL. Then "Viewing as": head office sees every store, the North planner sees the North region, and the Zhongshan store manager sees one store, with unit cost hidden.
 - **TELL:** "One governance model in Unity Catalog for your data, not six permission systems to keep in sync."
 
 ---
@@ -192,38 +183,38 @@ The inset shows the live "Viewing as Store Manager · Zhongshan Shop L0001" stri
 
 | Today | With Databricks |
 |---|---|
-| Order by gut feel and last year's calendar week | Order for the festival week, with a p90 buffer sized to the risk |
+| Order by gut feel and last year's calendar week | Order for the festival week, with a buffer sized to the risk |
 | Peak gifts run out before the festival | Volume lands in the lead-up weeks, when customers buy |
 | Every line approved by hand | Review the ~15% of lines that need you; accept the routine rest in one step |
 | POS, ERP, catalog, store, and holiday data apart, with no single view | One governed view in Unity Catalog; ask Genie, and decisions flow back to gold |
 
-**Suggested next step: plan your next order week together.** Your POS and ERP teams drop the five feeds, your planners review the first queue with us, and you see your own peak-gift exposure before the next Lunar New Year.
+**Suggested next step: plan your next order week together.** Connect your POS and ERP, review the first order week with your planners, and see your own peak-gift exposure before the next Lunar New Year.
 
 **Speaker notes**
 - **TELL:** "Here's what your Monday looks like with this in place."
 - **SHOW:** Four rows: order for the festival week instead of last year's calendar, stock the lead-up instead of running out, review only the exceptions instead of every line, and one governed view of your five sources instead of separate systems.
-- **TELL:** "The next step is simple. Your teams drop the feeds and we sit with your planners on the first order week, so you see your own exposure before the next Lunar New Year."
+- **TELL:** "The next step is simple. We connect your POS and ERP and sit with your planners on the first order week, so you see your own exposure before the next Lunar New Year."
 
 ---
 
 ## Live demo run-of-show (about 8 minutes)
 
-Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (what it means for the business). Read live values off the screen; the figures here are from the latest evidence run (`evidence/EVIDENCE.txt`, refreshed 24 Oct 2026; see its §1b live snapshot).
+Each beat is TELL (what you're about to show) → SHOW (the click) → LAND (what it means for the business). Read live values off the screen and keep the talk at outcome level; build-level figures are in `evidence/EVIDENCE.txt` if the CIO asks.
 
 | # | TELL | SHOW | LAND (business meaning) |
 |---|---|---|---|
-| 1 | "This is the one screen your managers open on Monday." | Header (order week, data loaded, model v6) and the KPI tiles: 481 of 908 peak lines need an order, $3.60M of peak sales at risk. | You see the exposure in dollars before anyone orders. |
-| 2 | "Only some lines need a person." | Needs review: "231 of 1,561 lines need you"; routine bar "1,330 routine lines · $1.72M at cost". Point to Accept all routine and **don't press it**. | Your managers' time goes to the ~15% that need judgement. |
-| 3 | "Let's go to one region and one store." | Region = North (82 need review, 462 routine), then Zhongshan Shop. | Each manager works their own queue. |
-| 4 | "Here's the mooncake box from the slides." | Open Classic Lotus Mooncake Box. Point to the forecast peaking in the lead-up weeks (188, 416), where last year's calendar orders 353 and 504 for the festival week and after. | The order lands before customers arrive, not after. |
-| 5 | "Here's why a manager can trust it." | The reason ("Mid-Autumn in 3 weeks – forecast 15.9x recent sales · Stock covers 0.2 of the 3 weeks needed · Holiday timing adds 5 units") and "Why this line needs you" ($22.5K peak sales at risk; $12.1K at cost). Then Accept, or adjust with a required reason. | The forecast explains itself in plain words, which drives adoption. Every decision is audited and flows back to gold. |
-| 6 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" The top answer in testing was Taian Service Area N, 6 SKUs, $56,791. Open the SQL. | Self-serve answers on governed data, running as the user, with no ticket. |
-| 7 | "Now, who sees what." | Viewing as → Store Manager · Zhongshan Shop L0001: "2 of 20 lines need you", unit cost masked. Open "How UC enforces this": app 31 / 2,247 rows, UC row filter 31 / 2,247 rows, and the live row filter and mask definitions. Switch to Regional Planner · North (782 store-SKUs). | One governance model: each person sees only their stores, cost stays private, and the app and Unity Catalog agree. |
+| 1 | "This is the one screen your managers open on Monday." | Header (order week, when data was loaded) and the KPI tiles: peak lines needing an order and peak sales at risk. | You see the exposure in dollars before anyone orders. |
+| 2 | "Only some lines need a person." | Needs review: the short list of lines that need a person; the routine bar below it. Point to Accept all routine and **don't press it**. | Your managers' time goes to the ~15% that need judgement. |
+| 3 | "Let's go to one region and one store." | Region = North, then Zhongshan Shop. | Each manager works their own queue. |
+| 4 | "Here's the mooncake box from the slides." | Open Classic Lotus Mooncake Box. Point to the forecast peaking in the lead-up weeks, where last year's calendar orders for the festival week and after. | The order lands before customers arrive, not after. |
+| 5 | "Here's why a manager can trust it." | The plain-words reason (festival in 3 weeks, stock covers too little) and "Why this line needs you" (peak sales at risk, high value). Then Accept, or adjust with a required reason. | The forecast explains itself in plain words, which drives adoption. Every decision is audited and flows back to gold. |
+| 6 | "Planners can just ask." | Ask Genie: "Which highway stores face the highest Mid-Autumn stockout risk?" Read the top stores off the answer, then open the SQL. | Self-serve answers on governed data, running as the user, with no ticket. |
+| 7 | "Now, who sees what." | Viewing as → Store Manager · Zhongshan Shop: only that store's lines, unit cost masked. Open "How UC enforces this": the app and the Unity Catalog row filter return the same rows, with the live filter and mask definitions. Switch to Regional Planner · North. | One governance model: each person sees only their stores, cost stays private, and the app and Unity Catalog agree. |
 | 8 | "Back to your outcomes." | Return to Viewing as → Me and the KPI tiles. | More peak-gift sales, managers on exceptions only, and one platform your CIO can govern. |
 
 **Optional CIO beat (only if asked):**
 - *TELL:* "Where does this number come from?"
-- *SHOW:* Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables (577 lineage rows). Then the row filter `governance.rf_store_scope` and mask `governance.mask_unit_cost` on the table.
+- *SHOW:* Catalog Explorer lineage from `gold.replenishment_recommendations_current` back through `gold.weekly_demand_features` to the silver POS and inventory tables . Then the row filter `governance.rf_store_scope` and mask `governance.mask_unit_cost` on the table.
 - *LAND:* every recommended order traces back to its source rows, under one set of controls.
 
 **CIO aside (beats 5 and 7):**

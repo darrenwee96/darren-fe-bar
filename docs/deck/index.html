@@ -15,6 +15,11 @@
     .deck { display: block; padding: 0; }
     .page { break-after: page; page-break-after: always; }
     .page:last-child { break-after: auto; page-break-after: auto; }
+    /* Blurred shadows print as grey rectangles in macOS Preview; use borders instead. */
+    .page * { box-shadow: none !important; }
+    .card, .kpi, .shot, .mk { border: 1px solid var(--db-line); }
+    .card.navy, .kpi.hl { border-color: var(--db-navy); }
+    .tl .dot { outline: 1px solid var(--db-line); }
   }
   body.single .deck { padding: 0; gap: 0; }
   body.single .page { display: none; }
@@ -50,6 +55,16 @@
   .fix { min-height: 72px; box-sizing: border-box; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--db-line); font-size: 16px; line-height: 1.45; color: var(--db-navy); }
   .fix b { color: var(--db-lava); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 4px; }
 
+  .obj { display: grid; grid-template-columns: 136px 1fr; gap: 16px; padding: 12px 0; border-top: 1px solid var(--db-line); }
+  .obj:first-of-type { margin-top: 12px; }
+  .obj .ob { white-space: nowrap; font-size: 30px; font-weight: 700; letter-spacing: -.02em; color: var(--db-navy); line-height: 1.1; }
+  .obj .ob small { font-size: 16px; font-weight: 500; letter-spacing: 0; }
+  .navy .obj { border-top-color: #33505A; grid-template-columns: 48px 1fr; }
+  .navy .obj .ob { font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: #FFC9BF; }
+  .navy .obj .h { color: #fff; }
+  .navy .obj .d { color: #C9D3D7; }
+  .navy .obj .chip { background: #2A4650; color: #fff; }
+  .obj .chip { align-self: flex-start; }
   /* KPI tiles */
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
   .kpi { min-height: 328px; box-sizing: border-box; background: #fff; border: 1px solid var(--db-line); border-radius: 12px; box-shadow: var(--shadow-sm); padding: 32px 32px 24px; display: flex; flex-direction: column; gap: 8px; }
@@ -120,45 +135,40 @@
   .beat:last-child { border-bottom: 0; }
   .beat .n { font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--db-lava); line-height: 1.2; }
 
-.arc { width: 1120px; height: 488px; display: grid; grid-template-columns: 120px 1fr 160px; column-gap: 24px; font-family: var(--font-sans); color: var(--db-ink); }
-.arc * { box-sizing: border-box; }
-.arc .side { display: flex; flex-direction: column; gap: 8px; justify-content: center; position: relative; }
-.arc .side-h { font-size: 12px; font-weight: 700; color: var(--db-navy); line-height: 1.4; margin-bottom: 4px; }
-.arc .src span { display: block; font-size: 12px; font-weight: 700; color: var(--db-navy); background: #fff; border: 1px solid var(--db-line); border-radius: 4px; padding: 8px; margin-bottom: 8px; }
-.arc .src span:last-child { margin-bottom: 0; }
-.arc .into { position: absolute; top: 50%; margin-top: -6px; width: 24px; }
-.arc .band { background: #fff; border: 2px solid var(--db-navy); border-radius: 12px; padding: 16px 24px 16px; display: flex; flex-direction: column; box-shadow: var(--shadow-md); }
-.arc .band-h { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--db-line); margin-bottom: 16px; }
-.arc .band-h .name { font-size: 16px; font-weight: 700; color: var(--db-navy); }
-.arc .band-h .tag { margin-left: auto; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-ink-muted); }
-.arc .stages { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24px; }
-.arc .st { background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 4px; position: relative; height: 232px; }
-.arc .st .ics { display: flex; gap: 8px; height: 32px; }
-.arc .st .ics img { width: 32px; height: 32px; }
-.arc .st .verb { font-size: 24px; font-weight: 700; color: var(--db-navy); line-height: 1.2; margin-top: 8px; }
-.arc .st .prod { font-size: 12px; font-weight: 700; color: var(--db-ink-muted); }
-.arc .st ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.arc .st li { font-size: 12px; line-height: 1.35; color: var(--db-ink-soft); padding-left: 12px; position: relative; }
-.arc .st li::before { content: ""; position: absolute; left: 0; top: 6px; width: 4px; height: 4px; border-radius: 1px; background: var(--db-coral); }
-.arc .st .chip { margin-top: auto; align-self: flex-start; font-size: 12px; font-weight: 700; color: var(--db-green-700); background: #DDF3EA; border-radius: 4px; padding: 4px 8px; }
-.arc .st:not(:last-child)::after { content: ""; position: absolute; right: -21px; top: 31px; width: 14px; height: 2px; background: var(--db-coral); }
-.arc .st:not(:last-child)::before { content: ""; position: absolute; right: -22px; top: 27px; border-left: 7px solid var(--db-coral); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
-.arc .loop { position: relative; height: 64px; }
-.arc .loop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.arc .loop .pill { position: absolute; left: 37.5%; top: 24px; transform: translateX(-50%); background: var(--db-lava); color: #fff; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 4px 16px; white-space: nowrap; }
-.arc .uc { margin-top: 8px; background: var(--db-navy); border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: 32px 1fr; column-gap: 16px; row-gap: 8px; align-items: center; }
-.arc .uc .r2 { display: flex; align-items: center; gap: 8px; }
-.arc .uc .r2 span { flex: none; font-size: 12px; font-weight: 700; color: #fff; background: var(--db-lava); border-radius: 4px; padding: 2px 8px; }
-.arc .uc .r2 .n { flex: 1; margin-left: 8px; }
-.arc .uc img { width: 32px; height: 32px; grid-row: span 2; }
-.arc .uc .t { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.arc .uc .t span { font-size: 12px; font-weight: 700; color: #fff; border: 1px solid #4A636B; border-radius: 4px; padding: 2px 8px; }
-.arc .uc .t span.hl { background: var(--db-lava); border-color: var(--db-lava); }
-.arc .uc .n { font-size: 12px; color: #C9D3D7; line-height: 1.4; }
-.arc .who { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--db-line); border-radius: 8px; padding: 12px 8px; }
-.arc .who svg { flex: none; }
-.arc .who b { display: block; font-size: 12px; color: var(--db-navy); line-height: 1.3; }
-.arc .who i { display: block; font-style: normal; font-size: 12px; color: var(--db-ink-soft); line-height: 1.3; margin-top: 2px; }
+.ax { width: 1120px; height: 492px; position: relative; font-family: var(--font-sans); color: var(--db-ink); }
+.ax * { box-sizing: border-box; }
+.ax .ax-pnl { position: absolute; top: 34px; height: 352px; background: var(--db-oat-light); border: 1px solid var(--db-line); border-radius: 10px; }
+.ax .ax-pnl > .ax-h { position: absolute; left: 12px; top: 9px; font-size: 12px; font-weight: 700; color: var(--db-navy); white-space: nowrap; }
+.ax .ax-plat { position: absolute; left: 188px; top: 0; width: 932px; height: 492px; background: #fff; border: 1px solid var(--db-line); border-radius: 14px; }
+.ax .ax-plat-h { position: absolute; left: 16px; top: 8px; right: 16px; display: flex; align-items: center; gap: 10px; }
+.ax .ax-plat-h img { height: 16px; width: auto; }
+.ax .ax-plat-h b { font-size: 13px; color: var(--db-navy); }
+.ax .ax-plat-h i { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--db-ink-muted); }
+.ax .ax-pnl.ax-users { background: #FFF3F0; border-color: #FBC9BE; }
+.ax .ax-c { position: absolute; background: #fff; border: 1px solid var(--db-line); border-radius: 8px; padding: 8px 10px; }
+.ax .ax-c .ax-r { display: flex; align-items: center; gap: 8px; }
+.ax .ax-c .ax-i { flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--db-oat-light); border: 1px solid var(--db-line); display: flex; align-items: center; justify-content: center; }
+.ax .ax-c .ax-i img, .ax .ax-c .ax-i svg { width: 16px; height: 16px; }
+.ax .ax-c b { display: block; font-size: 13px; font-weight: 700; color: var(--db-navy); line-height: 1.2; }
+.ax .ax-c p { margin: 5px 0 0; font-size: 11px; line-height: 1.3; color: var(--db-ink-soft); }
+.ax .ax-c .ax-who { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ax .ax-c .ax-who span { font-size: 11px; font-weight: 700; color: var(--db-navy); background: var(--db-oat-medium); border-radius: 4px; padding: 2px 6px; }
+.ax .ax-tile { position: absolute; top: 70px; height: 210px; width: 96px; border-radius: 8px; border: 1.5px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px; gap: 8px; }
+.ax .ax-tile b { font-size: 18px; font-weight: 700; color: var(--db-navy); }
+.ax .ax-tile p { margin: 0; font-size: 11px; line-height: 1.35; color: var(--db-ink-soft); }
+.ax .ax-br { left: 380px; background: #FCE6DF; border-color: #F2A08F; }
+.ax .ax-si { left: 488px; background: #EEEDE9; border-color: #C9C5BE; }
+.ax .ax-go { left: 596px; background: #FFF1D1; border-color: #E9C46A; }
+.ax .ax-band { position: absolute; left: 204px; width: 904px; height: 40px; border-radius: 8px; background: var(--db-oat-light); border: 1px solid var(--db-line); display: grid; grid-template-columns: 150px 150px 1fr; align-items: center; column-gap: 12px; padding: 0 12px; }
+.ax .ax-band > b { font-size: 13px; font-weight: 700; color: var(--db-navy); }
+.ax .ax-band .ax-p { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--db-line); border-radius: 6px; height: 28px; padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--db-navy); }
+.ax .ax-band .ax-p img { width: 16px; height: 16px; }
+.ax .ax-band .ax-t { font-size: 12px; color: var(--db-ink-soft); white-space: nowrap; overflow: hidden; }
+.ax .ax-band.ax-uc { background: var(--db-navy); border-color: var(--db-navy); }
+.ax .ax-band.ax-uc > b { color: #fff; }
+.ax .ax-band.ax-uc .ax-t { color: #C9D3D7; }
+.ax .ax-band.ax-uc .ax-t em { font-style: normal; color: #fff; font-weight: 700; }
+.ax svg.ax-wires { position: absolute; left: 0; top: 0; width: 1120px; height: 492px; overflow: visible; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -178,49 +188,16 @@
   <img src="assets/illustration-nodal-02.svg" alt="" style="position:absolute;right:72px;top:96px;height:288px;opacity:.95;">
   <div class="footer"><span>Prepared for your VP Merchandising and CIO</span><span>October 2026</span></div>
 </div></section>
-
-<!-- 2 · What you get -->
+<!-- 2 · The problem -->
 <section class="page" id="s2"><div class="slide">
-  <span class="eyebrow">Your outcome</span>
-  <div class="title">What you get</div>
-  <div class="rule"></div>
-  <div class="kpis">
-    <div class="kpi hl">
-      <span class="lab">Peak-gift sales to win back</span>
-      <span class="num">$2–3M<small>/yr</small></span>
-      <span class="what">The opportunity in fuller festival shelves</span>
-      <span class="proof">Expected: 20–30% of the $10.3M/yr you lose on peak gifts today</span>
-    </div>
-    <div class="kpi">
-      <span class="lab">Manager time</span>
-      <span class="num">~15%</span>
-      <span class="what">of order lines need a manager. The rest are routine</span>
-      <span class="proof">231 of 1,561 lines this order week need a decision</span>
-    </div>
-    <div class="kpi">
-      <span class="lab">Seen before the week starts</span>
-      <span class="num">$3.6M</span>
-      <span class="what">of peak-gift sales flagged as at risk</span>
-      <span class="proof">481 of 908 peak-gift lines need an order this week</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px;">
-    <div class="d" style="border-left:3px solid var(--db-coral);padding-left:16px;"><b style="color:var(--db-navy);">VP Merchandising:</b> full shelves in the festival lead-up, and your managers spend time only where it matters.</div>
-    <div class="d" style="border-left:3px solid var(--db-navy);padding-left:16px;"><b style="color:var(--db-navy);">CIO:</b> one platform from POS files to approved order, governed in Unity Catalog, with no vendor-to-vendor copies.</div>
-  </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>2 / 9</span></div>
-</div></section>
-
-<!-- 3 · The problem -->
-<section class="page" id="s3"><div class="slide">
-  <span class="eyebrow">The problem</span>
+  <span class="eyebrow">The business problem</span>
   <div class="title">Festivals move. Orders don’t.</div>
   <div class="rule tight"></div>
   <div style="display:grid;grid-template-columns:400px 1fr;gap:32px;">
     <div style="display:flex;flex-direction:column;gap:16px;">
       <div class="card" style="border-top:4px solid var(--db-lava);padding:16px 24px;"><span class="big" style="color:var(--db-lava);">$17.8M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">lost sales from empty shelves across your 80 stores</span></div>
-      <div class="card" style="padding:16px 24px;"><span class="big">$10.3M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">of that on peak gifts, 57.5% of all lost sales</span></div>
-      <div class="card navy" style="padding:16px 24px;"><span class="big" style="color:#fff;">18.7–21.1%</span><span class="d" style="color:#C9D3D7;">of peak-gift store-days out of stock in Mid-Autumn 2025, vs 8.6% overall</span></div>
+      <div class="card" style="padding:16px 24px;"><span class="big">$10.3M<span style="font-size:20px;font-weight:500;letter-spacing:0;">/yr</span></span><span class="d">of that on peak gifts, the products customers buy for festivals</span></div>
+      <div class="card navy" style="padding:16px 24px;"><span class="big" style="color:#fff;">1 in 5</span><span class="d" style="color:#C9D3D7;">peak-gift shelves empty at Mid-Autumn, more than twice the usual rate</span></div>
     </div>
     <div class="card" style="padding:24px;gap:12px;">
       <span class="lab">Zhongshan Shop · Classic Lotus Mooncake Box · Mid-Autumn 2025</span>
@@ -266,11 +243,10 @@
     </div>
   </div>
   <div class="source">Mid-Autumn fell on Sep 17 in 2024 and Oct 6 in 2025. Ordering by last year’s calendar week stocked this line for the wrong week.</div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>3 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>2 / 9</span></div>
 </div></section>
-
-<!-- 4 · Why it's hard -->
-<section class="page" id="s4"><div class="slide">
+<!-- 3 · Why it's hard -->
+<section class="page" id="s3"><div class="slide">
   <span class="eyebrow">Why it’s hard today</span>
   <div class="title">Three things in the way</div>
   <div class="rule"></div>
@@ -282,13 +258,13 @@
         <span class="chip">POS</span><span class="chip">ERP inventory</span><span class="chip">Product catalog</span><span class="chip">Store master</span><span class="chip">Holiday calendar</span>
       </div>
       <span class="d">Different owners, formats, and refresh cycles. Even your store IDs differ: <span class="mono">DT001</span> vs <span class="mono">L0001</span>.</span>
-      <div class="fix"><b>With Databricks</b>Lakeflow reconciles all five into one governed gold table.</div>
+      <div class="fix"><b>What it costs you</b>No single view of demand, so every forecast starts from a spreadsheet.</div>
     </div>
     <div class="card" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:var(--db-lava);">02</span>
       <span class="h">Stockouts hide demand</span>
       <span class="d">When the shelf is empty, sales stop. Your history records what sold, not what customers wanted.</span>
-      <div class="fix"><b>With Databricks</b>The forecast learns from weeks with stock on the shelf.</div>
+      <div class="fix"><b>What it costs you</b>History understates the peak, so next year’s order is short again.</div>
     </div>
     <div class="card navy" style="min-height:376px;">
       <span class="mono" style="font-size:16px;color:#FFC9BF;">03</span>
@@ -297,60 +273,91 @@
         <span class="chip" style="background:#2A4650;color:#fff;">ETL tool</span><span class="chip" style="background:#2A4650;color:#fff;">Warehouse</span><span class="chip" style="background:#2A4650;color:#fff;">ML platform</span><span class="chip" style="background:#2A4650;color:#fff;">OLTP database</span><span class="chip" style="background:#2A4650;color:#fff;">BI / chat</span><span class="chip" style="background:#2A4650;color:#fff;">App hosting</span>
       </div>
       <span class="d" style="color:#C9D3D7;">Each hop adds a copy, a handoff, and another set of permissions to keep in sync.</span>
-      <div class="fix" style="color:#fff;border-top-color:#33505A;"><b style="color:#FFC9BF;">With Databricks</b>One platform and one governed data flow.</div>
+      <div class="fix" style="color:#fff;border-top-color:#33505A;"><b style="color:#FFC9BF;">What it costs you</b>Slow, costly projects, and access rules that drift apart.</div>
+    </div>
+  </div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>3 / 9</span></div>
+</div></section>
+<!-- 4 · How Databricks helps -->
+<section class="page" id="s4"><div class="slide">
+  <span class="eyebrow">How Databricks helps</span>
+  <div class="title">What this project delivers</div>
+  <div class="rule tight"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div class="card" style="padding:20px 24px;gap:0;">
+      <span class="lab" style="color:var(--db-lava);">Business objectives · VP Merchandising</span>
+      <div class="obj"><span class="ob">$2–3M<small>/yr</small></span><div><div class="h">Win back peak-gift sales</div><div class="d">Order for the week the festival falls. Target: 20–30% of today’s peak-gift lost sales.</div><span class="chip" style="margin-top:6px;">Holiday-aware forecast</span></div></div>
+      <div class="obj"><span class="ob">~15%</span><div><div class="h">Manager time where it matters</div><div class="d">Only flagged order lines need a decision. The routine rest are accepted in one step.</div><span class="chip" style="margin-top:6px;">Exception-based ordering app</span></div></div>
+      <div class="obj"><span class="ob">Flat</span><div><div class="h">No extra waste</div><div class="d">Fuller festival shelves, with expiry and markdowns held at today’s level.</div><span class="chip" style="margin-top:6px;">Buffers capped by shelf life</span></div></div>
+    </div>
+    <div class="card navy" style="padding:20px 24px;gap:0;">
+      <span class="lab">Technical objectives · CIO</span>
+      <div class="obj"><span class="ob">01</span><div><div class="h">One governed view of demand</div><div class="d">Five source systems unified and quality-checked in one place.</div><span class="chip" style="margin-top:6px;">Lakeflow · Unity Catalog</span></div></div>
+      <div class="obj"><span class="ob">02</span><div><div class="h">An explainable forecast inside ordering</div><div class="d">Each recommended order reaches the manager with its reasons; every decision is recorded.</div><span class="chip" style="margin-top:6px;">Mosaic AI · Lakebase · Apps</span></div></div>
+      <div class="obj"><span class="ob">03</span><div><div class="h">Self-service without new risk</div><div class="d">Plain-language questions, with the same permissions in the app, SQL and Genie.</div><span class="chip" style="margin-top:6px;">Genie · Unity Catalog</span></div></div>
     </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>4 / 9</span></div>
 </div></section>
-
 <!-- 5 · Architecture -->
 <section class="page" id="s5"><div class="slide">
-  <span class="eyebrow">How it works</span>
-  <div class="title">One platform, end to end</div>
+  <span class="eyebrow">How Databricks helps · Architecture</span>
+  <div class="title">One governed platform, from source to order</div>
   <div class="rule tight"></div>
-  <div class="arc">
-  <div class="side">
-    <span class="side-h">Your systems keep running. They just drop files.</span>
-    <div class="src"><span>POS sales</span><span>ERP inventory</span><span>Product catalog</span><span>Store master</span><span>Holiday calendar</span></div>
-    <svg class="into" width="24" height="12" style="right:-24px;"><line x1="2" y1="6" x2="14" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M14,1 L22,6 L14,11 z" fill="#FF5F46"/></svg>
+  <div class="ax">
+  <div class="ax-pnl" style="left:0;width:172px;"><span class="ax-h">Eastwind source systems</span></div>
+  <div class="ax-c" style="left:8px;top:70px;width:156px;height:56px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21z M9.5 8h5 M9.5 12h5"/></svg></span><b>POS sales</b></div><p>Daily sales by store</p></div>
+  <div class="ax-c" style="left:8px;top:134px;width:156px;height:56px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4 M12 12v8"/></svg></span><b>ERP inventory</b></div><p>Stock and receipts</p></div>
+  <div class="ax-c" style="left:8px;top:198px;width:156px;height:56px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9h8v8l-9 9z M15.5 8.5h.01"/></svg></span><b>Product catalog</b></div><p>SKUs and shelf life</p></div>
+  <div class="ax-c" style="left:8px;top:262px;width:156px;height:56px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16l-1.5-4h-13z M5 9v10h14V9 M10 19v-5h4v5"/></svg></span><b>Store master</b></div><p>Three store formats</p></div>
+  <div class="ax-c" style="left:8px;top:326px;width:156px;height:56px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4"/></svg></span><b>Holidays</b></div><p>Festival calendar</p></div>
+
+  <div class="ax-plat">
+    <div class="ax-plat-h"><img src="assets/databricks-logo-full-color.svg" alt="Databricks"><b>Data Intelligence Platform</b><i>Proposed architecture</i></div>
   </div>
-  <div class="band">
-    <div class="band-h">
-      <img src="assets/databricks-logo-full-color.svg" alt="Databricks" style="height:20px;width:auto;">
-      <span class="name">Data Intelligence Platform</span>
-      <span class="tag">One governed data flow</span>
-    </div>
-    <div class="stages">
-      <div class="st"><div class="ics"><img src="assets/lakeflow-icon-full-color.svg" alt=""></div><span class="verb">Unify</span><span class="prod">Lakeflow</span><ul><li>Bronze, silver, gold</li><li>Quality expectations</li></ul><span class="chip">0 mismatched weeks</span></div>
-      <div class="st"><div class="ics"><img src="assets/mosaic-ai-icon-full-color.svg" alt=""></div><span class="verb">Predict</span><span class="prod">Mosaic AI · MLflow</span><ul><li>Forecast + p90 band</li><li>Versioned, compared with the live model</li></ul><span class="chip">Festival-aligned</span></div>
-      <div class="st"><div class="ics"><img src="assets/lakebase-icon-full-color.svg" alt=""><img src="assets/apps-icon-full-color.svg" alt=""></div><span class="verb">Decide</span><span class="prod">Lakebase + App</span><ul><li>Exception-based queue</li><li>Every decision audited</li></ul><span class="chip">~15% need you</span></div>
-      <div class="st"><div class="ics"><img src="assets/genie-icon-full-color.svg" alt=""></div><span class="verb">Ask</span><span class="prod">Genie</span><ul><li>Natural language</li><li>Runs as the user, SQL shown</li></ul><span class="chip">No ticket needed</span></div>
-    </div>
-    <div class="loop">
-      <svg viewBox="0 0 740 64" preserveAspectRatio="none">
-        <defs><marker id="arcLoopHead" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#FF3621"/></marker></defs>
-        <path d="M 466 0 L 466 40 L 84 40 L 84 10" fill="none" stroke="#FF3621" stroke-width="4" stroke-linejoin="round" marker-end="url(#arcLoopHead)"/>
-      </svg>
-      <span class="pill">Manager decisions flow back to gold</span>
-    </div>
-    <div class="uc">
-      <img src="assets/unity-catalog-icon-full-color.svg" alt="">
-      <div class="t">Unity Catalog governs every step: lineage and permissions</div>
-      <div class="r2"><span>Row filter · store and region</span><span>Column mask · unit cost</span><i class="n" style="font-style:normal;">On gold recommendations. The app applies the same mapping to Lakebase reads.</i></div>
-    </div>
-  </div>
-  <div class="side">
-    <svg class="into" width="24" height="12" style="left:-24px;"><line x1="2" y1="6" x2="14" y2="6" stroke="#FF5F46" stroke-width="2"/><path d="M14,1 L22,6 L14,11 z" fill="#FF5F46"/></svg>
-    <span class="side-h">Who uses it</span>
-    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11h16l-2-5H10z M9 11v10h14V11 M13 21v-5h6v5" /></g></svg><div><b>Store manager</b><i>Own store’s exceptions</i></div></div>
-    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 25s-6-6.5-6-11a6 6 0 0 1 12 0c0 4.5-6 11-6 11z" /><circle cx="16" cy="14" r="2.2" /></g></svg><div><b>Regional planner</b><i>One region</i></div></div>
-    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 25V8h8v17 M18 13h5v12 M8 25h17 M13 12h2 M13 16h2 M13 20h2" /></g></svg><div><b>Head-office analyst</b><i>All stores, with Genie</i></div></div>
-    <div class="who"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#EEEDE9"/><g fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 24V9 M9 24h16 M13 20v-4 M17 20v-8 M21 20v-6" /></g></svg><div><b>Executive</b><i>Outcome KPIs</i></div></div>
-  </div>
+
+  <div class="ax-pnl" style="left:204px;width:148px;"><span class="ax-h">Data ingestion</span></div>
+  <div class="ax-c" style="left:212px;top:76px;width:132px;height:96px;"><div class="ax-r"><span class="ax-i"><img src="assets/lakeflow-icon-full-color.svg" alt=""></span><b>Lakeflow Connect</b></div><p>Managed CDC from the POS and ERP databases</p></div>
+  <div class="ax-c" style="left:212px;top:235px;width:132px;height:110px;"><div class="ax-r"><span class="ax-i"><img src="assets/unity-catalog-icon-full-color.svg" alt=""></span><b>Auto Loader</b></div><p>Catalog, store and holiday files land in UC Volumes and load incrementally</p></div>
+
+  <div class="ax-pnl" style="left:368px;width:340px;"><span class="ax-h">Lakehouse · Medallion architecture</span></div>
+  <div class="ax-tile ax-br"><b>Bronze</b><p>Raw data as received, full history</p></div>
+  <div class="ax-tile ax-si"><b>Silver</b><p>Cleansed, conformed, store IDs matched</p></div>
+  <div class="ax-tile ax-go"><b>Gold</b><p>Weekly demand by store, product, channel</p></div>
+  <div class="ax-c" style="left:380px;top:292px;width:312px;height:82px;"><div class="ax-r"><span class="ax-i"><img src="assets/lakeflow-icon-full-color.svg" alt=""></span><b>Lakeflow Spark Declarative Pipelines</b></div><p>Declarative transforms with data quality checks: bad records are quarantined before they reach the forecast</p></div>
+
+  <div class="ax-pnl" style="left:724px;width:176px;"><span class="ax-h">Intelligence · Serving</span></div>
+  <div class="ax-c" style="left:732px;top:70px;width:160px;height:92px;"><div class="ax-r"><span class="ax-i"><img src="assets/mosaic-ai-icon-full-color.svg" alt=""></span><b>Mosaic AI · MLflow</b></div><p>Holiday-aware forecast with a risk buffer</p></div>
+  <div class="ax-c" style="left:732px;top:182px;width:160px;height:100px;"><div class="ax-r"><span class="ax-i"><img src="assets/lakebase-icon-full-color.svg" alt=""></span><b>Lakebase</b></div><p>Orders to approve and manager decisions</p></div>
+  <div class="ax-c" style="left:732px;top:300px;width:160px;height:74px;"><div class="ax-r"><span class="ax-i"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B3139" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6 M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></span><b>Databricks SQL</b></div><p>Serverless warehouse</p></div>
+
+  <div class="ax-pnl ax-users" style="left:916px;width:192px;"><span class="ax-h">Business users · AI agents</span></div>
+  <div class="ax-c" style="left:924px;top:70px;width:176px;height:150px;"><div class="ax-r"><span class="ax-i"><img src="assets/apps-icon-full-color.svg" alt=""></span><b>Databricks App</b></div><p>Review exceptions and approve orders</p><div class="ax-who"><span>Store manager</span><span>Regional planner</span><span>Head office</span><span>Executive</span></div></div>
+  <div class="ax-c" style="left:924px;top:236px;width:176px;height:138px;"><div class="ax-r"><span class="ax-i"><img src="assets/genie-icon-full-color.svg" alt=""></span><b>Genie Agent</b></div><p>Ask questions in plain language on governed data</p></div>
+
+  <div class="ax-band ax-uc" style="top:398px;"><b>Unified governance</b><span class="ax-p"><img src="assets/unity-catalog-icon-full-color.svg" alt="">Unity Catalog</span><span class="ax-t">Access control · <em>Row filters and column masks</em> · Lineage · Auditing · Model registry</span></div>
+  <div class="ax-band" style="top:444px;"><b>Orchestration</b><span class="ax-p"><img src="assets/lakeflow-icon-full-color.svg" alt="">Lakeflow Jobs</span><span class="ax-t">Weekly: refresh data → forecast → recommend orders → serve to the app · Delta Lake · Serverless</span></div>
+
+  <svg class="ax-wires" viewBox="0 0 1120 492">
+    <defs><marker id="axh" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 z" fill="#FF5F46"/></marker></defs>
+    <g fill="none" stroke="#FF5F46" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M164,98 H186 V124"/><path d="M164,162 H186 V124"/><path d="M186,124 H211" marker-end="url(#axh)"/>
+      <path d="M164,226 H186 V290"/><path d="M164,290 H186"/><path d="M164,354 H186 V290"/><path d="M186,290 H211" marker-end="url(#axh)"/>
+      <path d="M344,124 H362 V150 H379" marker-end="url(#axh)"/>
+      <path d="M344,290 H362 V210 H379" marker-end="url(#axh)"/>
+      <path d="M476,175 H487" marker-end="url(#axh)"/>
+      <path d="M584,175 H595" marker-end="url(#axh)"/>
+      <path d="M692,116 H731" marker-end="url(#axh)"/>
+      <path d="M692,262 H714 V337 H731" marker-end="url(#axh)"/>
+      <path d="M812,162 V181" marker-end="url(#axh)"/>
+      <path d="M732,250 H693" stroke-dasharray="4 3" marker-end="url(#axh)"/>
+      <path d="M892,232 H906 V145 H923" marker-end="url(#axh)"/>
+      <path d="M892,337 H906 V305 H923" marker-end="url(#axh)"/>
+    </g>
+  </svg>
 </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>5 / 9</span></div>
 </div></section>
-
 <!-- 6 · Right quantity, right week -->
 <section class="page" id="s6"><div class="slide">
   <span class="eyebrow">Outcome 1 · Unify and predict</span>
@@ -360,8 +367,8 @@
     <div style="display:flex;flex-direction:column;gap:16px;">
       <div class="beats">
         <div class="beat"><span class="n">01</span><div><div class="h">Aligned to the festival</div><div class="d">The forecast compares this year with last year’s festival weeks, not last year’s calendar weeks.</div></div></div>
-        <div class="beat"><span class="n">02</span><div><div class="h">A buffer sized to the risk</div><div class="d">Every line carries a p90 plan-for quantity, so safety stock grows into the peak.</div></div></div>
-        <div class="beat"><span class="n">03</span><div><div class="h">Fewer empty shelves</div><div class="d">In the holiday backtest, modelled lost sales fell in all 6 season and channel windows.</div></div></div>
+        <div class="beat"><span class="n">02</span><div><div class="h">A buffer sized to the risk</div><div class="d">Every order carries a buffer sized to the risk, so safety stock grows into the peak.</div></div></div>
+        <div class="beat"><span class="n">03</span><div><div class="h">Fewer empty shelves</div><div class="d">Stock lands in the lead-up weeks, when customers actually buy.</div></div></div>
       </div>
     </div>
     <div class="card" style="gap:12px;">
@@ -401,12 +408,11 @@
 <text x="418.0" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#3A3838">Sep 28</text>
 <line x1="40" x2="472" y1="216" y2="216" stroke="#8A8580" stroke-width="1"/>
 </svg></div>
-      <span class="small">Forecast units from the latest weekly run. Mid-Autumn 2026 is Sep 25.</span>
+      <span class="small">One store and gift box, units per week. Mid-Autumn 2026 falls on Sep 25.</span>
     </div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Lakeflow, Mosaic AI, MLflow</span><span>6 / 9</span></div>
 </div></section>
-
 <!-- 7 · Managers review only the exceptions -->
 <section class="page" id="s7"><div class="slide">
   <span class="eyebrow">Outcome 2 · Decide</span>
@@ -419,9 +425,9 @@
         <div class="mk" style="left:-16px;top:-16px;">1</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:24px;">
-        <div class="co"><div class="mk">1</div><div><div class="h">231 of 1,561 lines need you</div><div class="d">The 1,330 routine lines follow the forecast and can be accepted in one step.</div></div></div>
-        <div class="co"><div class="mk">2</div><div><div class="h">Why this line needs you</div><div class="d">Peak gift at risk, $22.5K of sales if not ordered. High value, $12.1K at cost.</div></div></div>
-        <div class="co"><div class="mk">3</div><div><div class="h">Why this quantity</div><div class="d">Mid-Autumn in 3 weeks, forecast 15.9x recent sales. Model v6.</div></div></div>
+        <div class="co"><div class="mk">1</div><div><div class="h">Only the exceptions need you</div><div class="d">About one line in seven is flagged. Routine lines follow the forecast and are accepted in one step.</div></div></div>
+        <div class="co"><div class="mk">2</div><div><div class="h">Why this line needs you</div><div class="d">Each flagged line says why: a peak gift at risk, or an order big enough to check.</div></div></div>
+        <div class="co"><div class="mk">3</div><div><div class="h">Why this quantity</div><div class="d">Reasons in plain words, such as an upcoming festival or low stock cover, so managers can trust or override it.</div></div></div>
       </div>
     </div>
     <div style="position:relative;">
@@ -434,9 +440,8 @@
       <div class="mk" style="left:-16px;top:232px;">2</div>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Live Databricks App, captured 24 Oct 2026: review queue and the Zhongshan Shop line</span><span>7 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Databricks App</span><span>7 / 9</span></div>
 </div></section>
-
 <!-- 8 · Ask and govern -->
 <section class="page" id="s8"><div class="slide">
   <span class="eyebrow">Outcome 3 · Ask, governed</span>
@@ -446,17 +451,17 @@
     <div class="card" style="gap:8px;padding:16px 24px;">
       <div style="display:flex;align-items:center;gap:12px;"><img src="assets/genie-icon-full-color.svg" alt="" style="width:32px;height:32px;"><span class="h">Ask Genie</span></div>
       <div style="background:var(--db-oat-light);border:1px solid var(--db-line);border-radius:8px;padding:8px 12px;font-size:16px;line-height:1.4;color:var(--db-navy);">“Which highway stores face the highest Mid-Autumn stockout risk?”</div>
-      <div class="d"><b style="color:var(--db-navy);">Taian Service Area N</b>: 6 SKUs, $56,791 at risk</div>
+      <div class="d">Genie lists the highway kiosks most at risk, ranked by sales at stake.</div>
       <div class="small">Runs as you, on governed gold tables, SQL shown.</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div class="lab" style="color:var(--db-lava);">Viewing as · same table, different access</div>
       <table class="tbl tight">
-        <thead><tr><th>Persona</th><th style="text-align:right;">Store-SKUs visible</th><th>Unit cost</th></tr></thead>
+        <thead><tr><th>Persona</th><th>Sees</th><th>Unit cost</th></tr></thead>
         <tbody>
-          <tr><td>Head-office analyst</td><td class="mono" style="text-align:right;">2,247</td><td>Visible</td></tr>
-          <tr><td>Regional planner, North</td><td class="mono" style="text-align:right;">782</td><td>Visible</td></tr>
-          <tr><td>Store manager, Zhongshan Shop</td><td class="mono" style="text-align:right;">31</td><td><span class="pill no">Masked</span></td></tr>
+          <tr><td>Head-office analyst</td><td>All stores</td><td>Visible</td></tr>
+          <tr><td>Regional planner, North</td><td>North region only</td><td>Visible</td></tr>
+          <tr><td>Store manager, Zhongshan Shop</td><td>Own store only</td><td><span class="pill no">Masked</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -467,19 +472,18 @@
       <img src="assets/app-governance.png" alt="Governance drawer rows: App Lakebase 31 of 2,247 rows; Unity Catalog row filter 31 of 2,247 rows">
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="d" style="color:var(--db-navy);"><b>31 of 2,247 rows</b> for this store manager, in the app and in Unity Catalog.</div>
-      <div class="small">Row filter and column mask on the gold recommendations table; the app applies the same mapping to its Lakebase reads.</div>
+      <div class="d" style="color:var(--db-navy);"><b>One set of permissions, enforced everywhere:</b> in the app, in SQL and in Genie.</div>
+      <div class="small">Defined once in Unity Catalog as a row filter and a column mask.</div>
       <div style="display:flex;flex-direction:column;gap:4px;padding-top:8px;border-top:1px solid var(--db-line);">
         <span class="lab" style="color:var(--db-lava);">For the CIO</span>
-        <span class="d" style="color:var(--db-navy);"><b>0</b> mismatched weeks, gold vs source</span>
-        <span class="d" style="color:var(--db-navy);"><b>40 of 40</b> planted bad records quarantined</span>
-        <span class="d" style="color:var(--db-navy);"><b>Spoofed identity ignored;</b> out-of-scope decisions refused</span>
+        <span class="d" style="color:var(--db-navy);">Lineage from every order back to its source system</span>
+        <span class="d" style="color:var(--db-navy);">Bad records quarantined before they reach the forecast</span>
+        <span class="d" style="color:var(--db-navy);">Every manager decision audited</span>
       </div>
     </div>
   </div>
-  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Genie, Unity Catalog · live app, captured 24 Oct 2026</span><span>8 / 9</span></div>
+  <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment · Genie, Unity Catalog</span><span>8 / 9</span></div>
 </div></section>
-
 <!-- 9 · How your Monday changes -->
 <section class="page" id="s9"><div class="slide white">
   <span class="eyebrow">What changes for you</span>
@@ -488,7 +492,7 @@
   <table class="tbl">
     <thead><tr><th style="width:42%;">Today</th><th>With Databricks</th></tr></thead>
     <tbody>
-      <tr><td>Order by gut feel and last year’s calendar week</td><td>Order for the festival week, with a p90 buffer sized to the risk</td></tr>
+      <tr><td>Order by gut feel and last year’s calendar week</td><td>Order for the festival week, with a buffer sized to the risk</td></tr>
       <tr><td>Peak gifts run out before the festival</td><td>Volume lands in the lead-up weeks, when customers buy</td></tr>
       <tr><td>Every line approved by hand</td><td>Review the ~15% of lines that need you; accept the routine rest in one step</td></tr>
       <tr><td>POS, ERP, catalog, store, and holiday data apart, with no single view</td><td>One governed view in Unity Catalog; ask Genie, and decisions flow back to gold</td></tr>
@@ -499,7 +503,7 @@
       <div class="lab" style="color:#FFC9BF;">Suggested next step</div>
       <div style="font-size:32px;font-weight:700;color:#fff;margin-top:8px;letter-spacing:-.01em;">Plan your next order week together</div>
     </div>
-    <div style="font-size:16px;line-height:1.45;color:#C9D3D7;">Your POS and ERP teams drop the five feeds, your planners review the first queue with us, and you see your own peak-gift exposure before the next Lunar New Year.</div>
+    <div style="font-size:16px;line-height:1.45;color:#C9D3D7;">Connect your POS and ERP, review the first order week with your planners, and see your own peak-gift exposure before the next Lunar New Year.</div>
   </div>
   <div class="footer"><span>Eastwind Gourmet · Forecast-driven replenishment</span><span>9 / 9</span></div>
 </div></section>
